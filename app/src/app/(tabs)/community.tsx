@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Palette, Spacing } from '@/constants/theme';
+import { InsightPalette as Palette, Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { timeAgo } from '@/lib/format';
 
@@ -63,7 +63,7 @@ export default function CommunityScreen() {
         </Pressable>
       </View>
       <View style={styles.tabs}>
-        <SegmentedTabs tabs={[...TABS]} value={tab} onChange={(t) => setTab(t as (typeof TABS)[number])} />
+        <SegmentedTabs variant="insight" tabs={[...TABS]} value={tab} onChange={(t) => setTab(t as (typeof TABS)[number])} />
       </View>
       <FlatList
         data={feedQuery.data?.posts ?? []}
@@ -75,11 +75,12 @@ export default function CommunityScreen() {
           feedQuery.isLoading ? (
             <View style={{ padding: 16, gap: 12 }}>
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} style={{ height: 120, borderRadius: 12 }} />
+                <Skeleton key={i} style={{ height: 120, borderRadius: 16, backgroundColor: Palette.soft }} />
               ))}
             </View>
           ) : (
             <EmptyState
+              variant="insight"
               title={tab === 'Following' ? 'No posts from people you follow' : 'No posts yet'}
               subtitle={tab === 'Following' ? 'Follow traders to fill this feed.' : 'Be the first to share a market idea.'}
             />
@@ -143,21 +144,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: { color: Palette.text, fontSize: 24, fontWeight: '800' },
+  title: { color: Palette.text, fontSize: 26, lineHeight: 34, fontWeight: '400', letterSpacing: -0.3 },
   compose: {
     backgroundColor: Palette.accent,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
+    minHeight: 40,
+    justifyContent: 'center',
     paddingVertical: 8,
     borderRadius: 8,
   },
-  composeText: { color: '#fff', fontWeight: '700' },
+  composeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   tabs: { paddingHorizontal: Spacing.three, marginBottom: Spacing.two },
   card: {
     marginHorizontal: Spacing.three,
     marginBottom: Spacing.three,
     padding: Spacing.three,
     backgroundColor: Palette.card,
-    borderRadius: 12,
+    borderRadius: 16,
+    boxShadow: '0 1px 2px rgba(31,31,30,0.04)',
     borderWidth: 1,
     borderColor: Palette.border,
   },
@@ -165,20 +169,20 @@ const styles = StyleSheet.create({
   avatar: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 10,
     backgroundColor: Palette.accentMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: { color: Palette.accent, fontWeight: '800' },
-  author: { color: Palette.text, fontWeight: '700' },
+  author: { color: Palette.text, fontSize: 14, fontWeight: '600' },
   meta: { color: Palette.textMuted, fontSize: 12, marginTop: 2 },
   follow: { color: Palette.accent, fontWeight: '700', fontSize: 12 },
-  content: { color: Palette.text, fontSize: 15, lineHeight: 22 },
+  content: { color: Palette.body, fontSize: 15, lineHeight: 22 },
   chip: {
     alignSelf: 'flex-start',
     marginTop: 10,
-    backgroundColor: Palette.bgElevated,
+    backgroundColor: Palette.soft,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -186,6 +190,6 @@ const styles = StyleSheet.create({
     borderColor: Palette.border,
   },
   chipText: { color: Palette.accent, fontWeight: '700', fontSize: 12 },
-  actions: { flexDirection: 'row', gap: 16, marginTop: 14 },
-  action: { color: Palette.textSecondary, fontSize: 13, fontWeight: '600' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: Palette.border },
+  action: { color: Palette.textSecondary, fontSize: 13, fontWeight: '500' },
 });

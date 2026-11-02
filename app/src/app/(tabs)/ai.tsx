@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
-import { Fonts } from '@/constants/theme';
+import { Fonts, InsightPalette } from '@/constants/theme';
 import { api, streamAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
 import { useAuth } from '@/store/auth';
@@ -25,12 +25,7 @@ const STARTERS = [
   { title: 'Compare two markets', prompt: 'Compare the latest Bitcoin and Ethereum prices and daily changes. What should I watch?', icon: 'analytics' as const },
 ];
 // Warm, monochrome chat palette.
-const INK = '#1F1F1E';
-const BODY = '#3D3D3A';
-const MUTED = '#8A8A86';
-const PAGE = '#F7F7F5';
-const SOFT = '#EDEDEA';
-const LINE = '#E6E6E2';
+const { text: INK, body: BODY, textMuted: MUTED, bg: PAGE, soft: SOFT, border: LINE } = InsightPalette;
 const LOGO = 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837cb6f4498b.jpg';
 
 function greeting(date = new Date()) {

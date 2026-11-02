@@ -6,7 +6,7 @@ import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Palette, Spacing } from '@/constants/theme';
+import { InsightPalette as Palette, Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
 
 export default function ComposeScreen() {
@@ -47,7 +47,7 @@ export default function ComposeScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen
         options={{
-          headerStyle: { backgroundColor: Palette.bgElevated },
+          headerStyle: { backgroundColor: Palette.bg },
           headerTintColor: Palette.text,
           headerRight: () => (
             <Pressable onPress={() => mutation.mutate()} disabled={!content.trim() || mutation.isPending}>
@@ -84,9 +84,14 @@ export default function ComposeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.bg, padding: Spacing.three },
+  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: Palette.bg, padding: Spacing.three },
   input: {
     minHeight: 160,
+    backgroundColor: Palette.card,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 16,
+    padding: 14,
     color: Palette.text,
     fontSize: 16,
     lineHeight: 24,
@@ -104,7 +109,7 @@ const styles = StyleSheet.create({
     color: Palette.text,
   },
   imgBtn: {
-    backgroundColor: Palette.card,
+    backgroundColor: Palette.soft,
     borderWidth: 1,
     borderColor: Palette.border,
     borderRadius: 10,

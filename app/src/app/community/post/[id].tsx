@@ -5,7 +5,7 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Palette, Spacing } from '@/constants/theme';
+import { InsightPalette as Palette, Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { timeAgo } from '@/lib/format';
 
@@ -56,7 +56,7 @@ export default function PostDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen
         options={{
-          headerStyle: { backgroundColor: Palette.bgElevated },
+          headerStyle: { backgroundColor: Palette.bg },
           headerTintColor: Palette.text,
         }}
       />
@@ -112,11 +112,11 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.bg },
+  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: Palette.bg },
   post: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: Palette.border },
   author: { color: Palette.text, fontWeight: '700' },
   meta: { color: Palette.textMuted, fontSize: 12, marginTop: 2, marginBottom: 10 },
-  content: { color: Palette.text, fontSize: 15, lineHeight: 22 },
+  content: { color: Palette.body, fontSize: 15, lineHeight: 22 },
   chip: {
     marginTop: 10,
     alignSelf: 'flex-start',
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   },
   reply: { marginLeft: 20, backgroundColor: Palette.bgElevated },
   replyBtn: { color: Palette.accent, marginTop: 6, fontWeight: '600', fontSize: 12 },
-  composer: { borderTopWidth: 1, borderTopColor: Palette.border, padding: Spacing.three },
+  composer: { backgroundColor: Palette.bg, borderTopWidth: 1, borderTopColor: Palette.border, padding: Spacing.three },
   replying: { color: Palette.textMuted, marginBottom: 6, fontSize: 12 },
   row: { flexDirection: 'row', gap: 8 },
   input: {

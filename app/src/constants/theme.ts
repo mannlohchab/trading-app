@@ -23,6 +23,24 @@ export const Palette = {
   pill: '#F3F4F8',
 } as const;
 
+/** Shared warm, monochrome theme for Insights and Community. */
+export const InsightPalette = {
+  bg: '#F7F7F5',
+  bgElevated: '#FFFFFF',
+  card: '#FFFFFF',
+  soft: '#EDEDEA',
+  border: '#E6E6E2',
+  borderSubtle: '#E6E6E2',
+  text: '#1F1F1E',
+  body: '#3D3D3A',
+  textSecondary: '#6B6B67',
+  textMuted: '#8A8A86',
+  accent: '#1F1F1E',
+  accentMuted: '#EDEDEA',
+  red: '#DC2626',
+  yellow: '#1F1F1E',
+} as const;
+
 export const Colors = {
   light: {
     text: '#0B0E11',

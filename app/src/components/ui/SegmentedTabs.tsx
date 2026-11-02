@@ -1,17 +1,19 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { Palette, Spacing } from '@/constants/theme';
+import { InsightPalette, Palette, Spacing } from '@/constants/theme';
 
 type Props = {
   tabs: string[];
   value: string;
   onChange: (tab: string) => void;
+  variant?: 'default' | 'insight';
 };
 
-export function SegmentedTabs({ tabs, value, onChange }: Props) {
+export function SegmentedTabs({ tabs, value, onChange, variant = 'default' }: Props) {
+  const warm = variant === 'insight';
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, warm && styles.warmRow]}>
       {tabs.map((tab) => {
         const selected = tab === value;
         return (
@@ -21,7 +23,7 @@ export function SegmentedTabs({ tabs, value, onChange }: Props) {
             style={[styles.tab, selected && styles.tabSelected]}
             accessibilityRole="tab"
             accessibilityState={{ selected }}>
-            <Text style={[styles.label, selected && styles.labelSelected]}>{tab}</Text>
+            <Text style={[styles.label, selected && styles.labelSelected, warm && styles.warmLabel, warm && selected && styles.warmSelected]}>{tab}</Text>
           </Pressable>
         );
       })}
@@ -30,6 +32,9 @@ export function SegmentedTabs({ tabs, value, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
+  warmRow: { backgroundColor: InsightPalette.soft },
+  warmLabel: { color: InsightPalette.textSecondary, fontWeight: '500' },
+  warmSelected: { color: InsightPalette.text, fontWeight: '600' },
   row: {
     flexDirection: 'row',
     backgroundColor: '#EEF0F6',

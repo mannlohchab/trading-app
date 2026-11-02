@@ -1,18 +1,19 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { Palette, Spacing } from '@/constants/theme';
+import { InsightPalette, Palette, Spacing } from '@/constants/theme';
 
 type Props = {
   title: string;
   subtitle?: string;
+  variant?: 'default' | 'insight';
 };
 
-export function EmptyState({ title, subtitle }: Props) {
+export function EmptyState({ title, subtitle, variant = 'default' }: Props) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.title, variant === 'insight' && { color: InsightPalette.text }]}>{title}</Text>
+      {subtitle ? <Text style={[styles.subtitle, variant === 'insight' && { color: InsightPalette.textSecondary }]}>{subtitle}</Text> : null}
     </View>
   );
 }
