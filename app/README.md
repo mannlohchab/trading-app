@@ -1,6 +1,6 @@
 # TradingGurukul App (Expo)
 
-Expo SDK 58 client with forex/crypto market data and INR equity paper trading.
+Expo SDK 58 client with forex/crypto market data and USD paper trading.
 
 ## Run
 

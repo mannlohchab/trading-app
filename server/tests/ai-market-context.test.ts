@@ -19,6 +19,14 @@ test('recognizes crypto names, bounded aliases and forex pair spellings', () => 
   expect(findMentionedInstruments('BTC, BTCUSDT, bitcoin, BTC/USDT').map(i => i.symbol)).toEqual(['BTCUSDT']);
   expect(findMentionedInstruments('absolute solutions and methodology')).toEqual([]);
   expect(findMentionedInstruments('AAPL and EUR/GBP')).toEqual([]);
+  expect(findMentionedInstruments('BTC/USD and BTC / USD')).toEqual([]);
+  expect(findMentionedInstruments('EUR / USD and BTC / USDT').map(i => i.symbol)).toEqual(['EUR/USD', 'BTCUSDT']);
+});
+
+test('a comparison follow-up refreshes both the earlier asset and the newly named asset', async () => {
+  const p = provider();
+  await buildMarketContext({ message: 'Compare it with Ethereum', history: ['Bitcoin price?'] }, p.value);
+  expect(p.calls).toEqual(['BTCUSDT', 'ETHUSDT']);
 });
 
 test('normal chat receives sourced timestamped prices with actual quote currency', async () => {

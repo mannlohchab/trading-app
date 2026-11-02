@@ -37,7 +37,7 @@ function setup(initialDrawings = []) {
     chart: { timeScale: () => timeScale, applyOptions: value => options.push(value), subscribeCrosshairMove() {}, subscribeClick: callback => { chartClicked = callback; } },
     series: { coordinateToPrice: y => 200 - y / transform.y, priceToCoordinate: price => (200 - price) * transform.y },
     candles: [{ time: 1000 }, { time: 1060 }, { time: 1120 }, { time: 4600 }],
-    initialDrawings, drawingKey: 'NSE:NIFTY:5m', tip: { style: {} },
+    initialDrawings, drawingKey: 'BINANCE:BTCUSDT:5m', tip: { style: {} },
     requestAnimationFrame: callback => frames.push(callback), ResizeObserver: class { observe() {} },
   });
   const flush = () => { while (frames.length) frames.shift()(); };
@@ -107,7 +107,7 @@ test('generated chart embeds valid drawing code for every chart type and indicat
   runInNewContext(compiled, { exports, require: () => drawingModule });
   for (const type of ['candle', 'line', 'area']) {
     for (const indicators of [[], ['MA', 'EMA', 'BB', 'VOL']]) {
-      const html = exports.buildChartHtml([{ time: 1000, open: 100, high: 105, low: 99, close: 103, volume: 500 }], type, indicators, 'NIFTY');
+      const html = exports.buildChartHtml([{ time: 1000, open: 100, high: 105, low: 99, close: 103, volume: 500 }], type, indicators, 'BTCUSDT');
       const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
       assert.doesNotThrow(() => new Script(script));
       assert.ok(html.includes('id="tools-toggle"'));

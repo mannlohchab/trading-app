@@ -7,6 +7,14 @@ await import('../../src/db/migrate');
 const { config } = await import('../../src/lib/config');
 const { aiRouter } = await import('../../src/modules/ai/routes');
 const scenario = process.argv[2];
+const { getMarketDataProvider } = await import('../../src/providers/marketData');
+const marketCalls: string[] = [];
+getMarketDataProvider().quote = async (symbol) => {
+  marketCalls.push(symbol);
+  if (scenario === 'market-unavailable') throw new Error('Provider offline');
+  return { symbol, exchange: 'BINANCE', name: 'Bitcoin / Tether', ltp: 70000, open: 69000, high: 71000, low: 68000,
+    close: 69000, change: 1000, changePercent: 1.45, volume: 500, currency: 'USDT', source: 'binance', asOf: 1793577600, stale: false };
+};
 config.cloudflare.accountId = 'test-account';
 config.cloudflare.apiToken = scenario === 'missing-config' ? '' : 'test-token';
 sqlite.run("INSERT INTO users(id,email,username,password_hash) VALUES('test-user','test@example.invalid','test','unused')");
@@ -15,6 +23,7 @@ for (let i = 0; i < 30; i++) {
   sqlite.run('INSERT INTO ai_messages(id,conversation_id,role,content,created_at) VALUES(?,?,?,?,?)',
     [`message-${i}`, 'chat', i % 2 ? 'assistant' : 'user', `Old message ${i}`, '2020-01-01 00:00:00']);
 }
+if (scenario === 'market-followup') sqlite.run("UPDATE ai_messages SET content='What is Bitcoin trading at?' WHERE id='message-28'");
 let sent: any;
 globalThis.fetch = (async (_url, options) => {
   sent = JSON.parse(options!.body as string);
@@ -38,7 +47,7 @@ const res = Object.assign(new EventEmitter(), {
   end() { this.writableEnded = true; },
 });
 const req = Object.assign(new EventEmitter(), {
-  body: { conversationId: 'chat', message: 'My newest question', kind: 'chat' },
+  body: { conversationId: 'chat', message: scenario === 'market-followup' ? 'What is its price now?' : scenario.startsWith('market-') ? 'What is Bitcoin trading at?' : 'My newest question', kind: 'chat' },
   user: { userId: 'test-user' },
 });
 let forwarded: any;
@@ -59,6 +68,18 @@ if (scenario === 'disconnect') {
   assert.match(events.at(-1).message, /00:00 UTC/);
   assert.equal(res.writableEnded, true);
   assert.equal(sqlite.query('SELECT COUNT(*) AS n FROM ai_messages').get().n, 31);
+} else if (scenario.startsWith('market-')) {
+  assert.equal(forwarded, undefined);
+  assert.deepEqual(marketCalls, ['BTCUSDT']);
+  const prompt = sent.messages[0].content;
+  assert.ok(prompt.includes(scenario === 'market-unavailable' ? 'quote unavailable' : '70000 USDT'));
+  if (scenario !== 'market-unavailable') {
+    assert.ok(prompt.includes('2026-11-02T00:00:00.000Z'));
+    assert.ok(prompt.includes('binance'));
+  }
+  assert.equal(sent.messages.at(-1).content, req.body.message);
+  assert.ok(res.output.includes('"type":"done"'));
+  assert.equal(sqlite.query('SELECT COUNT(*) AS n FROM ai_messages').get().n, 32);
 } else {
   assert.equal(forwarded, undefined);
   assert.equal(sent.messages.at(-1).content, 'My newest question');

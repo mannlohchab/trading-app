@@ -12,9 +12,9 @@ function stream(text, chunkSize = 1) {
 
 test('stream preserves split UTF-8 tokens and accepts a final event without a newline', async () => {
   const events = [];
-  await consumeAiStream(stream('data: {"type":"meta","conversationId":"one"}\r\n\r\ndata: {"type":"token","content":"₹100"}\n\ndata: {"type":"done"}'), event => events.push(event));
+  await consumeAiStream(stream('data: {"type":"meta","conversationId":"one"}\r\n\r\ndata: {"type":"token","content":"$100"}\n\ndata: {"type":"done"}'), event => events.push(event));
   assert.deepEqual(events, [
-    { type: 'meta', conversationId: 'one' }, { type: 'token', content: '₹100' }, { type: 'done' },
+    { type: 'meta', conversationId: 'one' }, { type: 'token', content: '$100' }, { type: 'done' },
   ]);
 });
 

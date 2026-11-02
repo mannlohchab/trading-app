@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-for (const scenario of ['history', 'quota', 'missing-config', 'disconnect']) {
+for (const scenario of ['history', 'quota', 'missing-config', 'disconnect', 'market-chat', 'market-followup', 'market-unavailable']) {
   test(`AI chat route: ${scenario}`, async () => {
     // Each scenario gets its own database and module configuration, never the user's data.
     const child = Bun.spawn([process.execPath, 'tests/fixtures/ai-route.ts', scenario], {

@@ -62,7 +62,7 @@ test('demo API, AI and quote subscriptions make no network or real-auth calls', 
   const { subscribeQuotes } = load('../src/lib/socket.ts', {
     './quoteSubscriptions': { QuoteSubscriptions }, 'socket.io-client': { io: unexpected }, './config': { API_URL: 'https://real.invalid' }, './demoMode': { DEMO_MODE: true },
   });
-  subscribeQuotes(['NIFTY'], unexpected)();
+  subscribeQuotes(['BINANCE:BTCUSDT'], unexpected)();
 });
 
 test('live mode still uses the network and never substitutes demo data on failure', async () => {

@@ -27,7 +27,7 @@ test('watchlists, explore, overview and all chart ranges have labeled sample dat
   const explore = await request(demo, '/api/market/explore');
   assert.ok(explore.gainers.length && explore.losers.length);
   for (const [timeframe, range] of [['5m', '1D'], ['1h', '7D'], ['1d', '15D'], ['1d', '1M'], ['1d', '3M']]) {
-    const history = await request(demo, `/api/market/candles/RELIANCE?timeframe=${timeframe}&liveOnly=true`);
+    const history = await request(demo, `/api/market/candles/ETHUSDT?timeframe=${timeframe}&liveOnly=true`);
     assert.equal(history.isDemo, true);
     assert.equal(buildPreviewChart(history, range), null);
     assert.ok(buildPreviewChart(history, range, true)?.points.length > 1);
@@ -35,7 +35,7 @@ test('watchlists, explore, overview and all chart ranges have labeled sample dat
       assert.equal(buildHistoryChart(history), null);
       assert.ok(buildHistoryChart(history, true));
     }
-    const { quote } = await request(demo, '/api/market/quote/RELIANCE');
+    const { quote } = await request(demo, '/api/market/quote/ETHUSDT');
     assert.equal(history.candles.at(-1).close, quote.ltp);
     assert.ok(history.candles.every((c, i, all) => c.high >= Math.max(c.open, c.close) && c.low <= Math.min(c.open, c.close) && (!i || c.time > all[i - 1].time)));
   }
@@ -67,8 +67,11 @@ test('community has posts and comments and supports local interaction', async ()
   assert.ok(detail.comments.length);
   await request(demo, `/api/community/posts/${post.id}/comments`, 'POST', { content: 'A preview comment' });
   assert.equal((await request(demo, `/api/community/posts/${post.id}`)).comments.at(-1).content, 'A preview comment');
-  await request(demo, '/api/community/posts', 'POST', { content: 'My preview post', symbol: 'TCS' });
-  assert.equal((await request(demo, '/api/community/feed?tab=foryou')).posts[0].content, 'My preview post');
+  await request(demo, '/api/community/posts', 'POST', { content: 'My preview post', symbol: 'eurusd' });
+  const [mine] = (await request(demo, '/api/community/feed?tab=foryou')).posts;
+  assert.equal(mine.content, 'My preview post');
+  assert.deepEqual([mine.symbol, mine.exchange], ['EUR/USD', 'FOREX']);
+  await assert.rejects(request(demo, '/api/community/posts', 'POST', { content: 'x', symbol: 'TCS' }), /not included/);
 });
 
 test('sample AI streams labeled answers into conversation history and handles aborts', async () => {
@@ -99,7 +102,7 @@ test('unsupported writes and unknown requests fail instead of contacting the bac
 
 test('demo quote, homepage and Explore share the same intraday prices and session totals', async () => {
   const demo = createDemoApi();
-  for (const symbol of ['NIFTY', 'BANKNIFTY', 'INDIAVIX', 'RELIANCE', 'ITC']) {
+  for (const symbol of ['BTCUSDT', 'DOGEUSDT', 'EUR/USD', 'USD/JPY', 'NZD/USD']) {
     const { quote } = await request(demo, `/api/market/quote/${encodeURIComponent(symbol)}`);
     const { candles } = await request(demo, `/api/market/candles/${encodeURIComponent(symbol)}?timeframe=5m`);
     assert.deepEqual(quote.sparkline, candles.map(c => c.close));
@@ -114,7 +117,7 @@ test('demo quote, homepage and Explore share the same intraday prices and sessio
 test('demo sessions are stable, distinct per instrument and contain advances and pullbacks', async () => {
   const demo = createDemoApi();
   const shapes = [];
-  for (const symbol of ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'INDIAVIX', 'RELIANCE', 'ITC']) {
+  for (const symbol of ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'EUR/USD', 'GBP/USD', 'USD/JPY']) {
     const { quote } = await request(demo, `/api/market/quote/${encodeURIComponent(symbol)}`);
     const prices = quote.sparkline;
     assert.ok(prices.length >= 60);
@@ -127,7 +130,7 @@ test('demo sessions are stable, distinct per instrument and contain advances and
   assert.equal(new Set(shapes).size, shapes.length);
 });
 
-test('demo discovery prioritizes crypto and forex with correct precision and keeps INR portfolio separate', async () => {
+test('demo discovery has only crypto and forex with correct precision and a USD-settled portfolio', async () => {
   const demo = createDemoApi();
   const explore = await request(demo, '/api/market/explore');
   assert.ok(explore.crypto.some(q => q.symbol === 'BTCUSDT' && q.currency === 'USDT'));
@@ -136,5 +139,7 @@ test('demo discovery prioritizes crypto and forex with correct precision and kee
   assert.equal(history.isDemo, true); assert.equal(history.currency, 'USD');
   assert.ok(history.candles.some(c => Math.round(c.close * 100) / 100 !== c.close));
   const portfolio = await request(demo, '/api/trading/portfolio');
-  assert.ok(portfolio.positions.every(p => p.exchange === 'NSE'));
+  assert.ok(portfolio.positions.every(p => ['BINANCE', 'FOREX'].includes(p.exchange)));
+  const { results } = await request(demo, '/api/market/search?q=');
+  assert.ok(results.every(q => ['BINANCE', 'FOREX'].includes(q.exchange) && ['USD', 'USDT', 'JPY', 'CHF', 'CAD'].includes(q.currency)));
 });

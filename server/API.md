@@ -16,9 +16,9 @@ Auth: `Authorization: Bearer <accessToken>` on protected routes.
 
 - `GET /api/market/status`
 - `GET /api/market/search?q=`
-- `GET /api/market/quote/:symbol?exchange=NSE`
+- `GET /api/market/quote/:symbol?exchange=BINANCE`
 - `POST /api/market/quotes` `{ symbols: [{ symbol, exchange? }] }`
-- `GET /api/market/candles/:symbol?timeframe=1d&exchange=NSE`
+- `GET /api/market/candles/:symbol?timeframe=1d&exchange=FOREX`
 - `GET /api/market/overview`
 - `GET /api/market/movers`
 - `GET /api/market/explore`
@@ -28,7 +28,7 @@ Primary exchanges are `BINANCE` and `FOREX`. For example:
 - `/api/market/quote/BTCUSDT?exchange=BINANCE`
 - `/api/market/candles/EUR%2FUSD?exchange=FOREX&timeframe=5m`
 
-Supported crypto: BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT, DOGEUSDT. Forex: EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD. `EURUSD` and `BTC/USDT` aliases normalize to canonical symbols. An omitted exchange resolves supported primary pairs, otherwise defaults to NSE for backward compatibility; explicit exchanges are respected.
+Supported crypto: BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT, DOGEUSDT. Forex: EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD. `EURUSD` and `BTC/USDT` aliases normalize to canonical symbols. An omitted exchange resolves any supported pair; explicit exchanges are respected. Any other symbol or exchange returns `400 INVALID_INSTRUMENT`.
 
 Quotes include `source`, `asOf` (Unix seconds), `currency`, `pricePrecision`, `assetClass`, and optional `stale`/`marketOpen`. Candle responses include `{ candles, isDemo, source, currency, pricePrecision }`; OHLCV times are Unix seconds. Sources are `twelvedata`, `binance`, `angelone`, or `yahoo`. `liveOnly=true` excludes generated prices; it does not guarantee real-time availability. Forex volume is zero because this feed does not provide centralized traded volume.
 
@@ -38,7 +38,7 @@ Twelve Data is configured with `TWELVE_DATA_API_KEY`. Requests use server-side s
 
 Binance public REST supplies initial snapshots/history and exchange precision metadata. REST quotes cache for 10 seconds, history for 30 seconds, exchange metadata for one hour. Active full charts use `fresh=true` to bypass the history snapshot cache; simultaneous fresh requests still coalesce. Client-side reconciliation keeps bars received during a history request and preserves newer stream observations. One combined WebSocket supplies subscribed ticker/kline updates; it reconnects with bounded backoff, detects silence and rotates before the 24-hour connection limit. The Bun WebSocket client handles protocol ping/pong frames. Crypto trading hours are 24/7; this does not imply the connection is healthy.
 
-Legacy NSE/BSE instruments retain Angel One with Yahoo fallback. Unavailable batch quotes are omitted; watchlist entries retain `quote: null` even when all quotes fail. A direct quote/candle request fails rather than fabricating data. MCX contracts are not substituted with overseas futures. Existing INR portfolio valuation fails if a position has no quote.
+Unavailable batch quotes are omitted; watchlist entries retain `quote: null` even when all quotes fail. A direct quote/candle request fails rather than fabricating data. Portfolio valuation fails if a position has no quote.
 
 ## Watchlists (auth)
 
@@ -51,7 +51,9 @@ Legacy NSE/BSE instruments retain Angel One with Yahoo fallback. Unavailable bat
 
 ## Trading / paper (auth)
 
-Existing accounts settle in INR. Forex/crypto order placement and pending execution reject `UNSUPPORTED_ACCOUNT_CURRENCY` before any fill or balance mutation. These markets are data-only; fractional/multi-currency settlement and leveraged trading are not implemented.
+Paper accounts settle in USD. Orders are accepted for instruments quoted in USD or USDT (all crypto pairs; EUR/USD, GBP/USD, AUD/USD, NZD/USD); USDT is treated 1:1 with USD for simulation only. USD/JPY, USD/CHF and USD/CAD are market-data only: order placement and pending execution reject `UNSUPPORTED_ACCOUNT_CURRENCY` before any fill or balance mutation. `quantity` is a positive number with up to 8 decimals (base-currency units, e.g. `0.05` BTC or `10000` EUR). Multi-currency settlement and leveraged trading are not implemented.
+
+Upgrading from a release with Indian markets: the first migration (`PRAGMA user_version` 1) deletes NSE/BSE/MCX watchlist items, untags such posts, clears all INR orders/positions/transactions, and resets every paper account to `DEFAULT_PAPER_BALANCE` USD.
 
 - `GET /api/trading/portfolio`
 - `GET /api/trading/orders`
@@ -86,10 +88,10 @@ Existing accounts settle in INR. Forex/crypto order placement and pending execut
 
 ## Socket.IO
 
-- Client → `subscribe` / `unsubscribe`: arrays such as `["BINANCE:BTCUSDT", "FOREX:EUR/USD", "BSE:TCS"]`. Legacy `"TCS"` maps to `NSE:TCS`.
+- Client → `subscribe` / `unsubscribe`: arrays such as `["BINANCE:BTCUSDT", "FOREX:EUR/USD"]`. A bare supported symbol such as `"BTCUSDT"` resolves to its exchange; unsupported keys are ignored.
 - Client → `subscribe-candles` / `unsubscribe-candles`: arrays such as `["BINANCE:BTCUSDT:5m"]`; all supported chart timeframes are accepted, including case-sensitive `1M`.
 - Server → `quote`: normalized quote, only to interested rooms.
 - Server → `candle`: `{ symbol, exchange, timeframe, candle, eventTime }`. `candle.time` is seconds; `eventTime` preserves Binance milliseconds for ordering.
 - Server → `market-status`: `{ exchange, status }` (`connecting`, `live`, `reconnecting`, `idle`, or `unavailable`). A stream status describes connectivity, not a guarantee that every price is current; inspect `asOf`/`stale`.
 
-Input arrays and per-client quote/candle sets are capped at 50. The crypto upstream union is bounded at 64 streams. Forex and legacy equities poll only subscribed instruments. Clients reference-count interests, keep a bounded union of 50 live quote keys, resubscribe on reconnect, and release listeners on unmount. Excess interests retain periodic REST snapshots with a visible live-limit label; waiting keys are promoted when capacity is released. The former global `quotes` broadcast is removed; clients should use scoped subscriptions. Active chart history is refreshed after stream reconnection and periodically to recover gaps.
+Input arrays and per-client quote/candle sets are capped at 50. The crypto upstream union is bounded at 64 streams. Forex polls only subscribed instruments. Clients reference-count interests, keep a bounded union of 50 live quote keys, resubscribe on reconnect, and release listeners on unmount. Excess interests retain periodic REST snapshots with a visible live-limit label; waiting keys are promoted when capacity is released. The former global `quotes` broadcast is removed; clients should use scoped subscriptions. Active chart history is refreshed after stream reconnection and periodically to recover gaps.

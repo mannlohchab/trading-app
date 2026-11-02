@@ -4,10 +4,10 @@ import { buildPreviewChart, nearestChartPoint, previewLineSegments } from '../sr
 
 const candle = (date, close) => ({ time: Date.parse(date) / 1000, close });
 const candles = [
-  candle('2026-10-29T09:15:00+05:30', 90),
-  candle('2026-10-30T09:15:00+05:30', 100),
-  candle('2026-10-30T09:20:00+05:30', 110),
-  candle('2026-10-30T09:30:00+05:30', 105),
+  candle('2026-10-29T09:15:00Z', 90),
+  candle('2026-10-30T09:15:00Z', 100),
+  candle('2026-10-30T09:20:00Z', 110),
+  candle('2026-10-30T09:30:00Z', 105),
 ];
 
 test('1D selects the latest real session and preserves gaps between observation times', () => {
@@ -20,7 +20,7 @@ test('1D selects the latest real session and preserves gaps between observation 
 });
 
 test('longer ranges include previous sessions without fabricating missing prices', () => {
-  const chart = buildPreviewChart({ isDemo: false, source: 'yahoo', candles }, '7D');
+  const chart = buildPreviewChart({ isDemo: false, source: 'twelvedata', candles }, '7D');
   assert.deepEqual(chart.points.map(p => p.value), [90, 100, 110, 105]);
   assert.equal(chart.start, candles[0].time);
   assert.equal(chart.end, candles[3].time);

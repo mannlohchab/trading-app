@@ -10,11 +10,11 @@ test('prices preserve forex pip precision and explicit crypto quote currency',()
   assert.equal(formatMarketPrice(1.09123,{exchange:'FOREX',symbol:'EUR/USD'}),'1.09123 USD');
   assert.equal(formatMarketPrice(153.125,{exchange:'FOREX',symbol:'USD/JPY'}),'153.125 JPY');
   assert.equal(formatMarketPrice(.00001234,{exchange:'BINANCE',currency:'USDT',pricePrecision:8}),'0.00001234 USDT');
-  assert.equal(formatMarketPrice(100,{exchange:'NSE'}),'₹100.00');
+  assert.equal(formatMarketPrice(100,{exchange:'BINANCE',symbol:'SOLUSDT'}),'100.00 USDT');
 });
-test('crypto and forex do not get classified as stocks',()=>{
+test('watchlist groups only crypto and forex, dropping unsupported exchanges',()=>{
   const g=groupQuotes([{symbol:'BTCUSDT',exchange:'BINANCE'},{symbol:'EUR/USD',exchange:'FOREX'},{symbol:'TCS',exchange:'NSE'}]);
-  assert.equal(g.crypto.length,1);assert.equal(g.forex.length,1);assert.equal(g.stocks.length,1);
+  assert.deepEqual(Object.keys(g),['crypto','forex']);assert.equal(g.crypto.length,1);assert.equal(g.forex.length,1);
 });
 test('crypto mini-chart keeps a rolling day crossing UTC midnight',()=>{
   const chart=buildHistoryChart({isDemo:false,source:'binance',candles:[
@@ -29,16 +29,16 @@ test('shared subscribers reconnect and release upstream interest only after the 
   const m=new QuoteSubscriptions(socket);const got=[];
   const a=m.subscribe(['BINANCE:BTCUSDT'],q=>got.push(q));const b=m.subscribe(['BINANCE:BTCUSDT'],()=>{});
   assert.equal(emitted.filter(e=>e[0]==='subscribe').length,1);
-  handlers.get('quote')({exchange:'NSE',symbol:'BTCUSDT'});assert.equal(got.length,0);
+  handlers.get('quote')({exchange:'FOREX',symbol:'BTCUSDT'});assert.equal(got.length,0);
   handlers.get('quote')({exchange:'BINANCE',symbol:'BTCUSDT'});assert.equal(got.length,1);
   handlers.get('connect')();assert.equal(emitted.filter(e=>e[0]==='subscribe').length,2);
   a();assert.equal(emitted.filter(e=>e[0]==='unsubscribe').length,0);b();assert.equal(emitted.at(-1)[0],'unsubscribe');
 });
 test('quote patches preserve history, distinguish exchanges and ignore old events',()=>{
-  const data={items:[{symbol:'TCS',exchange:'NSE',quote:{symbol:'TCS',exchange:'NSE',ltp:100,asOf:20,sparkline:[90,100]}},{symbol:'TCS',exchange:'BSE',quote:null}]};
-  const updated=patchMarketData(data,{symbol:'TCS',exchange:'NSE',ltp:110,asOf:21});
+  const data={items:[{symbol:'BTCUSDT',exchange:'BINANCE',quote:{symbol:'BTCUSDT',exchange:'BINANCE',ltp:100,asOf:20,sparkline:[90,100]}},{symbol:'BTCUSDT',exchange:'FOREX',quote:null}]};
+  const updated=patchMarketData(data,{symbol:'BTCUSDT',exchange:'BINANCE',ltp:110,asOf:21});
   assert.equal(updated.items[0].quote.ltp,110);assert.deepEqual(updated.items[0].quote.sparkline,[90,100]);assert.equal(updated.items[1].quote,null);
-  assert.equal(patchMarketData(updated,{symbol:'TCS',exchange:'NSE',ltp:95,asOf:19}),updated);
+  assert.equal(patchMarketData(updated,{symbol:'BTCUSDT',exchange:'BINANCE',ltp:95,asOf:19}),updated);
 });
 test('live candles update last bar, append new bars, and ignore older bars',()=>{
   const a=[{time:100,close:1},{time:200,close:2}];
@@ -55,7 +55,7 @@ test('crypto detail preview retains the rolling day across midnight', async()=>{
 test('subscription union is bounded, reports excess, promotes waiting keys and survives reconnect',()=>{
   const events=[];const handlers=new Map();const limits=[];
   const m=new QuoteSubscriptions({emit:(...e)=>events.push(e),on:(e,f)=>handlers.set(e,f),off:e=>handlers.delete(e)});
-  const first=m.subscribe(Array.from({length:50},(_,i)=>`NSE:S${i}`),()=>{});
+  const first=m.subscribe(Array.from({length:50},(_,i)=>`BINANCE:S${i}USDT`),()=>{});
   const second=m.subscribe(['BINANCE:BTCUSDT'],()=>{},n=>limits.push(n));
   handlers.get('connect')();
   assert.ok(events.every(e=>e[1].length<=50));

@@ -13,6 +13,7 @@ import { portfolioSummary } from '../trading/engine';
 import rateLimit from 'express-rate-limit';
 import { param } from '../../lib/params';
 import { hasCloudflareAi } from '../../lib/config';
+import { buildMarketContext } from '../../providers/aiMarketContext';
 
 export const aiRouter = Router();
 aiRouter.use(requireAuth);
@@ -108,33 +109,27 @@ aiRouter.post(
         content: body.message,
       });
 
-      let context = '';
-      if (body.kind === 'analysis' || body.symbol) {
-        const symbol = (body.symbol ?? 'BTCUSDT').toUpperCase();
-        const exchange = body.exchange;
-        const quote = await getMarketDataProvider().quote(symbol, exchange);
-        const candles = await getMarketDataProvider().candles(symbol, '1d', exchange);
-        const last = candles.slice(-5);
-        context += `Observed quote for ${quote.name} (${quote.symbol}): LTP ${quote.ltp} ${quote.currency ?? ''}, change ${quote.changePercent}%, high ${quote.high}, low ${quote.low}, volume ${quote.volume}.\n`;
-        context += `Recent daily closes: ${last.map((c) => c.close).join(', ')}.\n`;
-        context += `Data source: ${quote.source ?? 'unknown'}, observed at ${quote.asOf ?? 'unknown'} Unix seconds; stale: ${quote.stale ?? false}.\n`;
-      }
+      const history = (await db.query.aiMessages.findMany({
+        where: eq(aiMessages.conversationId, conversationId),
+        // SQLite insertion order also resolves messages created within the same second.
+        orderBy: [desc(sql`rowid`)],
+        limit: 12,
+      })).reverse();
+
+      let context = await buildMarketContext({
+        ...body,
+        history: history.slice(0, -1).filter(message => message.role === 'user').map(message => message.content),
+      }, getMarketDataProvider(), controller.signal);
+      context += '\n\n';
       if (body.kind === 'portfolio') {
         const portfolio = await portfolioSummary(req.user!.userId);
         context += `Paper portfolio (USD) equity $${portfolio.equity.toFixed(2)}, cash $${portfolio.cashBalance.toFixed(2)}, unrealized P&L $${portfolio.unrealizedPnl.toFixed(2)}, realized P&L $${portfolio.realizedPnl.toFixed(2)}.\n`;
         context += `Positions: ${portfolio.positions.map((p) => `${p.symbol} x${p.quantity} @${p.avgPrice} LTP ${p.ltp} uPnL ${p.unrealizedPnl.toFixed(2)}`).join('; ') || 'none'}.\n`;
       }
 
-      const history = await db.query.aiMessages.findMany({
-        where: eq(aiMessages.conversationId, conversationId),
-        // SQLite insertion order also resolves messages created within the same second.
-        orderBy: [desc(sql`rowid`)],
-        limit: 12,
-      });
-
       const messages: ChatMessage[] = [
         { role: 'system', content: buildSystemPrompt(context) },
-        ...history.reverse().map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ];
 
       res.setHeader('Content-Type', 'text/event-stream');
