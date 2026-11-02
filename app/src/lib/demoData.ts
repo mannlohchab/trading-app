@@ -164,13 +164,14 @@ export function createDemoApi() {
   ];
   const posts = postContent.map(([symbol, content], i) => ({ id: `preview-post-${i}`, content, symbol, exchange: symbol.includes('/') ? 'FOREX' : 'BINANCE',
     likeCount: [42, 86, 24, 18, 57, 12][i], commentCount: 2, createdAt: ago(1 + i * 3), liked: false, bookmarked: i === 1,
-    isEditorsPick: i === 1 || i === 4, author: authors[i % authors.length] }));
+    imageUrl: undefined as string | undefined, isEditorsPick: i === 1 || i === 4, author: authors[i % authors.length] }));
   type Comment = { id: string; content: string; parentId: string | null; createdAt: string; author: typeof authors[number] };
   const comments: Record<string, Comment[]> = Object.fromEntries(posts.map(post => [post.id, [
     { id: `${post.id}-c1`, content: 'The focus on process really helps. Adding this to my practice journal.', parentId: null, createdAt: ago(0.5), author: authors[2] },
     { id: `${post.id}-c2`, content: 'I’m tracking position size and sector exposure in my paper portfolio too.', parentId: null, createdAt: ago(0.25), author: authors[0] },
   ]]));
   const following = new Set([authors[0].id, authors[1].id]);
+  const enrichPost = (post: typeof posts[number]) => ({ ...post, following: following.has(post.author.id) });
   const sampleAnswer = (kind: AiKind, symbol = 'BTCUSDT') => kind === 'portfolio'
     ? 'Demo portfolio review\n\nYour sample portfolio holds four crypto pairs and one forex position alongside a USD cash reserve. Bitcoin and Ethereum are the largest positions, so most of the risk moves with the broader crypto market.\n\nFor your next review:\n• Compare your allocation with your learning goals.\n• Set a position-size limit before each paper trade.\n• Keep a journal of why you entered and what would change your view.\n\nThis is a prepared sample response for the UI preview, not a live portfolio recommendation.'
     : kind === 'analysis'
@@ -256,30 +257,46 @@ export function createDemoApi() {
       if (parts[1] === 'community') {
         if (parts[2] === 'feed') {
           const tab = url.searchParams.get('tab');
-          return { posts: posts.filter(p => tab === 'editors' ? p.isEditorsPick : tab === 'following' ? following.has(p.author.id) : true) };
+          const offset = Number(url.searchParams.get('offset') ?? 0);
+          const limit = Number(url.searchParams.get('limit') ?? 20);
+          if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('Invalid pagination');
+          const filtered = posts.filter(p => tab === 'editors' ? p.isEditorsPick : tab === 'following' ? following.has(p.author.id) : tab === 'saved' ? p.bookmarked : true);
+          const page = filtered.slice(offset, offset + limit);
+          return { posts: page.map(enrichPost), nextOffset: offset + page.length, hasMore: offset + page.length < filtered.length };
         }
         if (parts[2] === 'users' && parts[4] === 'follow' && method === 'POST') {
+          if (parts[3] === user.id || !authors.some(a => a.id === parts[3])) throw new Error('Cannot follow this user');
           if (following.has(parts[3])) following.delete(parts[3]); else following.add(parts[3]);
           return { following: following.has(parts[3]) };
         }
         if (parts[2] === 'posts') {
           if (parts.length === 3 && method === 'POST') {
+            const content = text('content').trim();
+            if (!content || content.length > 5000) throw new Error('Post must contain 1–5000 characters');
             const tagged = text('symbol') ? quoteFor(text('symbol').replace(/^([A-Z]{3})([A-Z]{3})$/i, '$1/$2')) : undefined;
-            const post = { id: id('post'), content: text('content'), symbol: tagged?.symbol ?? '', exchange: tagged?.exchange ?? '', likeCount: 0,
+            const post = { id: id('post'), content, imageUrl: text('imageUrl') || undefined, symbol: tagged?.symbol ?? '', exchange: tagged?.exchange ?? '', likeCount: 0,
               commentCount: 0, createdAt: new Date().toISOString(), liked: false, bookmarked: false, isEditorsPick: false, author: user };
-            posts.unshift(post); comments[post.id] = []; return { post };
+            posts.unshift(post); comments[post.id] = []; return { post: enrichPost(post) };
           }
           const post = posts.find(p => p.id === parts[3]);
           if (!post) throw new Error('Demo post not found.');
           if (method === 'POST') {
-            if (parts[4] === 'like') { post.liked = !post.liked; post.likeCount += post.liked ? 1 : -1; }
-            else if (parts[4] === 'bookmark') post.bookmarked = !post.bookmarked;
+            if (parts[4] === 'like') { post.liked = !post.liked; post.likeCount += post.liked ? 1 : -1; return { liked: post.liked }; }
+            else if (parts[4] === 'bookmark') { post.bookmarked = !post.bookmarked; return { bookmarked: post.bookmarked }; }
             else if (parts[4] === 'comments') {
-              comments[post.id].push({ id: id('comment'), content: text('content'), parentId: text('parentId') || null, createdAt: new Date().toISOString(), author: user });
+              const content = text('content').trim();
+              const parentId = text('parentId') || null;
+              if (!content || content.length > 2000) throw new Error('Comment must contain 1–2000 characters');
+              if (parentId && !comments[post.id].some(c => c.id === parentId)) throw new Error('Reply must belong to this post');
+              comments[post.id].push({ id: id('comment'), content, parentId, createdAt: new Date().toISOString(), author: user });
               post.commentCount = comments[post.id].length;
+              return { comment: comments[post.id].at(-1) };
+            } else if (parts[4] === 'report') {
+              if (text('reason').trim().length < 3) throw new Error('Please enter a report reason');
+              return { ok: true, message: 'Report submitted for moderation review' };
             } else if (parts[4] !== 'report') throw new Error('This action is not available in demo preview.');
           }
-          return { post, comments: comments[post.id] };
+          return { post: enrichPost(post), comments: comments[post.id] };
         }
       }
       if (url.pathname === '/api/ai/suggestions') return { suggestions: ['How do I size a paper trade?', 'How do forex pips work?', 'Help me build a trading journal.'] };

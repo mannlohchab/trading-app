@@ -1,166 +1,96 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { Text, TextInput } from '@/components/ui/AppText';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { InsightPalette as Palette, Spacing } from '@/constants/theme';
+import { Text, TextInput } from '@/components/ui/AppText';
+import { PostCard } from '@/components/community/PostCard';
+import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { InsightPalette as P } from '@/constants/theme';
 import { api } from '@/lib/api';
+import { refreshCommunity, type CommunityDetail, type CommunityComment } from '@/lib/community';
 import { timeAgo } from '@/lib/format';
+import { useAuth } from '@/store/auth';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const userId = useAuth(s => s.user?.id);
   const [comment, setComment] = useState('');
-  const [replyTo, setReplyTo] = useState<string | undefined>();
-  const qc = useQueryClient();
-
-  const detailQuery = useQuery({
-    queryKey: ['post', id],
-    queryFn: () =>
-      api<{
-        post: {
-          id: string;
-          content: string;
-          symbol?: string | null;
-          likeCount: number;
-          createdAt: string;
-          author: { username: string; displayName: string | null };
-        };
-        comments: {
-          id: string;
-          content: string;
-          parentId: string | null;
-          createdAt: string;
-          author: { username?: string; displayName?: string | null };
-        }[];
-      }>(`/api/community/posts/${id}`),
+  const [replyTo, setReplyTo] = useState<CommunityComment>();
+  const client = useQueryClient();
+  const detail = useQuery({
+    queryKey: ['post', userId, id],
+    queryFn: ({ signal }) => api<CommunityDetail>(`/api/community/posts/${id}`, { signal }),
   });
-
-  const commentMutation = useMutation({
-    mutationFn: () =>
-      api(`/api/community/posts/${id}/comments`, {
-        method: 'POST',
-        body: { content: comment, parentId: replyTo },
-      }),
-    onSuccess: () => {
-      setComment('');
-      setReplyTo(undefined);
-      void qc.invalidateQueries({ queryKey: ['post', id] });
+  const mutation = useMutation({
+    mutationFn: () => api(`/api/community/posts/${id}/comments`, {
+      method: 'POST', body: { content: comment.trim(), parentId: replyTo?.id },
+    }),
+    onSuccess: async () => {
+      setComment(''); setReplyTo(undefined);
+      await refreshCommunity(client);
     },
   });
-
-  const post = detailQuery.data?.post;
-
-  return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <Stack.Screen
-        options={{
-          headerStyle: { backgroundColor: Palette.bg },
-          headerTintColor: Palette.text,
-        }}
-      />
-      <FlatList
-        data={detailQuery.data?.comments ?? []}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          post ? (
-            <View style={styles.post}>
-              <Text style={styles.author}>{post.author.displayName ?? post.author.username}</Text>
-              <Text style={styles.meta}>
-                @{post.author.username} · {timeAgo(post.createdAt)}
-              </Text>
-              <Text style={styles.content}>{post.content}</Text>
-              {post.symbol ? <Text style={styles.chip}>{post.symbol}</Text> : null}
-              <Text style={styles.section}>Comments</Text>
-            </View>
-          ) : (
-            <View />
-          )
-        }
-        renderItem={({ item }) => (
-          <View style={[styles.comment, item.parentId ? styles.reply : null]}>
-            <Text style={styles.author}>{item.author.displayName ?? item.author.username}</Text>
+  const comments = detail.data?.comments ?? [];
+  return <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <Stack.Screen options={{ headerStyle: { backgroundColor: P.bg }, headerTintColor: P.text }} />
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      {detail.error && <ErrorBanner message={detail.error.message || 'Unable to load this post.'} onRetry={() => void detail.refetch()} />}
+      {detail.isPending ? <ActivityIndicator style={styles.loading} color={P.text} /> : <FlatList
+        data={comments}
+        keyExtractor={item => item.id}
+        keyboardShouldPersistTaps="handled"
+        refreshing={detail.isRefetching}
+        onRefresh={() => void detail.refetch()}
+        contentContainerStyle={styles.list}
+        ListHeaderComponent={detail.data ? <>
+          <PostCard post={detail.data.post} />
+          <Text style={styles.section}>Comments ({detail.data.post.commentCount})</Text>
+        </> : undefined}
+        ListEmptyComponent={detail.data ? <Text style={styles.empty}>No comments yet. Start the conversation.</Text> : undefined}
+        renderItem={({ item }) => {
+          const parent = item.parentId ? comments.find(c => c.id === item.parentId) : undefined;
+          return <View style={[styles.comment, item.parentId && styles.reply]}>
+            {parent && <Text style={styles.meta}>Replying to @{parent.author.username}: {parent.content.slice(0, 80)}{parent.content.length > 80 ? '…' : ''}</Text>}
+            <Text style={styles.author}>{item.author.displayName || item.author.username || 'Trader'}</Text>
+            <Text style={styles.meta}>{timeAgo(item.createdAt)}</Text>
             <Text style={styles.content}>{item.content}</Text>
-            <Pressable onPress={() => setReplyTo(item.id)}>
-              <Text style={styles.replyBtn}>Reply</Text>
-            </Pressable>
-          </View>
-        )}
-      />
-      <View style={styles.composer}>
-        {replyTo ? (
-          <Pressable onPress={() => setReplyTo(undefined)}>
-            <Text style={styles.replying}>Replying · tap to cancel</Text>
-          </Pressable>
-        ) : null}
+            <Pressable accessibilityRole="button" disabled={mutation.isPending} onPress={() => setReplyTo(item)} style={styles.replyButton}><Text style={styles.replyText}>Reply</Text></Pressable>
+          </View>;
+        }}
+      />}
+      {detail.data && <View style={styles.composer}>
+        {mutation.error && <ErrorBanner message={mutation.error.message || 'Could not send your comment.'} />}
+        {replyTo && <View style={styles.replyBanner}>
+          <Text style={styles.meta}>Replying to @{replyTo.author.username || 'trader'}</Text>
+          <Pressable accessibilityRole="button" disabled={mutation.isPending} onPress={() => setReplyTo(undefined)} style={styles.replyButton}><Text style={styles.replyText}>Cancel reply</Text></Pressable>
+        </View>}
         <View style={styles.row}>
-          <TextInput
-            style={styles.input}
-            value={comment}
-            onChangeText={setComment}
-            placeholder="Write a comment…"
-            placeholderTextColor={Palette.textMuted}
-          />
-          <Pressable style={styles.send} onPress={() => commentMutation.mutate()} disabled={!comment.trim()}>
-            <Text style={styles.sendText}>Send</Text>
+          <TextInput style={styles.input} value={comment} onChangeText={setComment} placeholder="Write a comment…" accessibilityLabel="Comment" placeholderTextColor={P.textMuted} editable={!mutation.isPending} multiline maxLength={2000} />
+          <Pressable accessibilityRole="button" style={[styles.send, (!comment.trim() || mutation.isPending) && styles.disabled]} onPress={() => mutation.mutate()} disabled={!comment.trim() || mutation.isPending}>
+            <Text style={styles.sendText}>{mutation.isPending ? 'Sending…' : 'Send'}</Text>
           </Pressable>
         </View>
-      </View>
-    </SafeAreaView>
-  );
+        <Text style={styles.counter}>{comment.length}/2000</Text>
+      </View>}
+    </KeyboardAvoidingView>
+  </SafeAreaView>;
 }
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: Palette.bg },
-  post: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: Palette.border },
-  author: { color: Palette.text, fontWeight: '700' },
-  meta: { color: Palette.textMuted, fontSize: 12, marginTop: 2, marginBottom: 10 },
-  content: { color: Palette.body, fontSize: 15, lineHeight: 22 },
-  chip: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    color: Palette.accent,
-    fontWeight: '700',
-    backgroundColor: Palette.card,
-    overflow: 'hidden',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  section: {
-    color: Palette.textSecondary,
-    fontWeight: '700',
-    marginTop: 20,
-    textTransform: 'uppercase',
-    fontSize: 12,
-  },
-  comment: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Palette.borderSubtle,
-  },
-  reply: { marginLeft: 20, backgroundColor: Palette.bgElevated },
-  replyBtn: { color: Palette.accent, marginTop: 6, fontWeight: '600', fontSize: 12 },
-  composer: { backgroundColor: Palette.bg, borderTopWidth: 1, borderTopColor: Palette.border, padding: Spacing.three },
-  replying: { color: Palette.textMuted, marginBottom: 6, fontSize: 12 },
-  row: { flexDirection: 'row', gap: 8 },
-  input: {
-    flex: 1,
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: Palette.text,
-  },
-  send: {
-    backgroundColor: Palette.accent,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-  },
-  sendText: { color: '#fff', fontWeight: '700' },
+  flex: { flex: 1 }, safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: P.bg },
+  loading: { padding: 40 }, list: { paddingTop: 12, paddingBottom: 24 },
+  section: { color: P.text, fontSize: 16, fontWeight: '600', paddingHorizontal: 16, paddingBottom: 12 },
+  empty: { color: P.textSecondary, fontSize: 14, padding: 16 },
+  comment: { paddingHorizontal: 16, paddingTop: 12, borderBottomWidth: 1, borderBottomColor: P.border },
+  reply: { marginLeft: 20, backgroundColor: P.card }, author: { color: P.text, fontWeight: '600', fontSize: 14 },
+  meta: { color: P.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 4 },
+  content: { color: P.body, fontSize: 15, lineHeight: 22 },
+  replyButton: { minHeight: 40, justifyContent: 'center' }, replyText: { color: P.text, fontSize: 12, fontWeight: '600' },
+  composer: { borderTopWidth: 1, borderTopColor: P.border, padding: 12, backgroundColor: P.bg },
+  replyBanner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  row: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
+  input: { flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: P.card, borderWidth: 1, borderColor: P.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: P.text },
+  send: { backgroundColor: P.text, minHeight: 44, borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center' },
+  sendText: { color: '#fff', fontWeight: '600', fontSize: 13 }, disabled: { opacity: 0.4 },
+  counter: { textAlign: 'right', fontSize: 11, color: P.textMuted, marginTop: 4 },
 });

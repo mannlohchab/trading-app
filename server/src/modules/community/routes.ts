@@ -28,6 +28,7 @@ async function enrichPosts(postRows: (typeof posts.$inferSelect)[], viewerId?: s
 
   let liked = new Set<string>();
   let bookmarked = new Set<string>();
+  let following = new Set<string>();
   if (viewerId) {
     const postIds = postRows.map((p) => p.id);
     const likes = await db.query.reactions.findMany({
@@ -36,6 +37,10 @@ async function enrichPosts(postRows: (typeof posts.$inferSelect)[], viewerId?: s
     const marks = await db.query.bookmarks.findMany({
       where: and(eq(bookmarks.userId, viewerId), inArray(bookmarks.postId, postIds)),
     });
+    const followed = await db.query.follows.findMany({
+      where: and(eq(follows.followerId, viewerId), inArray(follows.followingId, userIds)),
+    });
+    following = new Set(followed.map((f) => f.followingId));
     liked = new Set(likes.map((l) => l.postId));
     bookmarked = new Set(marks.map((b) => b.postId));
   }
@@ -46,6 +51,7 @@ async function enrichPosts(postRows: (typeof posts.$inferSelect)[], viewerId?: s
       ...p,
       liked: liked.has(p.id),
       bookmarked: bookmarked.has(p.id),
+      following: following.has(p.userId),
       author: {
         id: author.id,
         username: author.username,
@@ -59,40 +65,28 @@ async function enrichPosts(postRows: (typeof posts.$inferSelect)[], viewerId?: s
 communityRouter.get('/feed', optionalAuth, async (req, res, next) => {
   try {
     const tab = String(req.query.tab ?? 'foryou');
-    const cursor = Number(req.query.offset ?? 0);
-    const limit = Math.min(Number(req.query.limit ?? 20), 50);
-
-    let rows: (typeof posts.$inferSelect)[] = [];
-    if (tab === 'editors') {
-      rows = await db.query.posts.findMany({
-        where: eq(posts.isEditorsPick, true),
-        orderBy: [desc(posts.createdAt)],
-        limit,
-        offset: cursor,
-      });
-    } else if (tab === 'following') {
-      if (!req.user) throw new AppError(401, 'Authentication required');
-      const following = await db.query.follows.findMany({
-        where: eq(follows.followerId, req.user.userId),
-      });
-      const ids = following.map((f) => f.followingId);
-      if (ids.length) {
-        rows = await db.query.posts.findMany({
-          where: inArray(posts.userId, ids),
-          orderBy: [desc(posts.createdAt)],
-          limit,
-          offset: cursor,
-        });
-      }
-    } else {
-      rows = await db.query.posts.findMany({
-        orderBy: [desc(posts.likeCount), desc(posts.createdAt)],
-        limit,
-        offset: cursor,
-      });
+    const offset = Number(req.query.offset ?? 0);
+    const limit = Number(req.query.limit ?? 20);
+    if (!['foryou', 'editors', 'following', 'saved'].includes(tab) ||
+      !Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+      throw new AppError(400, 'Invalid feed tab or pagination');
     }
-
-    res.json({ posts: await enrichPosts(rows, req.user?.userId), nextOffset: cursor + rows.length });
+    let filter;
+    if (tab === 'editors') filter = eq(posts.isEditorsPick, true);
+    if (tab === 'following' || tab === 'saved') {
+      if (!req.user) throw new AppError(401, 'Authentication required');
+      const ids = tab === 'following'
+        ? (await db.query.follows.findMany({ where: eq(follows.followerId, req.user.userId) })).map((f) => f.followingId)
+        : (await db.query.bookmarks.findMany({ where: eq(bookmarks.userId, req.user.userId) })).map((b) => b.postId);
+      if (!ids.length) { res.json({ posts: [], nextOffset: offset, hasMore: false }); return; }
+      filter = inArray(tab === 'following' ? posts.userId : posts.id, ids);
+    }
+    // Stable chronological ordering keeps new posts visible and pagination consistent when likes change.
+    const rows = await db.query.posts.findMany({
+      where: filter, orderBy: [desc(posts.createdAt), desc(posts.id)], limit: limit + 1, offset,
+    });
+    const page = rows.slice(0, limit);
+    res.json({ posts: await enrichPosts(page, req.user?.userId), nextOffset: offset + page.length, hasMore: rows.length > limit });
   } catch (err) {
     next(err);
   }
@@ -133,7 +127,7 @@ communityRouter.post(
   requireAuth,
   validateBody(
     z.object({
-      content: z.string().min(1).max(5000),
+      content: z.string().trim().min(1).max(5000),
       imageUrl: z.string().optional(),
       symbol: z.string().optional(),
       exchange: z.string().optional(),
@@ -186,11 +180,15 @@ communityRouter.post('/posts/:id/like', requireAuth, async (req, res, next) => {
 communityRouter.post(
   '/posts/:id/comments',
   requireAuth,
-  validateBody(z.object({ content: z.string().min(1).max(2000), parentId: z.string().optional() })),
+  validateBody(z.object({ content: z.string().trim().min(1).max(2000), parentId: z.string().optional() })),
   async (req, res, next) => {
     try {
       const post = assertFound(await db.query.posts.findFirst({ where: eq(posts.id, param(req, 'id')) }));
       const body = req.body as { content: string; parentId?: string };
+      if (body.parentId) {
+        const parent = await db.query.comments.findFirst({ where: eq(comments.id, body.parentId) });
+        if (!parent || parent.postId !== post.id) throw new AppError(400, 'Reply must belong to this post');
+      }
       const row = {
         id: id(),
         postId: post.id,
@@ -228,7 +226,7 @@ communityRouter.post('/posts/:id/bookmark', requireAuth, async (req, res, next) 
 communityRouter.post(
   '/posts/:id/report',
   requireAuth,
-  validateBody(z.object({ reason: z.string().min(3).max(500) })),
+  validateBody(z.object({ reason: z.string().trim().min(3).max(500) })),
   async (req, res, next) => {
     try {
       const post = assertFound(await db.query.posts.findFirst({ where: eq(posts.id, param(req, 'id')) }));

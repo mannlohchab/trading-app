@@ -1,195 +1,64 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
-import { Text } from '@/components/ui/AppText';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { Text } from '@/components/ui/AppText';
+import { PostCard } from '@/components/community/PostCard';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { InsightPalette as Palette, Spacing } from '@/constants/theme';
+import { InsightPalette as P } from '@/constants/theme';
 import { api } from '@/lib/api';
-import { timeAgo } from '@/lib/format';
+import type { CommunityPage } from '@/lib/community';
+import { useAuth } from '@/store/auth';
 
-type Post = {
-  id: string;
-  content: string;
-  symbol?: string | null;
-  likeCount: number;
-  commentCount: number;
-  createdAt: string;
-  liked: boolean;
-  bookmarked: boolean;
-  isEditorsPick: boolean;
-  author: { id: string; username: string; displayName: string | null; avatarUrl: string | null };
-};
-
-const TABS = ['For You', "Editors' Picks", 'Following'] as const;
-const TAB_MAP = { 'For You': 'foryou', "Editors' Picks": 'editors', Following: 'following' } as const;
+const TABS = ['For You', "Editors' Picks", 'Following', 'Saved'] as const;
+const TAB_MAP = { 'For You': 'foryou', "Editors' Picks": 'editors', Following: 'following', Saved: 'saved' } as const;
 
 export default function CommunityScreen() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('For You');
-  const qc = useQueryClient();
-  const feedTab = TAB_MAP[tab];
-
-  const feedQuery = useQuery({
-    queryKey: ['feed', feedTab],
-    queryFn: () => api<{ posts: Post[] }>(`/api/community/feed?tab=${feedTab}`),
+  const userId = useAuth(s => s.user?.id);
+  const feed = useInfiniteQuery({
+    queryKey: ['feed', userId, TAB_MAP[tab]],
+    initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) => api<CommunityPage>(`/api/community/feed?tab=${TAB_MAP[tab]}&offset=${pageParam}&limit=20`, { signal }),
+    getNextPageParam: last => last.hasMore ? last.nextOffset : undefined,
   });
-
-  const likeMutation = useMutation({
-    mutationFn: (id: string) => api(`/api/community/posts/${id}/like`, { method: 'POST' }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['feed'] }),
-  });
-  const bookmarkMutation = useMutation({
-    mutationFn: (id: string) => api(`/api/community/posts/${id}/bookmark`, { method: 'POST' }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['feed'] }),
-  });
-  const reportMutation = useMutation({
-    mutationFn: (id: string) =>
-      api(`/api/community/posts/${id}/report`, { method: 'POST', body: { reason: 'Inappropriate content' } }),
-  });
-  const followMutation = useMutation({
-    mutationFn: (userId: string) => api(`/api/community/users/${userId}/follow`, { method: 'POST' }),
-  });
-
-  return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Community</Text>
-        <Pressable style={styles.compose} onPress={() => router.push('/community/compose')}>
-          <Text style={styles.composeText}>Post</Text>
-        </Pressable>
-      </View>
-      <View style={styles.tabs}>
-        <SegmentedTabs variant="insight" tabs={[...TABS]} value={tab} onChange={(t) => setTab(t as (typeof TABS)[number])} />
-      </View>
-      <FlatList
-        data={feedQuery.data?.posts ?? []}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        refreshing={feedQuery.isFetching}
-        onRefresh={() => void feedQuery.refetch()}
-        ListEmptyComponent={
-          feedQuery.isLoading ? (
-            <View style={{ padding: 16, gap: 12 }}>
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} style={{ height: 120, borderRadius: 16, backgroundColor: Palette.soft }} />
-              ))}
-            </View>
-          ) : (
-            <EmptyState
-              variant="insight"
-              title={tab === 'Following' ? 'No posts from people you follow' : 'No posts yet'}
-              subtitle={tab === 'Following' ? 'Follow traders to fill this feed.' : 'Be the first to share a market idea.'}
-            />
-          )
-        }
-        renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => router.push(`/community/post/${item.id}`)}>
-            <View style={styles.cardHeader}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(item.author.displayName ?? item.author.username)[0]?.toUpperCase()}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.author}>{item.author.displayName ?? item.author.username}</Text>
-                <Text style={styles.meta}>
-                  @{item.author.username} · {timeAgo(item.createdAt)}
-                  {item.isEditorsPick ? ' · Editors’ Pick' : ''}
-                </Text>
-              </View>
-              <Pressable onPress={() => followMutation.mutate(item.author.id)}>
-                <Text style={styles.follow}>Follow</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.content}>{item.content}</Text>
-            {item.symbol ? (
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>{item.symbol}</Text>
-              </View>
-            ) : null}
-            <View style={styles.actions}>
-              <Pressable onPress={() => likeMutation.mutate(item.id)}>
-                <Text style={[styles.action, item.liked && { color: Palette.red }]}>
-                  {item.liked ? '♥' : '♡'} {item.likeCount}
-                </Text>
-              </Pressable>
-              <Text style={styles.action}>💬 {item.commentCount}</Text>
-              <Pressable onPress={() => bookmarkMutation.mutate(item.id)}>
-                <Text style={[styles.action, item.bookmarked && { color: Palette.yellow }]}>
-                  {item.bookmarked ? '★' : '☆'}
-                </Text>
-              </Pressable>
-              <Pressable onPress={() => Share.share({ message: item.content })}>
-                <Text style={styles.action}>Share</Text>
-              </Pressable>
-              <Pressable onPress={() => reportMutation.mutate(item.id)}>
-                <Text style={styles.action}>Report</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        )}
-      />
-    </SafeAreaView>
-  );
+  const posts = [...new Map(feed.data?.pages.flatMap(page => page.posts).map(post => [post.id, post])).values()];
+  return <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.header}>
+      <Text style={styles.title}>Community</Text>
+      <Pressable accessibilityRole="button" style={styles.compose} onPress={() => router.push('/community/compose')}><Text style={styles.composeText}>Post</Text></Pressable>
+    </View>
+    <View style={styles.tabs}><SegmentedTabs variant="insight" tabs={[...TABS]} value={tab} onChange={value => setTab(value as typeof tab)} /></View>
+    {feed.error && !feed.isFetchNextPageError && <ErrorBanner message={feed.error.message || 'Unable to load the feed.'} onRetry={() => void feed.refetch()} />}
+    <FlatList
+      data={posts}
+      keyExtractor={post => post.id}
+      contentContainerStyle={styles.list}
+      refreshing={feed.isRefetching && !feed.isFetchingNextPage}
+      onRefresh={() => void feed.refetch()}
+      onEndReached={() => { if (feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError) void feed.fetchNextPage(); }}
+      onEndReachedThreshold={0.3}
+      ListEmptyComponent={feed.isPending
+        ? <View style={styles.loading}>{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} style={{ height: 160, borderRadius: 16, backgroundColor: P.soft }} />)}</View>
+        : feed.isError ? undefined : <EmptyState variant="insight"
+          title={tab === 'Saved' ? 'No saved posts' : tab === 'Following' ? 'No posts from people you follow' : 'No posts yet'}
+          subtitle={tab === 'Saved' ? 'Tap Save on a post to find it here.' : tab === 'Following' ? 'Follow traders from For You to fill this feed.' : 'Be the first to share a market idea.'} />}
+      ListFooterComponent={feed.isFetchingNextPage ? <ActivityIndicator color={P.text} style={styles.footer} />
+        : feed.isFetchNextPageError ? <ErrorBanner message="Could not load more posts." onRetry={() => void feed.fetchNextPage()} /> : undefined}
+      renderItem={({ item }) => <PostCard post={item} onOpen={() => router.push(`/community/post/${item.id}`)} />}
+    />
+  </SafeAreaView>;
 }
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
-  header: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: { color: Palette.text, fontSize: 26, lineHeight: 34, fontWeight: '400', letterSpacing: -0.3 },
-  compose: {
-    backgroundColor: Palette.accent,
-    paddingHorizontal: 16,
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
+  safe: { flex: 1, backgroundColor: P.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
+  header: { paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { color: P.text, fontSize: 26, lineHeight: 34, fontWeight: '400', letterSpacing: -0.3 },
+  compose: { backgroundColor: P.text, paddingHorizontal: 16, minHeight: 40, justifyContent: 'center', borderRadius: 8 },
   composeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  tabs: { paddingHorizontal: Spacing.three, marginBottom: Spacing.two },
-  card: {
-    marginHorizontal: Spacing.three,
-    marginBottom: Spacing.three,
-    padding: Spacing.three,
-    backgroundColor: Palette.card,
-    borderRadius: 16,
-    boxShadow: '0 1px 2px rgba(31,31,30,0.04)',
-    borderWidth: 1,
-    borderColor: Palette.border,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Palette.accentMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: Palette.accent, fontWeight: '800' },
-  author: { color: Palette.text, fontSize: 14, fontWeight: '600' },
-  meta: { color: Palette.textMuted, fontSize: 12, marginTop: 2 },
-  follow: { color: Palette.accent, fontWeight: '700', fontSize: 12 },
-  content: { color: Palette.body, fontSize: 15, lineHeight: 22 },
-  chip: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    backgroundColor: Palette.soft,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: Palette.border,
-  },
-  chipText: { color: Palette.accent, fontWeight: '700', fontSize: 12 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: Palette.border },
-  action: { color: Palette.textSecondary, fontSize: 13, fontWeight: '500' },
+  tabs: { paddingHorizontal: 16, marginBottom: 12 }, list: { paddingBottom: 32 },
+  loading: { padding: 16, gap: 12 }, footer: { padding: 16 },
 });

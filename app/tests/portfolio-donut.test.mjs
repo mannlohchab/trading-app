@@ -18,6 +18,7 @@ function renderDonut(portfolio) {
     'expo-image': { Image: 'Image' },
     'react-native': { View: 'View', Text: 'Text', StyleSheet: { create: styles => styles, absoluteFill: {} } },
     '@/components/ui/GlassIcon': { GlassPressable: 'Pressable' },
+    '@/components/ui/AppText': { Text: 'Text' },
     '@/lib/portfolioAllocation': allocation,
     '@/lib/format': format,
     '@/lib/svgImage': svgImage,

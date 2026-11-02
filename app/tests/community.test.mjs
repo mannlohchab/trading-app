@@ -23,3 +23,15 @@ test('community demo preserves post images and validates replies and empty conte
   await assert.rejects(demo.request(`/api/community/posts/${post.id}/comments`, { method: 'POST', body: { content: 'Reply', parentId: 'missing' } }));
   assert.equal((await demo.request(`/api/community/posts/${post.id}`)).post.commentCount, 0);
 });
+
+test('community mutations invalidate every feed, post detail and profile count without touching markets', async () => {
+  const { QueryClient } = await import('@tanstack/react-query');
+  const { refreshCommunity } = await import('../src/lib/community.ts');
+  const client = new QueryClient();
+  const keys = [['feed', 'viewer', 'foryou'], ['feed', 'viewer', 'following'], ['feed', 'viewer', 'saved'], ['post', 'viewer', 'post-id'], ['profile-overview', 'viewer']];
+  for (const key of [...keys, ['market']]) client.setQueryData(key, { sample: true });
+  await refreshCommunity(client);
+  for (const key of keys) assert.equal(client.getQueryState(key).isInvalidated, true);
+  assert.equal(client.getQueryState(['market']).isInvalidated, false);
+  client.clear();
+});
