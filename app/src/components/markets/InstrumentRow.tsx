@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   identity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 9 },
   names: { flex: 1, minWidth: 0, gap: 5 },
   chart: { alignItems: 'center', flexShrink: 0, gap: 5 },
-  chartCaption: { color: '#9693A2', fontSize: 8 },
+  chartCaption: { color: '#8F96A4', fontSize: 8 },
   symbol: { color: Palette.text, fontSize: 13, fontWeight: '600', letterSpacing: -0.2 },
   name: { color: '#858998', fontSize: 11 },
   right: { alignItems: 'flex-end', flexShrink: 0, gap: 5 },

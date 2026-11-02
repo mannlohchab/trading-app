@@ -116,11 +116,12 @@ aiRouter.post(
         limit: 12,
       })).reverse();
 
-      let context = await buildMarketContext({
+      const market = await buildMarketContext({
         ...body,
         history: history.slice(0, -1).filter(message => message.role === 'user').map(message => message.content),
       }, getMarketDataProvider(), controller.signal);
-      context += '\n\n';
+      let context = market.context + '\n\n';
+      if (market.priceSummary) context += 'The app displays the verified price snapshot above your answer. Do not repeat that section; add only the requested explanation or analysis.\n\n';
       if (body.kind === 'portfolio') {
         const portfolio = await portfolioSummary(req.user!.userId);
         context += `Paper portfolio (USD) equity $${portfolio.equity.toFixed(2)}, cash $${portfolio.cashBalance.toFixed(2)}, unrealized P&L $${portfolio.unrealizedPnl.toFixed(2)}, realized P&L $${portfolio.realizedPnl.toFixed(2)}.\n`;
@@ -138,8 +139,11 @@ aiRouter.post(
       res.flushHeaders?.();
 
       res.write(`data: ${JSON.stringify({ type: 'meta', conversationId })}\n\n`);
+      if (market.priceSummary) {
+        res.write(`data: ${JSON.stringify({ type: 'token', content: market.priceSummary })}\n\n`);
+      }
 
-      const full = await streamWorkersAi(messages, (chunk) => {
+      const full = market.priceSummary + await streamWorkersAi(messages, (chunk) => {
         res.write(`data: ${JSON.stringify({ type: 'token', content: chunk })}\n\n`);
       }, controller.signal);
       controller.signal.throwIfAborted();

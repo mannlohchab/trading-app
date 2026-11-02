@@ -20,10 +20,10 @@ from gi.repository import Rsvg
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets/icons/nucleo-glass"
 SELECTED_COLORS = {
-    "#575757": "#9c8cf2",
-    "#151515": "#6659e8",
-    "#E3E3E5": "#ede9ff",
-    "#BBBBC0": "#bfb5ed",
+    "#575757": "#649df8",
+    "#151515": "#0375cf",
+    "#E3E3E5": "#e3edff",
+    "#BBBBC0": "#a3bef2",
 }
 
 for path in sorted(ASSETS.glob("*.svg")):

@@ -40,7 +40,7 @@ test('unsupported or unrelated newer topics cannot resurrect an older instrument
     { message: 'Explain it further', history: ['Bitcoin price', 'What is position sizing?'] },
   ]) {
     const p = provider();
-    const context = await buildMarketContext(request, p.value);
+    const { context } = await buildMarketContext(request, p.value);
     expect(p.calls).toEqual([]);
     expect(context).not.toContain('70000');
   }
@@ -48,7 +48,7 @@ test('unsupported or unrelated newer topics cannot resurrect an older instrument
 
 test('normal chat receives sourced timestamped prices with actual quote currency', async () => {
   const p = provider();
-  const context = await buildMarketContext({ message: 'What is Bitcoin trading at?' }, p.value);
+  const { context } = await buildMarketContext({ message: 'What is Bitcoin trading at?' }, p.value);
   expect(p.calls).toEqual(['BTCUSDT']);
   expect(context).toContain('70000 USDT');
   expect(context).toContain('binance');
@@ -67,22 +67,41 @@ test('referential follow-ups refresh the previous pair but unrelated questions d
   expect(p.calls).toEqual(['ETHUSDT']);
 });
 
+test('current-price follow-ups resolve the last instruments without an explicit ticker', async () => {
+  for (const message of ["What's the price now?", 'current price', 'What are their prices now?']) {
+    const p = provider();
+    await buildMarketContext({ message, history: ['Bitcoin price?'] }, p.value);
+    expect(p.calls).toEqual(['BTCUSDT']);
+  }
+});
+
+test('price summaries preserve forex precision and clearly label stale quotes', async () => {
+  const p = provider({ quote: async () => ({ ...quote, symbol: 'EUR/USD', exchange: 'FOREX', currency: 'USD',
+    source: 'twelvedata', ltp: 1.08456, pricePrecision: 5, stale: true }) });
+  const result = await buildMarketContext({ message: 'EUR/USD price' }, p.value);
+  expect(result.priceSummary).toContain('1.08456 USD');
+  expect(result.priceSummary).toContain('Last available price');
+  expect(result.priceSummary).toContain('stale');
+  expect(result.priceSummary).toContain('Twelve Data');
+  expect(result.priceSummary).not.toContain('**Current price');
+});
+
 test('explicit market selection works and conflicting exchanges do not silently change the asset', async () => {
   const p = provider();
-  expect(await buildMarketContext({ message: 'Analyze', symbol: 'BTCUSDT', exchange: 'BINANCE', kind: 'analysis' }, p.value)).toContain('70000 USDT');
+  expect((await buildMarketContext({ message: 'Analyze', symbol: 'BTCUSDT', exchange: 'BINANCE', kind: 'analysis' }, p.value)).context).toContain('70000 USDT');
   p.calls.length = 0;
-  expect(await buildMarketContext({ message: 'Analyze', symbol: 'BTCUSDT', exchange: 'FOREX', kind: 'analysis' }, p.value)).toContain('unsupported');
+  expect((await buildMarketContext({ message: 'Analyze', symbol: 'BTCUSDT', exchange: 'FOREX', kind: 'analysis' }, p.value)).context).toContain('unsupported');
   expect(p.calls).toEqual([]);
 });
 
 test('stale and missing data remain explicit; history failure does not discard a quote', async () => {
   const p = provider({ quote: async () => ({ ...quote, stale: true }) });
-  const context = await buildMarketContext({ message: 'Analyze Bitcoin trend' }, p.value);
+  const { context } = await buildMarketContext({ message: 'Analyze Bitcoin trend' }, p.value);
   expect(context).toContain('70000 USDT');
   expect(context).toContain('stale');
   expect(context).toContain('history unavailable');
   const unavailable = provider({ quote: async () => { throw new Error('secret upstream URL'); } });
-  const failure = await buildMarketContext({ message: 'Bitcoin price' }, unavailable.value);
+  const { context: failure } = await buildMarketContext({ message: 'Bitcoin price' }, unavailable.value);
   expect(failure).toContain('quote unavailable');
   expect(failure).not.toContain('secret upstream URL');
   expect(failure).not.toContain('70000');
@@ -91,7 +110,7 @@ test('stale and missing data remain explicit; history failure does not discard a
 test('lookup is bounded, quote-only questions do not spend history credits, and abort stops lookup', async () => {
   let histories = 0;
   const p = provider({ candles: async () => { histories++; return []; } });
-  const context = await buildMarketContext({ message: 'Price of BTC ETH SOL XRP DOGE' }, p.value);
+  const { context } = await buildMarketContext({ message: 'Price of BTC ETH SOL XRP DOGE' }, p.value);
   expect(p.calls).toEqual(['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
   expect(histories).toBe(0);
   expect(context).toContain('limit');

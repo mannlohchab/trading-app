@@ -28,12 +28,14 @@ export function findMentionedInstruments(message: string): Instrument[] {
 }
 
 type Request = { message: string; history?: string[]; symbol?: string; exchange?: string; kind?: string };
+export type MarketContext = { context: string; priceSummary: string };
 
 function conversationSelection(message: string, prior: Instrument[]): Instrument[] {
   const mentioned = findMentionedInstruments(message);
   const pairs = message.match(/\b[a-z0-9]{2,10}\s*\/\s*[a-z0-9]{2,10}\b|\b[a-z0-9]{2,8}(?:usdt|usd)\b/gi) ?? [];
   const unsupported = pairs.some(pair => !resolveInstrument(pair));
-  const refersBack = /\b(it|its|that pair|that coin|that market|those|them|these pairs|same pair)\b|^(?:refresh|update)(?: please)?[.!?]*$/i.test(message);
+  const priceFollowup = /^(?:(?:what(?:'s| is| are)|show(?: me)?|tell me|and)\s+)?(?:the\s+)?(?:(?:current|latest)\s+)?prices?(?:\s+(?:now|right now|today|please))?[.!?]*$/i.test(message.trim());
+  const refersBack = priceFollowup || /\b(it|its|their|that pair|that coin|that market|those|them|these pairs|same pair)\b|^(?:refresh|update)(?: please)?[.!?]*$/i.test(message);
   // An unsupported explicit pair or a new topic resets reference context.
   if (unsupported || !refersBack) return mentioned;
   if (!mentioned.length) return prior;
@@ -51,7 +53,18 @@ function describeQuote(q: Quote): string {
     `Source: ${q.source ?? 'unknown'}; observed at ${time}; ${freshness}.`;
 }
 
-export async function buildMarketContext(request: Request, provider: MarketDataProvider, signal?: AbortSignal): Promise<string> {
+function priceSnapshot(q: Quote, instrument: Instrument): string {
+  const precision = Math.min(12, Math.max(0, Math.trunc(q.pricePrecision ?? instrument.pricePrecision ?? 2)));
+  const price = q.ltp.toLocaleString('en-US', { minimumFractionDigits: precision, maximumFractionDigits: precision });
+  const time = q.asOf && Number.isFinite(q.asOf) ? new Date(q.asOf * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : 'unknown';
+  const current = q.stale === false && time !== 'unknown';
+  const label = current ? 'Current price' : 'Last available price';
+  const source = q.source === 'binance' ? 'Binance' : q.source === 'twelvedata' ? 'Twelve Data' : 'Unknown source';
+  return `**${instrument.symbol} — ${label}: ${price} ${q.currency ?? instrument.currency ?? ''}**\n\n` +
+    `> ${source} · As of ${time}${current ? '' : ' · stale or freshness unknown'}`;
+}
+
+export async function buildMarketContext(request: Request, provider: MarketDataProvider, signal?: AbortSignal): Promise<MarketContext> {
   signal?.throwIfAborted();
   let prior: Instrument[] = [];
   for (const previous of request.history ?? []) prior = conversationSelection(previous, prior);
@@ -59,10 +72,10 @@ export async function buildMarketContext(request: Request, provider: MarketDataP
   if (request.symbol) {
     let selected: Instrument | undefined;
     try { selected = resolveInstrument(request.symbol, request.exchange); } catch { /* Report without substituting another asset. */ }
-    if (!selected) return 'The requested instrument is unsupported on the selected exchange. No quote supplied. Ask for a supported crypto or forex pair; do not substitute a different instrument.';
+    if (!selected) return { context: 'The requested instrument is unsupported on the selected exchange. No quote supplied. Ask for a supported crypto or forex pair; do not substitute a different instrument.', priceSummary: '' };
     instruments = [selected, ...instruments.filter(i => i.symbol !== selected.symbol)];
   }
-  if (!instruments.length) return 'No current market observations supplied for this request. If asked for a price, ask the user to name a supported pair; never use a remembered price as current.';
+  if (!instruments.length) return { context: 'No current market observations supplied for this request. If asked for a price, ask the user to name a supported pair; never use a remembered price as current.', priceSummary: '' };
   const selected = instruments.slice(0, 3);
   const lines = ['Market observations fetched for this turn (a point-in-time snapshot, not a continuous stream):'];
   if (instruments.length > selected.length) lines.push('Lookup limit: only the first three mentioned instruments were fetched; other requested instruments have no current quote.');
@@ -84,5 +97,12 @@ export async function buildMarketContext(request: Request, provider: MarketDataP
     return section;
   }));
   signal?.throwIfAborted();
-  return [...lines, ...sections].join('\n\n');
+  const prices = selected.map((instrument, index) => {
+    const result = quotes[index];
+    return result.status === 'fulfilled' ? priceSnapshot(result.value, instrument) : `**${instrument.symbol}:** Current price unavailable.`;
+  });
+  return {
+    context: [...lines, ...sections].join('\n\n'),
+    priceSummary: `## Latest market prices\n\n${prices.join('\n\n')}\n\n`,
+  };
 }

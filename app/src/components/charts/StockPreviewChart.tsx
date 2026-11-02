@@ -69,18 +69,18 @@ export function StockPreviewChart({ chart, metadata }: { chart: Chart; metadata?
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 18, padding: 14, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ECE8F5' },
-  heading: { fontSize: 16, fontWeight: '600', color: '#514363' },
+  card: { marginTop: 18, padding: 14, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E6EAF7' },
+  heading: { fontSize: 16, fontWeight: '600', color: '#414869' },
   chart: { flexDirection: 'row', height: CHART_HEIGHT, marginTop: 34, marginBottom: 14 },
   axis: { width: 68, justifyContent: 'space-between', paddingRight: 8, marginTop: -5, marginBottom: -5 },
   axisText: { color: '#616375', fontSize: 12, fontVariant: ['tabular-nums'] },
   plot: { flex: 1, marginRight: 5, backgroundColor: '#FCFAFF' },
-  line: { position: 'absolute', height: 2, borderRadius: 1, backgroundColor: '#8370ED' },
+  line: { position: 'absolute', height: 2, borderRadius: 1, backgroundColor: '#3385F2' },
   timeAxis: { flexDirection: 'row', justifyContent: 'space-between', marginLeft: 68, marginRight: 5, marginBottom: 16 },
   grid: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#ececf4' },
-  cursor: { position: 'absolute', bottom: 0, width: 1, backgroundColor: '#bdb3ef' },
-  dot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, marginLeft: -4.5, marginTop: -4.5, backgroundColor: '#8270ee', borderWidth: 2, borderColor: '#fff' },
-  bubble: { position: 'absolute', width: 92, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 16, backgroundColor: '#17171e', boxShadow: '0 3px 7px rgba(20,20,30,0.15)' },
+  cursor: { position: 'absolute', bottom: 0, width: 1, backgroundColor: '#9fbdf4' },
+  dot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, marginLeft: -4.5, marginTop: -4.5, backgroundColor: '#2f85f2', borderWidth: 2, borderColor: '#fff' },
+  bubble: { position: 'absolute', width: 92, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 16, backgroundColor: '#14181e', boxShadow: '0 3px 7px rgba(15,22,30,0.15)' },
   bubbleText: { color: '#fff', textAlign: 'center', fontSize: 12, fontWeight: '600' },
   selected: { color: '#727384', fontSize: 12, textAlign: 'right', marginRight: 5 },
 });

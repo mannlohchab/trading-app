@@ -77,6 +77,12 @@ if (scenario === 'disconnect') {
     assert.ok(prompt.includes('2026-11-02T00:00:00.000Z'));
     assert.ok(prompt.includes('binance'));
   }
+  const events = res.output.split('\n').filter(line => line.startsWith('data:')).map(line => JSON.parse(line.slice(5)));
+  const answer = events.filter(event => event.type === 'token').map(event => event.content).join('');
+  assert.ok(answer.includes(scenario === 'market-unavailable' ? 'Current price unavailable' : '70,000.00 USDT'), 'Fetched prices must be displayed even when the model only says Test answer');
+  if (scenario !== 'market-unavailable') assert.ok(answer.includes('2026-11-02 00:00:00 UTC'));
+  const saved = sqlite.query("SELECT content FROM ai_messages WHERE role='assistant' ORDER BY rowid DESC LIMIT 1").get();
+  assert.equal(saved.content, answer, 'Saved history must retain the displayed price');
   assert.equal(sent.messages.at(-1).content, req.body.message);
   assert.ok(res.output.includes('"type":"done"'));
   assert.equal(sqlite.query('SELECT COUNT(*) AS n FROM ai_messages').get().n, 32);
