@@ -10,7 +10,7 @@ const ticker = { symbol: 'BTCUSDT', lastPrice: '70000.12', openPrice: '69000', h
 const metadata = { symbols: [{ symbol: 'BTCUSDT', status: 'TRADING', baseAsset: 'BTC', quoteAsset: 'USDT',
   filters: [{ filterType: 'PRICE_FILTER', tickSize: '0.01000000' }] }] };
 
-test('pair aliases resolve without silently overriding explicit equity exchanges', () => {
+test('pair aliases resolve and never match a different exchange', () => {
   expect(resolveInstrument('eurusd')).toMatchObject({ symbol: 'EUR/USD', exchange: 'FOREX', currency: 'USD', pricePrecision: 5 });
   expect(resolveInstrument('btc/usdt', 'crypto')).toMatchObject({ symbol: 'BTCUSDT', exchange: 'BINANCE' });
   expect(resolveInstrument('USDJPY', 'FOREX')?.pricePrecision).toBe(3);

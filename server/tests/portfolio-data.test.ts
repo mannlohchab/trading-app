@@ -9,8 +9,8 @@ test('portfolio valuation fails when a position has no market quote instead of u
     realizedPnl: 0, createdAt: '', updatedAt: '',
   });
   const positions = spyOn(db.query.positions, 'findMany').mockResolvedValue([
-    { id: 'test-position', userId: 'test-user', accountId: 'test-account', symbol: 'GOLD', exchange: 'MCX',
-      name: 'Gold', quantity: 1, avgPrice: 76520, realizedPnl: 0, createdAt: '', updatedAt: '' },
+    { id: 'test-position', userId: 'test-user', accountId: 'test-account', symbol: 'ETHUSDT', exchange: 'BINANCE',
+      name: 'Ethereum / Tether', quantity: 0.5, avgPrice: 3200, realizedPnl: 0, createdAt: '', updatedAt: '' },
   ] as any);
   const quotes = spyOn(getMarketDataProvider(), 'quotes').mockResolvedValue([]);
   try {

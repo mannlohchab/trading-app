@@ -20,7 +20,7 @@ type Props = {
 
 export type { ChartCandle };
 
-export function TradingChart({ candles, chartType, indicators, height = 360, symbol = '', pricePrecision = 2, currency = 'INR', drawingKey, drawingStore }: Props) {
+export function TradingChart({ candles, chartType, indicators, height = 360, symbol = '', pricePrecision = 2, currency = 'USD', drawingKey, drawingStore }: Props) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const webview = useRef<WebView<{}>>(null);
   const initialCandles = useRef(candles);

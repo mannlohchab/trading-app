@@ -11,7 +11,7 @@ export const PREVIEW_RANGES = [
 export type PreviewRange = typeof PREVIEW_RANGES[number]['label'];
 export type PreviewPoint = { time: number; value: number; x: number; y: number };
 
-const sessionDate = (time: number) => new Date((time + 19_800) * 1000).toISOString().slice(0, 10);
+const utcDate = (time: number) => new Date(time * 1000).toISOString().slice(0, 10);
 
 export function buildPreviewChart(history: HistoryResponse | undefined, range: PreviewRange, allowDemo = false) {
   if (!history || (history.isDemo !== false && !(allowDemo && history.isDemo === true))) return null;
@@ -26,9 +26,9 @@ export function buildPreviewChart(history: HistoryResponse | undefined, range: P
   const end = sorted[sorted.length - 1][0];
   const days = PREVIEW_RANGES.find(r => r.label === range)!.days;
   const source = history.source ?? history.candles[0]?.source;
-  const date = source === 'twelvedata' || history.assetClass === 'forex' ? (t: number) => new Date(t * 1000).toISOString().slice(0,10) : sessionDate;
+  // Forex 1D is the latest UTC session; crypto (24/7) uses a rolling window.
   const samples = sorted.filter(([time]) => range === '1D' && source !== 'binance' && history.assetClass !== 'crypto'
-    ? date(time) === date(end)
+    ? utcDate(time) === utcDate(end)
     : time >= end - days * 86_400);
   if (samples.length < 2) return null;
   const values = samples.map(([, value]) => value);

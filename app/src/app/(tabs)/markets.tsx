@@ -40,7 +40,7 @@ export default function MarketsScreen() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Watchlist');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState({ crypto: true, forex: true, indices: true, stocks: true, futures: true });
+  const [expanded, setExpanded] = useState({ crypto: true, forex: true });
   const [directory, setDirectory] = useState(false);
   const [pageWidth, setPageWidth] = useState(390);
   const qc = useQueryClient();
@@ -66,7 +66,6 @@ export default function MarketsScreen() {
     enabled: true,
     queryFn: () =>
       api<{
-        indices: QuoteLike[];
         constituents: QuoteLike[];
         crypto?: QuoteLike[];
         forex?: QuoteLike[];
@@ -93,7 +92,6 @@ export default function MarketsScreen() {
         forex?: QuoteLike[];
         sentiment: string;
         volatilityLabel: string;
-        indices: QuoteLike[];
         news: { id: string; title: string; source: string }[];
         events: { id: string; title: string; date: string }[];
         isDemo: boolean;
@@ -197,9 +195,6 @@ export default function MarketsScreen() {
   const cardQuotes = [
     ...grouped.crypto,
     ...grouped.forex,
-    ...grouped.stocks,
-    ...grouped.indices,
-    ...grouped.futures,
     ...(watchlistQuotes.length ? [] : discovery),
   ].slice(0, 6);
   const cardWidth = Math.min(214, Math.max(156, (pageWidth - 20) / 2));
@@ -363,9 +358,6 @@ export default function MarketsScreen() {
               {(itemsQuery.data?.items ?? []).filter(i => !i.quote).map(i => <Pressable key={i.id} onLongPress={() => removeBySymbol(`${i.exchange}:${i.symbol}`)} onPress={() => router.push({pathname:'/stock/[symbol]',params:{symbol:i.symbol,exchange:i.exchange,name:i.name}})} style={{padding:16}}><Text>{i.symbol} · Quote unavailable</Text></Pressable>)}
               <WatchlistSection title="Crypto" quotes={grouped.crypto} expanded={expanded.crypto} onToggle={() => setExpanded(e => ({...e, crypto: !e.crypto}))} onRemove={removeBySymbol} />
               <WatchlistSection title="Forex" quotes={grouped.forex} expanded={expanded.forex} onToggle={() => setExpanded(e => ({...e, forex: !e.forex}))} onRemove={removeBySymbol} />
-              <WatchlistSection title="Indices" quotes={grouped.indices} expanded={expanded.indices} onToggle={() => setExpanded((e) => ({ ...e, indices: !e.indices }))} delayed={Boolean(isDemo)} onRemove={removeBySymbol} />
-              <WatchlistSection title="Stocks" quotes={grouped.stocks} expanded={expanded.stocks} onToggle={() => setExpanded((e) => ({ ...e, stocks: !e.stocks }))} delayed={Boolean(isDemo)} onRemove={removeBySymbol} />
-              <WatchlistSection title="Commodities" quotes={grouped.futures} expanded={expanded.futures} onToggle={() => setExpanded((e) => ({ ...e, futures: !e.futures }))} delayed={Boolean(isDemo)} onRemove={removeBySymbol} />
             </>
           )}
           {tab === 'Explore' &&

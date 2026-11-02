@@ -25,7 +25,7 @@ export function buildChartHtml(
   initialDrawings: ChartDrawing[] = [],
   drawingKey = symbol,
   pricePrecision = 2,
-  currency = 'INR',
+  currency = 'USD',
 ) {
   const data = JSON.stringify(candles);
   pricePrecision = Math.max(0, Math.min(12, pricePrecision));

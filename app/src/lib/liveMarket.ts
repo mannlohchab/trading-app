@@ -13,7 +13,7 @@ export function patchMarketData<T>(data: T, quote: LiveQuote): T {
     return {...value, ...quote} as T;
   }
   let changed = false; const next = {...value};
-  for (const key of ['items','quote','crypto','forex','indices','constituents','gainers','losers','active']) {
+  for (const key of ['items','quote','crypto','forex','constituents','gainers','losers','active']) {
     if (!(key in value)) continue;
     const updated = key === 'quote' && value.quote === null && value.symbol === quote.symbol && value.exchange === quote.exchange
       ? quote : patchMarketData(value[key], quote);

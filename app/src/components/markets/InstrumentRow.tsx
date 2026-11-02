@@ -15,7 +15,7 @@ export type QuoteLike = {
   currency?: string;
   pricePrecision?: number;
   stale?: boolean;
-  assetClass?: 'crypto' | 'forex' | 'equity';
+  assetClass?: 'crypto' | 'forex';
   symbol: string;
   exchange: string;
   name: string;
@@ -23,7 +23,7 @@ export type QuoteLike = {
   change: number;
   changePercent: number;
   sparkline?: number[];
-  source?: 'angelone' | 'yahoo' | 'demo' | 'binance' | 'twelvedata';
+  source?: 'demo' | 'binance' | 'twelvedata';
   asOf?: number;
 };
 
@@ -39,7 +39,7 @@ export function InstrumentRow({ quote, onRemove }: Props) {
   const history = buildHistoryChart(historyQuery.data, DEMO_MODE);
   const fallback = history ? null : buildWatchlistChart(undefined, quote, DEMO_MODE);
   const source = history ? historyQuery.data?.source : quote.source;
-  const caption = history ? `${source === 'demo' ? 'Demo · ' : source === 'yahoo' ? 'Yahoo · ' : ''}1D`
+  const caption = history ? `${source === 'demo' ? 'Demo · ' : ''}1D`
     : fallback ? (source === 'demo' ? 'Demo' : 'Recent') : historyQuery.isPending ? 'Loading' : 'No history';
   return (
     <View style={styles.wrap} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
@@ -64,7 +64,7 @@ export function InstrumentRow({ quote, onRemove }: Props) {
             <Text style={styles.ltp} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {formatMarketPrice(quote.ltp, quote, false)}
             </Text>
-            <Text style={styles.chartCaption}>{quote.currency ?? (quote.exchange === 'FOREX' ? quote.symbol.slice(-3) : quote.exchange === 'BINANCE' ? 'USDT' : 'INR')} · {quote.stale ? 'Last price' : marketSourceLabel(source)}</Text>
+            <Text style={styles.chartCaption}>{quote.currency ?? (quote.exchange === 'FOREX' ? quote.symbol.slice(-3) : 'USDT')} · {quote.stale ? 'Last price' : marketSourceLabel(source)}</Text>
             <PriceChange change={quote.change} changePercent={quote.changePercent} compact />
           </View>
         </View>

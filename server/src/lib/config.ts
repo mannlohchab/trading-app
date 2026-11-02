@@ -11,7 +11,7 @@ export const config = {
   clientOrigin: process.env.CLIENT_ORIGIN ?? '*',
   jwtSecret: required('JWT_SECRET', 'dev-jwt-secret-change-me'),
   jwtRefreshSecret: required('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
-  defaultPaperBalance: Number(process.env.DEFAULT_PAPER_BALANCE ?? 1_000_000),
+  defaultPaperBalance: Number(process.env.DEFAULT_PAPER_BALANCE ?? 100_000),
   twelveData: {
     apiKey: process.env.TWELVE_DATA_API_KEY ?? '',
     minuteCredits: Math.max(1, Number(process.env.TWELVE_DATA_MINUTE_CREDITS) || 8),
@@ -19,23 +19,12 @@ export const config = {
     quoteTtlMs: Math.max(15000, Number(process.env.FOREX_POLL_MS) || 60000),
     historyTtlMs: Math.max(60000, Number(process.env.FOREX_HISTORY_CACHE_MS) || 300000),
   },
-  angel: {
-    apiKey: process.env.ANGEL_API_KEY ?? '',
-    clientCode: process.env.ANGEL_CLIENT_CODE ?? '',
-    password: process.env.ANGEL_PASSWORD ?? '',
-    totpSecret: process.env.ANGEL_TOTP_SECRET ?? '',
-  },
   cloudflare: {
     accountId: process.env.CF_ACCOUNT_ID?.trim() ?? '',
     apiToken: process.env.CF_API_TOKEN?.trim() ?? '',
     model: process.env.CF_AI_MODEL?.trim() || '@cf/meta/llama-3.2-3b-instruct',
   },
 };
-
-export function hasAngelCredentials(): boolean {
-  const { apiKey, clientCode, password, totpSecret } = config.angel;
-  return Boolean(apiKey && clientCode && password && totpSecret);
-}
 
 export function hasCloudflareAi(): boolean {
   return Boolean(config.cloudflare.accountId && config.cloudflare.apiToken);

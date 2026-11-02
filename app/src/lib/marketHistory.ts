@@ -1,11 +1,11 @@
 export type HistoryResponse = {
-  candles: { time: number; close: number; source?: 'angelone' | 'yahoo' | 'demo' | 'binance' | 'twelvedata' }[];
+  candles: { time: number; close: number; source?: 'demo' | 'binance' | 'twelvedata' }[];
   assetClass?: string;
   isDemo: boolean;
-  source?: 'angelone' | 'yahoo' | 'demo' | 'binance' | 'twelvedata';
+  source?: 'demo' | 'binance' | 'twelvedata';
 };
 
-const indianDate = (time: number) => new Date((time + 19_800) * 1000).toISOString().slice(0, 10);
+const utcDate = (time: number) => new Date(time * 1000).toISOString().slice(0, 10);
 
 /** Demo series require an explicit preview opt-in; live failures stay empty. */
 export function buildHistoryChart(history?: HistoryResponse, allowDemo = false) {
@@ -19,10 +19,11 @@ export function buildHistoryChart(history?: HistoryResponse, allowDemo = false) 
   const sorted = [...unique].sort(([a], [b]) => a - b);
   if (!sorted.length) return null;
   const source = history.source ?? history.candles[0]?.source;
-  const date = source === 'twelvedata' || history.assetClass === 'forex' ? (time: number) => new Date(time * 1000).toISOString().slice(0,10) : indianDate;
+  // Crypto trades 24/7: use a rolling day. Forex uses the latest UTC session date.
+  const rolling = source === 'binance' || history.assetClass === 'crypto';
   const end = sorted[sorted.length - 1][0];
-  const sessionDate = source === 'binance' || history.assetClass === 'crypto' ? '24h' : date(end);
-  const samples = sorted.filter(([time]) => source === 'binance' || history.assetClass === 'crypto' ? time > end - 86400 : date(time) === sessionDate);
+  const sessionDate = rolling ? '24h' : utcDate(end);
+  const samples = sorted.filter(([time]) => rolling ? time > end - 86400 : utcDate(time) === sessionDate);
   if (samples.length < 2) return null;
   const high = Math.max(...samples.map(([, price]) => price));
   const low = Math.min(...samples.map(([, price]) => price));
@@ -45,14 +46,14 @@ export function buildHistoryChart(history?: HistoryResponse, allowDemo = false) 
 }
 
 type MiniPoint = { x: number; y: number; value: number };
-type QuoteSeries = { sparkline?: number[]; source?: 'angelone' | 'yahoo' | 'demo' | 'binance' | 'twelvedata' };
+type QuoteSeries = { sparkline?: number[]; source?: 'demo' | 'binance' | 'twelvedata' };
 
 /** Quotes can already contain a real price series, even if the history request fails. */
 export function buildWatchlistChart(history: HistoryResponse | undefined, quote: QuoteSeries, allowDemo = false) {
   const dated = buildHistoryChart(history, allowDemo);
   if (dated) return { points: dated.points, peak: dated.peak, positive: dated.positive,
     caption: `${history?.isDemo ? 'Demo · ' : ''}${dated.sessionDate} · 5m` };
-  if (quote.source !== 'angelone' && quote.source !== 'yahoo' && quote.source !== 'binance' && quote.source !== 'twelvedata' && !(allowDemo && quote.source === 'demo')) return null;
+  if (quote.source !== 'binance' && quote.source !== 'twelvedata' && !(allowDemo && quote.source === 'demo')) return null;
   const values = quote.sparkline;
   if (!values || values.length < 2 || values.some(value => !Number.isFinite(value) || value <= 0)) return null;
   const high = Math.max(...values), low = Math.min(...values);

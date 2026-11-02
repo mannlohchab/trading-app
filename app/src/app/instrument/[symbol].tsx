@@ -33,7 +33,7 @@ export default function InstrumentScreen() {
     retry: false,
     queryFn: ({ signal }) => loadCandles(() => api<{
       candles: ChartCandle[];
-      source?: 'angelone' | 'yahoo' | 'demo' | 'binance' | 'twelvedata';
+      source?: 'demo' | 'binance' | 'twelvedata';
       pricePrecision?: number;
       currency?: string;
     }>(`/api/market/candles/${encodeURIComponent(symbol)}?exchange=${encodeURIComponent(exchange)}&timeframe=${timeframe}&fresh=true`, { signal })),

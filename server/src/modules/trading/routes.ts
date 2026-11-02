@@ -13,11 +13,11 @@ tradingRouter.use(requireAuth);
 
 const orderSchema = z.object({
   symbol: z.string().min(1),
-  exchange: z.string().default('NSE'),
+  exchange: z.string().optional(),
   name: z.string().optional(),
   side: z.enum(['BUY', 'SELL']),
   orderType: z.enum(['MARKET', 'LIMIT']),
-  quantity: z.number().int().positive(),
+  quantity: z.number().positive(),
   limitPrice: z.number().positive().optional(),
   stopLoss: z.number().positive().optional(),
   takeProfit: z.number().positive().optional(),

@@ -18,14 +18,18 @@ export function resolveInstrument(symbol: string, exchange?: string): Instrument
   if (!found && (ex === 'FOREX' || ex === 'BINANCE')) throw new AppError(400, 'Unsupported market pair', 'INVALID_INSTRUMENT');
   return found;
 }
-export function requireInstrument(symbol: string, exchange: string): Instrument {
+export function requireInstrument(symbol: string, exchange?: string): Instrument {
   const instrument = resolveInstrument(symbol, exchange);
   if (!instrument) throw new AppError(400, 'Unsupported market pair', 'INVALID_INSTRUMENT');
   return instrument;
 }
-export function requireInrInstrument(symbol: string, exchange: string) {
-  const instrument = resolveInstrument(symbol, exchange);
-  if (instrument && instrument.currency !== 'INR') {
-    throw new AppError(400, 'Forex and crypto are market-data only. Paper accounts currently support INR instruments.', 'UNSUPPORTED_ACCOUNT_CURRENCY');
+export const ACCOUNT_CURRENCY = 'USD';
+/** Paper accounts settle in USD; USDT-quoted crypto is treated 1:1 with USD for simulation. */
+export const SETTLEMENT_CURRENCIES = new Set(['USD', 'USDT']);
+export function requireTradableInstrument(symbol: string, exchange?: string): Instrument {
+  const instrument = requireInstrument(symbol, exchange);
+  if (!SETTLEMENT_CURRENCIES.has(instrument.currency ?? '')) {
+    throw new AppError(400, `${instrument.symbol} is quoted in ${instrument.currency}. Paper accounts settle in USD, so only USD- and USDT-quoted instruments can be traded.`, 'UNSUPPORTED_ACCOUNT_CURRENCY');
   }
+  return instrument;
 }

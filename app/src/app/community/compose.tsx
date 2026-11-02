@@ -19,8 +19,8 @@ export default function ComposeScreen() {
         method: 'POST',
         body: {
           content,
-          symbol: symbol || undefined,
-          exchange: symbol ? symbol.includes('/') ? 'FOREX' : symbol.toUpperCase().endsWith('USDT') ? 'BINANCE' : 'NSE' : undefined,
+          // The server resolves pair aliases (BTC/USDT, EURUSD) to their canonical exchange.
+          symbol: symbol.trim() || undefined,
           imageUrl,
         },
       }),
@@ -67,7 +67,7 @@ export default function ComposeScreen() {
       <View style={styles.row}>
         <TextInput
           style={styles.symbol}
-          placeholder="Attach symbol (e.g. RELIANCE)"
+          placeholder="Attach symbol (e.g. BTCUSDT or EUR/USD)"
           placeholderTextColor={Palette.textMuted}
           autoCapitalize="characters"
           value={symbol}

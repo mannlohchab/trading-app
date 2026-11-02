@@ -1,4 +1,4 @@
-import { globalInstruments, resolveInstrument } from './instruments';
+import { globalInstruments, requireInstrument } from './instruments';
 import { availableQuotes } from './marketSummary';
 import type { BinanceMarketDataProvider } from './binanceMarketData';
 import type { TwelveDataProvider } from './twelveData';
@@ -14,25 +14,19 @@ export function forexSessionLabel(now = Date.now()): string {
 
 export class GlobalMarketDataProvider implements MarketDataProvider {
   readonly name='twelvedata+binance'; readonly isDemo=false;
-  constructor(private equities: MarketDataProvider, public crypto: BinanceMarketDataProvider, public forex: TwelveDataProvider) {}
+  constructor(public crypto: BinanceMarketDataProvider, public forex: TwelveDataProvider) {}
   async search(query:string) {
     const q=query.toUpperCase().replace(/[\s/_-]/g,'');
-    const primary=globalInstruments.filter(i=>`${i.symbol}${i.name}`.toUpperCase().replace(/[\s/_-]/g,'').includes(q));
-    const equities=await this.equities.search(query);
-    return [...primary,...equities];
+    return globalInstruments.filter(i=>`${i.symbol}${i.name}`.toUpperCase().replace(/[\s/_-]/g,'').includes(q));
   }
   async quote(symbol:string,exchange?:string):Promise<Quote> {
-    const i=resolveInstrument(symbol,exchange);
-    if(i?.exchange==='BINANCE') return this.crypto.quote(i.symbol);
-    if(i?.exchange==='FOREX') return this.forex.quote(i.symbol);
-    return {...await this.equities.quote(symbol,exchange ?? 'NSE'),assetClass:'equity',currency:'INR',pricePrecision:2};
+    const i=requireInstrument(symbol,exchange);
+    return i.exchange==='BINANCE' ? this.crypto.quote(i.symbol) : this.forex.quote(i.symbol);
   }
   quotes(symbols:{symbol:string;exchange?:string}[]) { return availableQuotes(this,symbols); }
   candles(symbol:string,timeframe:Timeframe,exchange?:string,fresh=false) {
-    const i=resolveInstrument(symbol,exchange);
-    if(i?.exchange==='BINANCE') return this.crypto.candles(i.symbol,timeframe,fresh);
-    if(i?.exchange==='FOREX') return this.forex.candles(i.symbol,timeframe);
-    return this.equities.candles(symbol,timeframe,exchange ?? 'NSE');
+    const i=requireInstrument(symbol,exchange);
+    return i.exchange==='BINANCE' ? this.crypto.candles(i.symbol,timeframe,fresh) : this.forex.candles(i.symbol,timeframe);
   }
   async explore() {
     const results=await Promise.allSettled(globalInstruments.map(i=>this.quote(i.symbol,i.exchange)));
@@ -41,7 +35,7 @@ export class GlobalMarketDataProvider implements MarketDataProvider {
     const availability={crypto:crypto.length ? crypto.some(q=>q.stale)?'Last observation · update delayed':'Available' : 'Binance data unavailable',
       forex:!this.forex.configured ? 'Twelve Data key not configured' : forex.length ? forex.some(q=>q.stale)?'Last observation · update delayed':'Available' : 'Forex data unavailable or request budget exhausted'};
     const sorted=[...quotes].sort((a,b)=>b.changePercent-a.changePercent);
-    return {crypto,forex,availability,marketSessions:{crypto:'Crypto · 24/7 trading hours',forex:forexSessionLabel()},indices:[],constituents:quotes,
+    return {crypto,forex,availability,marketSessions:{crypto:'Crypto · 24/7 trading hours',forex:forexSessionLabel()},constituents:quotes,
       gainers:sorted.filter(q=>q.changePercent>0).slice(0,5),losers:sorted.filter(q=>q.changePercent<0).reverse().slice(0,5),
       active:[...crypto].sort((a,b)=>b.volume-a.volume).slice(0,5),isDemo:false,status:'OPEN' as const,statusLabel:'Crypto · 24/7 trading hours'};
   }

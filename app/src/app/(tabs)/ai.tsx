@@ -11,6 +11,7 @@ import { Palette } from '@/constants/theme';
 import { api, streamAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
 import { useAuth } from '@/store/auth';
+import { AiResponse } from '@/components/ai/AiResponse';
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error' };
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
@@ -20,8 +21,8 @@ const MODES: { kind: AiKind; label: string; icon: GlassIconName }[] = [
   { kind: 'portfolio', label: 'Portfolio', icon: 'wallet' },
 ];
 const STARTERS = [
-  { title: 'Understand market trends', prompt: 'Explain how to interpret India VIX and what it tells us about market uncertainty.', icon: 'chart' as const },
-  { title: 'Plan a paper trade', prompt: 'Explain position sizing and risk management for an Indian equity paper-trading portfolio.', icon: 'analytics' as const },
+  { title: 'Check Bitcoin right now', prompt: 'What is Bitcoin trading at right now? Show the latest available price and daily change.', icon: 'chart' as const },
+  { title: 'Compare two markets', prompt: 'Compare the latest Bitcoin and Ethereum prices and daily changes. What should I watch?', icon: 'analytics' as const },
 ];
 const INK = '#202126';
 const MUTED = '#737780';
@@ -148,7 +149,7 @@ export default function AiScreen() {
     try {
       await streamAiChat({
         conversationId, message: trimmed, kind,
-        ...(kind === 'analysis' ? { symbol: symbol.trim().toUpperCase(), exchange: symbol.includes('/') || /^(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD)$/i.test(symbol.trim()) ? 'FOREX' : symbol.toUpperCase().endsWith('USDT') ? 'BINANCE' : 'NSE' } : {}),
+        ...(kind === 'analysis' ? { symbol: symbol.trim().toUpperCase(), exchange: symbol.includes('/') || /^(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD)$/i.test(symbol.trim()) ? 'FOREX' : 'BINANCE' } : {}),
       }, (event) => {
         if (!gate.isCurrent(request)) return;
         if (event.type === 'meta' && event.conversationId) setConversationId(event.conversationId);
@@ -248,7 +249,7 @@ export default function AiScreen() {
               <View style={styles.assistantMessage}>
                 <View style={styles.assistantLabel}><GlassIcon name="analytics" size={22} /><Text style={styles.assistantName}>AI Insight</Text>
                   {item.status === 'streaming' && <ActivityIndicator size="small" color={Palette.accent} />}</View>
-                {!!item.content && <Text selectable style={styles.messageText}>{item.content}</Text>}
+                {!!item.content && <AiResponse content={item.content} />}
                 {!item.content && <Text style={styles.muted}>{item.status === 'streaming' ? 'Looking into it…' : item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
                 {item.status === 'stopped' && !!item.content && <Text style={styles.responseStatus}>Stopped · partial response</Text>}
                 {item.status === 'error' && !!item.content && <Text style={styles.responseStatus}>Incomplete response</Text>}

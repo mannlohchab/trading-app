@@ -45,7 +45,7 @@ export default function RegisterScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
         <Text style={styles.brand}>Create account</Text>
-        <Text style={styles.subtitle}>Start with ₹10,00,000 virtual balance</Text>
+        <Text style={styles.subtitle}>Start with a $100,000 virtual balance</Text>
         <View style={styles.form}>
           <Text style={styles.label}>Email</Text>
           <TextInput style={styles.input} autoCapitalize="none" value={email} onChangeText={setEmail} placeholderTextColor={Palette.textMuted} placeholder="you@email.com" />

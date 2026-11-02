@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { GlassPressable } from '@/components/ui/GlassIcon';
 
-import { formatInr } from '@/lib/format';
+import { formatUsd } from '@/lib/format';
 import { svgImageSource } from '@/lib/svgImage';
 import { buildPortfolioAllocation, portfolioPoint, type AllocationKey, type PortfolioAllocationInput } from '@/lib/portfolioAllocation';
 
@@ -40,20 +40,20 @@ export function PortfolioDonut({ portfolio, loading }: Props) {
     <View>
       <View style={styles.chart}>
         <Image source={chartSource} style={StyleSheet.absoluteFill} contentFit="contain" accessible={false} />
-        <GlassPressable style={styles.center} accessibilityRole="button" accessibilityLabel={value == null ? loading ? 'Loading portfolio' : 'Portfolio value unavailable' : `${LABELS[selected]} ${formatInr(value)}. Show total portfolio value.`} onPress={() => setSelected('total')}>
+        <GlassPressable style={styles.center} accessibilityRole="button" accessibilityLabel={value == null ? loading ? 'Loading portfolio' : 'Portfolio value unavailable' : `${LABELS[selected]} ${formatUsd(value)}. Show total portfolio value.`} onPress={() => setSelected('total')}>
           <Text style={styles.centerLabel}>{LABELS[selected]}</Text>
-          <Text style={styles.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value == null ? '—' : formatInr(value, 0)}</Text>
+          <Text style={styles.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value == null ? '—' : formatUsd(value, 0)}</Text>
           <Text style={styles.centerHint}>{loading ? 'Loading portfolio…' : allocation ? selected === 'total' ? 'Paper portfolio' : 'Tap to view total' : 'Data unavailable'}</Text>
         </GlassPressable>
       </View>
       <View style={styles.legend}>
         {(['holdings', 'cash'] as const).map(key => (
-          <GlassPressable key={key} onPress={() => setSelected(selected === key ? 'total' : key)} accessibilityRole="button" accessibilityState={{ selected: selected === key }} accessibilityLabel={`${LABELS[key]}, ${allocation ? formatInr(allocation[key]) : 'unavailable'}`} style={({ pressed }) => [styles.legendItem, selected === key && { borderColor: COLORS[key], backgroundColor: key === 'holdings' ? '#FFF5F6' : '#F0FAF6' }, pressed && { opacity: 0.7 }]}>
+          <GlassPressable key={key} onPress={() => setSelected(selected === key ? 'total' : key)} accessibilityRole="button" accessibilityState={{ selected: selected === key }} accessibilityLabel={`${LABELS[key]}, ${allocation ? formatUsd(allocation[key]) : 'unavailable'}`} style={({ pressed }) => [styles.legendItem, selected === key && { borderColor: COLORS[key], backgroundColor: key === 'holdings' ? '#FFF5F6' : '#F0FAF6' }, pressed && { opacity: 0.7 }]}>
             <View style={styles.legendHeading}><View style={[styles.legendDot, { backgroundColor: COLORS[key] }]} />
               <Text style={styles.legendLabel}>{LABELS[key]}</Text>
               {allocation && allocation.total > 0 ? <Text style={[styles.share, { color: COLORS[key] }]}>{(allocation[key] / allocation.total * 100).toFixed(1)}%</Text> : null}
             </View>
-            <Text style={styles.legendValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{allocation ? formatInr(allocation[key]) : '—'}</Text>
+            <Text style={styles.legendValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{allocation ? formatUsd(allocation[key]) : '—'}</Text>
           </GlassPressable>
         ))}
       </View>

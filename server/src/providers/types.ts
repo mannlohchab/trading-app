@@ -1,5 +1,5 @@
-export type MarketSource = 'angelone' | 'yahoo' | 'twelvedata' | 'binance';
-export type MarketMetadata = { assetClass?: 'crypto' | 'forex' | 'equity'; baseCurrency?: string; currency?: string; pricePrecision?: number };
+export type MarketSource = 'twelvedata' | 'binance';
+export type MarketMetadata = { assetClass?: 'crypto' | 'forex'; baseCurrency?: string; currency?: string; pricePrecision?: number };
 
 export type Instrument = MarketMetadata & {
   symbol: string;
@@ -58,7 +58,6 @@ export type MarketOverview = {
   availability?: { crypto: string; forex: string };
   status: MarketStatus;
   statusLabel: string;
-  indices: Quote[];
   sentiment: 'Bullish' | 'Bearish' | 'Neutral';
   volatilityLabel: string;
   news: { id: string; title: string; source: string; publishedAt: string }[];

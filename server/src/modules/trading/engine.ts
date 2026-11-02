@@ -3,7 +3,7 @@ import { db, sqlite } from '../../db';
 import { orders, paperAccounts, positions, transactions } from '../../db/schema';
 import { AppError, assertFound } from '../../lib/errors';
 import { id } from '../../lib/ids';
-import { requireInrInstrument } from '../../providers/instruments';
+import { requireTradableInstrument } from '../../providers/instruments';
 import { getMarketDataProvider } from '../../providers/marketData';
 
 export type PlaceOrderInput = {
@@ -19,6 +19,10 @@ export type PlaceOrderInput = {
   takeProfit?: number;
 };
 
+const QTY_DECIMALS = 8;
+const QTY_EPSILON = 1e-9;
+const roundQty = (q: number) => Number(q.toFixed(QTY_DECIMALS));
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -30,16 +34,15 @@ export async function getOrCreateAccount(userId: string) {
 }
 
 export async function placeOrder(input: PlaceOrderInput) {
-  if (input.quantity <= 0 || !Number.isInteger(input.quantity)) {
-    throw new AppError(400, 'Quantity must be a positive integer');
+  const quantity = roundQty(input.quantity);
+  if (!Number.isFinite(input.quantity) || quantity <= 0) {
+    throw new AppError(400, `Quantity must be a positive number (up to ${QTY_DECIMALS} decimals)`);
   }
   if (input.orderType === 'LIMIT' && !(input.limitPrice && input.limitPrice > 0)) {
     throw new AppError(400, 'Limit price required for limit orders');
   }
 
-  const exchange = (input.exchange ?? 'NSE').toUpperCase();
-  const symbol = input.symbol.toUpperCase();
-  requireInrInstrument(symbol, exchange);
+  const { symbol, exchange } = requireTradableInstrument(input.symbol, input.exchange);
   const quote = await getMarketDataProvider().quote(symbol, exchange);
   const name = input.name ?? quote.name;
 
@@ -62,7 +65,7 @@ export async function placeOrder(input: PlaceOrderInput) {
         name,
         side: input.side,
         orderType: 'LIMIT',
-        quantity: input.quantity,
+        quantity,
         limitPrice: input.limitPrice,
         stopLoss: input.stopLoss,
         takeProfit: input.takeProfit,
@@ -82,7 +85,7 @@ export async function placeOrder(input: PlaceOrderInput) {
     name,
     side: input.side,
     orderType: input.orderType,
-    quantity: input.quantity,
+    quantity,
     fillPrice,
     limitPrice: input.limitPrice,
     stopLoss: input.stopLoss,
@@ -105,7 +108,7 @@ function fillOrderAtomic(args: {
   stopLoss?: number;
   takeProfit?: number;
 }) {
-  requireInrInstrument(args.symbol, args.exchange);
+  requireTradableInstrument(args.symbol, args.exchange);
   const notional = args.fillPrice * args.quantity;
 
   const result = sqlite.transaction(() => {
@@ -140,7 +143,7 @@ function fillOrderAtomic(args: {
         .run();
 
       if (existing) {
-        const newQty = existing.quantity + args.quantity;
+        const newQty = roundQty(existing.quantity + args.quantity);
         const newAvg = (existing.avgPrice * existing.quantity + args.fillPrice * args.quantity) / newQty;
         db.update(positions)
           .set({
@@ -169,7 +172,7 @@ function fillOrderAtomic(args: {
           .run();
       }
     } else {
-      if (!existing || existing.quantity < args.quantity) {
+      if (!existing || existing.quantity + QTY_EPSILON < args.quantity) {
         throw new AppError(400, 'Insufficient position quantity to sell');
       }
       realizedDelta = (args.fillPrice - existing.avgPrice) * args.quantity;
@@ -182,8 +185,8 @@ function fillOrderAtomic(args: {
         .where(eq(paperAccounts.id, args.accountId))
         .run();
 
-      const remaining = existing.quantity - args.quantity;
-      if (remaining === 0) {
+      const remaining = roundQty(existing.quantity - args.quantity);
+      if (remaining <= QTY_EPSILON) {
         db.delete(positions).where(eq(positions.id, existing.id)).run();
       } else {
         db.update(positions)
@@ -251,7 +254,7 @@ export async function processPendingOrders() {
   const pending = await db.query.orders.findMany({ where: eq(orders.status, 'PENDING') });
   for (const order of pending) {
     try {
-      requireInrInstrument(order.symbol, order.exchange);
+      requireTradableInstrument(order.symbol, order.exchange);
       const quote = await getMarketDataProvider().quote(order.symbol, order.exchange);
       const limit = order.limitPrice ?? 0;
       const shouldFill =

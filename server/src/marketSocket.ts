@@ -7,13 +7,12 @@ import { number, validCandles } from './providers/providerCache';
 export function normalizeSubscription(input:unknown,candle=false):string|null {
   if(typeof input!=='string' || input.length>80)return null;
   const parts=input.split(':');
-  const exchange=parts.length===1?'NSE':parts[0].toUpperCase(),symbol=parts.length===1?parts[0].toUpperCase():parts[1].toUpperCase();
+  const exchange=parts.length===1?undefined:parts[0].toUpperCase(),symbol=parts.length===1?parts[0].toUpperCase():parts[1].toUpperCase();
   if(candle && (parts.length!==3 || exchange!=='BINANCE' || !/^(1m|5m|15m|30m|1h|4h|1d|1w|1M)$/.test(parts[2])))return null;
   if(!candle && parts.length>2)return null;
   try {
     const i=resolveInstrument(symbol,exchange);
     if(i)return `${i.exchange}:${i.symbol}${candle?':'+parts[2]:''}`;
-    if(!candle && ['NSE','BSE','MCX'].includes(exchange) && /^[A-Z0-9&_-]{1,30}$/.test(symbol))return `${exchange}:${symbol}`;
   }catch { /* Unsupported pairs do not allocate rooms or upstream streams. */ }
   return null;
 }

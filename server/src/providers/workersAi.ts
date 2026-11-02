@@ -8,11 +8,11 @@ const DISCLAIMER =
 
 export function buildSystemPrompt(context?: string): string {
   return [
-    'You are an AI financial research assistant for forex and crypto markets, with legacy Indian equity support.',
+    'You are an AI financial research assistant for forex and crypto markets.',
     'Focus on forex currency pairs and crypto spot markets.',
     'Never invent live prices. If market data is provided below, treat it as factual; clearly label your own interpretation as AI-generated analysis.',
     'Never claim that any analysis guarantees future returns.',
-    'Be concise, professional, and educational. Preserve each instrument’s quote currency; USDT is not USD. INR portfolio accounting is separate.',
+    'Be concise, professional, and educational. Preserve each instrument’s quote currency; USDT is not USD. The paper portfolio is accounted in USD.',
     context ? `Factual market/portfolio context:\n${context}` : '',
   ]
     .filter(Boolean)
@@ -44,7 +44,7 @@ export async function streamWorkersAi(
     const body = await res.json().catch(() => null) as { errors?: { code?: number }[] } | null;
     const code = body?.errors?.[0]?.code;
     if (code === 3036) {
-      throw new AppError(429, 'Cloudflare Workers AI daily free allowance is exhausted. It resets at 00:00 UTC (05:30 IST). Please try after the reset.', 'AI_DAILY_LIMIT');
+      throw new AppError(429, 'Cloudflare Workers AI daily free allowance is exhausted. It resets at 00:00 UTC. Please try after the reset.', 'AI_DAILY_LIMIT');
     }
     if (res.status === 429) {
       throw new AppError(429, 'Cloudflare Workers AI is busy or rate-limited. Please try again shortly.', 'AI_BUSY');

@@ -31,10 +31,10 @@ test('missing credentials fail visibly without saving a canned AI answer', async
 });
 
 test('sends authenticated streaming requests with an output budget and decodes split events', async () => {
-  fetchSpy.mockResolvedValue(stream('data: {"res', 'ponse":"Diversify ₹"}\r\n\r\n', 'data: {"response":"100."}\n\ndata: [DONE]'));
+  fetchSpy.mockResolvedValue(stream('data: {"res', 'ponse":"Diversify $"}\r\n\r\n', 'data: {"response":"100."}\n\ndata: [DONE]'));
   const chunks: string[] = [];
   const answer = await streamWorkersAi(messages, c => chunks.push(c));
-  expect(answer).toStartWith('Diversify ₹100.');
+  expect(answer).toStartWith('Diversify $100.');
   expect(answer).toContain('Educational only');
   expect(chunks.join('')).toBe(answer);
   const [url, options] = fetchSpy.mock.calls[0];

@@ -17,7 +17,7 @@ import type { HistoryResponse } from '@/lib/marketHistory';
 import { buildPreviewChart, PREVIEW_RANGES, type PreviewRange } from '@/lib/stockPreview';
 
 type DetailQuote = QuoteLike & { open?: number; high?: number; low?: number; close?: number; volume?: number };
-const date = (time: number) => new Date(time * 1000).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' });
+const date = (time: number) => new Date(time * 1000).toLocaleDateString('en-US', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function StockDetailScreen() {
   const params = useLocalSearchParams<{ symbol: string; exchange?: string; name?: string }>();
@@ -78,7 +78,7 @@ export default function StockDetailScreen() {
           <View style={styles.sourceRow}>
             <Text style={styles.source}>{feedStatus}</Text>
             <Text style={styles.source}>{quote ? `${marketSourceLabel(quote.source)}${quote.stale ? ' · Last observation / stale' : ''}` : quoteQuery.isPending ? 'Loading quote…' : 'Quote unavailable'}</Text>
-            {quote?.asOf ? <Text style={styles.asOf}>As of {new Date(quote.asOf * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} IST</Text> : null}
+            {quote?.asOf ? <Text style={styles.asOf}>As of {new Date(quote.asOf * 1000).toLocaleString('en-US', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} UTC</Text> : null}
           </View>
           {quoteQuery.isError ? <Pressable accessibilityRole="button" onPress={() => void quoteQuery.refetch()}><Text style={styles.retry}>{quote ? 'Quote refresh failed' : 'Could not load quote'} · Retry</Text></Pressable> : null}
           <View style={styles.ranges}>

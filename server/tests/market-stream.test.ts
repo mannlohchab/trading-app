@@ -35,8 +35,10 @@ test('subscriptions validate keys and preserve exchange identity',()=>{
   expect(normalizeSubscription('FOREX:eurusd')).toBe('FOREX:EUR/USD');
   expect(normalizeSubscription('BINANCE:BTCUSDT:5m',true)).toBe('BINANCE:BTCUSDT:5m');
   expect(normalizeSubscription('BINANCE:BTCUSDT:bad',true)).toBeNull();
-  expect(normalizeSubscription('TCS')).toBe('NSE:TCS');
-  expect(normalizeSubscription('BSE:TCS')).toBe('BSE:TCS');
+  expect(normalizeSubscription('btcusdt')).toBe('BINANCE:BTCUSDT');
+  expect(normalizeSubscription('TCS')).toBeNull();
+  expect(normalizeSubscription('BSE:TCS')).toBeNull();
+  expect(normalizeSubscription('NSE:NIFTY')).toBeNull();
   expect(normalizeSubscription('FOREX:unlisted')).toBeNull();
 });
 

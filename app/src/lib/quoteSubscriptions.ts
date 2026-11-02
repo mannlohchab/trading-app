@@ -32,7 +32,7 @@ export class QuoteSubscriptions {
   }
   subscribe(keys: string[], callback: (data: any) => void, onLimit?: (count: number) => void) {
     if (!this.consumers.size) { this.socket.on('connect', this.reconnect); this.socket.on(this.event, this.receive); }
-    const consumer = {keys: new Set(keys.map(k => k.includes(':') ? k : `NSE:${k.toUpperCase()}`)), callback, onLimit};
+    const consumer = {keys: new Set(keys.filter(k => k.includes(':'))), callback, onLimit};
     this.consumers.add(consumer);
     for (const key of consumer.keys) this.counts.set(key, (this.counts.get(key) ?? 0) + 1);
     this.reconcile();

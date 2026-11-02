@@ -167,7 +167,7 @@ export default function LoginScreen() {
                   <Text style={styles.subtitle}>Not Harder</Text>
                 </View>
                 <Text style={styles.description}>
-                  Practice trading Indian markets with{'\n'}real-time insights at your fingertips
+                  Practice trading forex and crypto with{'\n'}real-time insights at your fingertips
                 </Text>
                 <View style={styles.actions}>
                   <Pressable

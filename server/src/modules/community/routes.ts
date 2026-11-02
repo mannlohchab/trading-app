@@ -13,6 +13,7 @@ import {
 } from '../../db/schema';
 import { AppError, assertFound } from '../../lib/errors';
 import { id } from '../../lib/ids';
+import { requireInstrument } from '../../providers/instruments';
 import { optionalAuth, requireAuth } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { param } from '../../lib/params';
@@ -141,13 +142,14 @@ communityRouter.post(
   async (req, res, next) => {
     try {
       const body = req.body as { content: string; imageUrl?: string; symbol?: string; exchange?: string };
+      const instrument = body.symbol?.trim() ? requireInstrument(body.symbol, body.exchange || undefined) : undefined;
       const row = {
         id: id(),
         userId: req.user!.userId,
         content: body.content,
         imageUrl: body.imageUrl,
-        symbol: body.symbol?.toUpperCase(),
-        exchange: body.exchange?.toUpperCase(),
+        symbol: instrument?.symbol,
+        exchange: instrument?.exchange,
       };
       await db.insert(posts).values(row);
       const [enriched] = await enrichPosts(

@@ -22,7 +22,7 @@ import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
 import { Palette } from '@/constants/theme';
 import { api } from '@/lib/api';
-import { formatInr, formatPct } from '@/lib/format';
+import { formatMarketPrice, formatUsd, formatPct } from '@/lib/format';
 import { useAuth, type User } from '@/store/auth';
 
 const TABS = ['Overview', 'Portfolio', 'Settings'] as const;
@@ -161,7 +161,7 @@ export default function ProfileScreen() {
               <Stat icon="community" tone="blue" label="Followers" value={String(data.community.followers)} />
               <Stat icon="profile" tone="blue" label="Following" value={String(data.community.following)} />
             </View> : null}
-            <Text style={styles.joined}>Member since {new Date(profileUser.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</Text>
+            <Text style={styles.joined}>Member since {new Date(profileUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
           </View>
         ) : tab !== 'Overview' ? <View style={styles.pageHeading}><Text style={styles.pageTitle}>{tab === 'Portfolio' ? 'Your holdings' : 'Account settings'}</Text><Text style={styles.pageSubtitle}>{tab === 'Portfolio' ? 'Positions, balances and activity' : 'Your profile, preferences and security'}</Text></View> : null}
 
@@ -182,7 +182,7 @@ export default function ProfileScreen() {
             <View style={styles.returnCard}>
               <View style={styles.returnLeft}>
                 <View style={styles.inline}><GlassIcon name="coin" size={19} /><Text style={styles.returnLabel}>Total profit / loss</Text></View>
-                <Text style={[styles.returnValue, data ? { color: pnlColor } : null]}>{data ? formatInr(data.portfolio.totalPnl) : '—'}</Text>
+                <Text style={[styles.returnValue, data ? { color: pnlColor } : null]}>{data ? formatUsd(data.portfolio.totalPnl) : '—'}</Text>
               </View>
               <View style={styles.returnRight}>
                 <Text style={styles.returnLabel}>All-time return</Text>
@@ -205,15 +205,15 @@ export default function ProfileScreen() {
           <View style={styles.block}>
             <View style={styles.card}>
               <View style={styles.inline}><GlassIcon name="wallet" size={25} /><Text style={styles.cardLabel}>Virtual portfolio</Text></View>
-              <Text style={styles.equity}>{formatInr(data.portfolio.equity)}</Text>
+              <Text style={styles.equity}>{formatUsd(data.portfolio.equity)}</Text>
               <Text style={[styles.pnl, { color: pnlColor }]}>
-                {formatInr(data.portfolio.totalPnl)} ({formatPct(data.portfolio.totalPnlPercent)})
+                {formatUsd(data.portfolio.totalPnl)} ({formatPct(data.portfolio.totalPnlPercent)})
               </Text>
               <View style={styles.grid}>
-                <Mini icon="wallet" label="Cash" value={formatInr(data.portfolio.cashBalance, 0)} />
-                <Mini icon="chart" label="Invested" value={formatInr(data.portfolio.invested, 0)} />
-                <Mini icon="analytics" label="Unrealized" value={formatInr(data.portfolio.unrealizedPnl, 0)} />
-                <Mini icon="coin" label="Realized" value={formatInr(data.portfolio.realizedPnl, 0)} />
+                <Mini icon="wallet" label="Cash" value={formatUsd(data.portfolio.cashBalance, 0)} />
+                <Mini icon="chart" label="Invested" value={formatUsd(data.portfolio.invested, 0)} />
+                <Mini icon="analytics" label="Unrealized" value={formatUsd(data.portfolio.unrealizedPnl, 0)} />
+                <Mini icon="coin" label="Realized" value={formatUsd(data.portfolio.realizedPnl, 0)} />
               </View>
             </View>
 
@@ -229,7 +229,7 @@ export default function ProfileScreen() {
                 <GlassPressable
                   key={p.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${p.name}, market value ${formatInr(p.marketValue)}`}
+                  accessibilityLabel={`Open ${p.name}, market value ${formatUsd(p.marketValue)}`}
                   style={styles.pos}
                   onPress={() =>
                     router.push({ pathname: '/instrument/[symbol]', params: { symbol: p.symbol, exchange: p.exchange, name: p.name } })
@@ -238,13 +238,13 @@ export default function ProfileScreen() {
                   <View style={styles.positionName}>
                     <Text style={styles.symbol}>{p.symbol}</Text>
                     <Text style={styles.meta}>
-                      {p.quantity} @ {p.avgPrice.toFixed(2)} · LTP {p.ltp.toFixed(2)}
+                      {p.quantity} @ {formatMarketPrice(p.avgPrice, p, false)} · LTP {formatMarketPrice(p.ltp, p, false)}
                     </Text>
                   </View>
                   <View style={styles.positionValue}>
-                    <Text style={styles.symbol} numberOfLines={1} adjustsFontSizeToFit>{formatInr(p.marketValue, 0)}</Text>
+                    <Text style={styles.symbol} numberOfLines={1} adjustsFontSizeToFit>{formatUsd(p.marketValue, 0)}</Text>
                     <Text style={[styles.positionPnl, { color: p.unrealizedPnl >= 0 ? Palette.green : Palette.red }]}>
-                      {formatInr(p.unrealizedPnl)}
+                      {formatUsd(p.unrealizedPnl)}
                     </Text>
                     <Text style={[styles.positionPnl, { color: p.unrealizedPnl >= 0 ? Palette.green : Palette.red }]}>
                       {formatPct(p.unrealizedPnlPercent)}
@@ -272,7 +272,7 @@ export default function ProfileScreen() {
                   </Text>
                   <Text style={styles.meta}>{t.createdAt.slice(0, 19).replace('T', ' ')}</Text>
                 </View>
-                <Text style={[styles.symbol, styles.activityAmount]} numberOfLines={1} adjustsFontSizeToFit>{formatInr(t.amount, 0)}</Text>
+                <Text style={[styles.symbol, styles.activityAmount]} numberOfLines={1} adjustsFontSizeToFit>{formatUsd(t.amount, 0)}</Text>
               </View>
             ))}
           </View>

@@ -10,11 +10,11 @@ TOKEN=$(curl -sf -X POST "$BASE/api/auth/login" -H 'Content-Type: application/js
   -d '{"emailOrUsername":"demo","password":"password123"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["accessToken"])')
 
 echo "Quote"
-curl -sf "$BASE/api/market/quote/TCS" | head -c 160; echo
+curl -sf "$BASE/api/market/quote/BTCUSDT?exchange=BINANCE" | head -c 160; echo
 
 echo "Paper buy"
 curl -sf -X POST "$BASE/api/trading/orders" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"symbol":"TCS","side":"BUY","orderType":"MARKET","quantity":1}' | head -c 200; echo
+  -d '{"symbol":"BTCUSDT","exchange":"BINANCE","side":"BUY","orderType":"MARKET","quantity":0.01}' | head -c 200; echo
 
 echo "Feed"
 curl -sf "$BASE/api/community/feed" | head -c 160; echo

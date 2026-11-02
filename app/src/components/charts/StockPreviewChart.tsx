@@ -15,13 +15,13 @@ export function StockPreviewChart({ chart, metadata }: { chart: Chart; metadata?
   function selectAt(x: number) {
     setSelectedTime(nearestChartPoint(chart.points, x / Math.max(width, 1) * 100).time);
   }
-  const tickTime = new Date(selected.time * 1000).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  const tickTime = new Date(selected.time * 1000).toLocaleString('en-US', {
+    timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   });
   function axisLabel(time: number) {
-    return new Date(time * 1000).toLocaleString('en-IN', chart.end - chart.start < 86_400
-      ? { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }
-      : { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+    return new Date(time * 1000).toLocaleString('en-US', chart.end - chart.start < 86_400
+      ? { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }
+      : { timeZone: 'UTC', day: 'numeric', month: 'short' });
   }
   return (
     <View style={styles.card}>
@@ -39,7 +39,7 @@ export function StockPreviewChart({ chart, metadata }: { chart: Chart; metadata?
           onResponderMove={event => selectAt(event.nativeEvent.locationX)}
           accessible
           accessibilityRole="adjustable"
-          accessibilityLabel={`Historical closing price ${formatMarketPrice(selected.value, metadata)}, ${tickTime} IST`}
+          accessibilityLabel={`Historical closing price ${formatMarketPrice(selected.value, metadata)}, ${tickTime} UTC`}
           accessibilityHint="Drag to inspect prices, or swipe up and down to select the next and previous observation."
           accessibilityActions={[{ name: 'increment', label: 'Next price' }, { name: 'decrement', label: 'Previous price' }]}
           onAccessibilityAction={event => {
@@ -63,7 +63,7 @@ export function StockPreviewChart({ chart, metadata }: { chart: Chart; metadata?
       <View style={styles.timeAxis}>
         {[chart.start, chart.points[Math.floor(chart.points.length / 2)].time, chart.end].map((time, i) => <Text key={i} style={styles.axisText}>{axisLabel(time)}</Text>)}
       </View>
-      <Text style={styles.selected}>{tickTime} IST · Close {formatMarketPrice(selected.value, metadata)}</Text>
+      <Text style={styles.selected}>{tickTime} UTC · Close {formatMarketPrice(selected.value, metadata)}</Text>
     </View>
   );
 }

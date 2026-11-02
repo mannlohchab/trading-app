@@ -10,7 +10,7 @@ import { resolveInstrument } from '../../providers/instruments';
 async function historyMetadata(symbol: string, exchange?: string) {
   const i = resolveInstrument(symbol, exchange);
   if (i?.exchange === 'BINANCE') return getMarketDataProvider().crypto.instrument(i.symbol);
-  return i ?? { currency: 'INR', pricePrecision: 2 };
+  return i ?? {};
 }
 
 export const marketRouter = Router();

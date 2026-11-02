@@ -7,7 +7,7 @@ import { AppError, assertFound } from '../../lib/errors';
 import { id } from '../../lib/ids';
 import { requireAuth } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
-import { resolveInstrument } from '../../providers/instruments';
+import { requireInstrument } from '../../providers/instruments';
 import { getMarketDataProvider } from '../../providers/marketData';
 import { param } from '../../lib/params';
 
@@ -81,7 +81,7 @@ watchlistsRouter.post(
   validateBody(
     z.object({
       symbol: z.string().min(1),
-      exchange: z.string().default('NSE'),
+      exchange: z.string().optional(),
       name: z.string().min(1),
       token: z.string().optional(),
     }),
@@ -93,13 +93,13 @@ watchlistsRouter.post(
           where: and(eq(watchlists.id, param(req, 'id')), eq(watchlists.userId, req.user!.userId)),
         }),
       );
-      const body = req.body as { symbol: string; exchange: string; name: string; token?: string };
-      const instrument = resolveInstrument(body.symbol, body.exchange);
+      const body = req.body as { symbol: string; exchange?: string; name: string; token?: string };
+      const instrument = requireInstrument(body.symbol, body.exchange);
       const row = {
         id: id(),
         watchlistId: list.id,
-        symbol: instrument?.symbol ?? body.symbol.toUpperCase(),
-        exchange: instrument?.exchange ?? body.exchange.toUpperCase(),
+        symbol: instrument.symbol,
+        exchange: instrument.exchange,
         name: body.name,
         token: body.token,
       };

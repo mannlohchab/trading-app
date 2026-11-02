@@ -115,13 +115,13 @@ aiRouter.post(
         const quote = await getMarketDataProvider().quote(symbol, exchange);
         const candles = await getMarketDataProvider().candles(symbol, '1d', exchange);
         const last = candles.slice(-5);
-        context += `Observed quote for ${quote.name} (${quote.symbol}): LTP ${quote.ltp} ${quote.currency ?? 'INR'}, change ${quote.changePercent}%, high ${quote.high}, low ${quote.low}, volume ${quote.volume}.\n`;
+        context += `Observed quote for ${quote.name} (${quote.symbol}): LTP ${quote.ltp} ${quote.currency ?? ''}, change ${quote.changePercent}%, high ${quote.high}, low ${quote.low}, volume ${quote.volume}.\n`;
         context += `Recent daily closes: ${last.map((c) => c.close).join(', ')}.\n`;
         context += `Data source: ${quote.source ?? 'unknown'}, observed at ${quote.asOf ?? 'unknown'} Unix seconds; stale: ${quote.stale ?? false}.\n`;
       }
       if (body.kind === 'portfolio') {
         const portfolio = await portfolioSummary(req.user!.userId);
-        context += `Paper portfolio equity ₹${portfolio.equity.toFixed(2)}, cash ₹${portfolio.cashBalance.toFixed(2)}, unrealized P&L ₹${portfolio.unrealizedPnl.toFixed(2)}, realized P&L ₹${portfolio.realizedPnl.toFixed(2)}.\n`;
+        context += `Paper portfolio (USD) equity $${portfolio.equity.toFixed(2)}, cash $${portfolio.cashBalance.toFixed(2)}, unrealized P&L $${portfolio.unrealizedPnl.toFixed(2)}, realized P&L $${portfolio.realizedPnl.toFixed(2)}.\n`;
         context += `Positions: ${portfolio.positions.map((p) => `${p.symbol} x${p.quantity} @${p.avgPrice} LTP ${p.ltp} uPnL ${p.unrealizedPnl.toFixed(2)}`).join('; ') || 'none'}.\n`;
       }
 
@@ -182,10 +182,10 @@ aiRouter.post(
 aiRouter.get('/suggestions', async (_req, res) => {
   res.json({
     suggestions: [
-      'Explain how Bitcoin 50 options weekly expiry works',
-      'What is a good risk management framework for Indian equities?',
+      'Explain how crypto perpetual funding rates work',
+      'What is a good risk management framework for crypto and forex?',
       'Compare RSI vs MACD for studying forex and crypto',
-      'How should I interpret India VIX?',
+      'How do forex trading sessions affect volatility?',
       'Analyze my paper portfolio diversification',
     ],
   });

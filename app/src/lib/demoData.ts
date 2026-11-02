@@ -71,25 +71,13 @@ export function createDemoApi() {
     ['USD/JPY', 'US Dollar / Japanese Yen', 'FOREX', 153.125, 0.31], ['USD/CHF', 'US Dollar / Swiss Franc', 'FOREX', 0.86543, -0.14],
     ['AUD/USD', 'Australian Dollar / US Dollar', 'FOREX', 0.65123, 0.42], ['USD/CAD', 'US Dollar / Canadian Dollar', 'FOREX', 1.38123, 0.12],
     ['NZD/USD', 'New Zealand Dollar / US Dollar', 'FOREX', 0.59123, -0.21],
-    ['NIFTY', 'Nifty 50', 'NSE', 24852.15, 0.86], ['BANKNIFTY', 'Nifty Bank', 'NSE', 52320.7, 1.24],
-    ['SENSEX', 'S&P BSE Sensex', 'BSE', 81546.4, 0.74], ['FINNIFTY', 'Nifty Financial Services', 'NSE', 24106.8, 0.62],
-    ['INDIAVIX', 'India VIX', 'NSE', 13.42, -3.17],
-    ['RELIANCE', 'Reliance Industries', 'NSE', 2992, 1.82], ['TCS', 'Tata Consultancy Services', 'NSE', 4130, 1.36],
-    ['INFY', 'Infosys', 'NSE', 1780, 2.14], ['HDFCBANK', 'HDFC Bank', 'NSE', 1695, 0.92],
-    ['ICICIBANK', 'ICICI Bank', 'NSE', 1288, 1.65], ['SBIN', 'State Bank of India', 'NSE', 820.4, -0.68],
-    ['ITC', 'ITC', 'NSE', 438, -1.23], ['BHARTIARTL', 'Bharti Airtel', 'NSE', 1620.5, 0.48],
-    ['LT', 'Larsen & Toubro', 'NSE', 3620, 1.12], ['TATAMOTORS', 'Tata Motors', 'NSE', 920.8, -1.84],
-    ['MARUTI', 'Maruti Suzuki', 'NSE', 12450, -0.43], ['SUNPHARMA', 'Sun Pharmaceutical', 'NSE', 1788, 1.08],
-    ['WIPRO', 'Wipro', 'NSE', 268.3, -0.92], ['TITAN', 'Titan Company', 'NSE', 3450, 0.76],
-    ['GOLD', 'Gold', 'MCX', 76520, 0.65], ['SILVER', 'Silver', 'MCX', 91240, -0.58],
-    ['CRUDEOIL', 'Crude Oil', 'MCX', 6245, -1.32],
   ];
   const quotes = instruments.map(([symbol, name, exchange, ltp, changePercent], index) => {
-    const currency = exchange === 'FOREX' ? symbol.slice(-3) : exchange === 'BINANCE' ? 'USDT' : 'INR';
+    const currency = exchange === 'FOREX' ? symbol.slice(-3) : 'USDT';
     const pricePrecision = exchange === 'FOREX' ? currency === 'JPY' ? 3 : 5 : ltp < 1 ? 5 : 2;
     const round = (n: number) => Number(n.toFixed(pricePrecision));
     const close = round(ltp / (1 + changePercent / 100));
-    return { symbol, name, exchange, currency, pricePrecision, assetClass: exchange === 'FOREX' ? 'forex' : exchange === 'BINANCE' ? 'crypto' : 'equity', ltp, changePercent, close, change: round(ltp - close),
+    return { symbol, name, exchange, currency, pricePrecision, assetClass: exchange === 'FOREX' ? 'forex' : 'crypto', ltp, changePercent, close, change: round(ltp - close),
       open: round(close * 1.002), high: round(Math.max(ltp, close) * 1.008), low: round(Math.min(ltp, close) * 0.994),
       volume: 850_000 + index * 173_921, source: 'demo' as const,
       sparkline: [] as number[],
@@ -100,18 +88,17 @@ export function createDemoApi() {
     if (!quote) throw new Error('This symbol is not included in the demo preview.');
     return quote;
   }
-  // End at the last weekday's 15:30 IST, so 1D always has a complete session.
+  // Forex ends at the last weekday's 21:00 UTC (New York close), so 1D always has a complete session.
   const sessionEnd = new Date(now);
-  sessionEnd.setUTCHours(10, 0, 0, 0);
+  sessionEnd.setUTCHours(21, 0, 0, 0);
   if (sessionEnd.getTime() > now) sessionEnd.setUTCDate(sessionEnd.getUTCDate() - 1);
   while ([0, 6].includes(sessionEnd.getUTCDay())) sessionEnd.setUTCDate(sessionEnd.getUTCDate() - 1);
   function history(symbol: string, timeframe: string) {
     const quote = quoteFor(symbol);
     const round = (n: number) => Number(n.toFixed(quote.pricePrecision));
-    const global = ['BINANCE','FOREX'].includes(quote.exchange);
     const steps: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800, '1M': 2592000 };
     const step = steps[timeframe] ?? 300;
-    const count = step < 3600 ? Math.floor((global ? 86400 : 22500) / step) + 1 : step < 86400 ? 120 : 100;
+    const count = step < 3600 ? Math.floor(86400 / step) + 1 : step < 86400 ? 120 : 100;
     const end = quote.exchange === 'BINANCE' ? Math.floor(now / 1000 / step) * step : sessionEnd.getTime() / 1000;
     const start = step < 3600 ? quote.open : quote.ltp * 0.91;
     const prices = demoSessionPrices(symbol, timeframe, start, quote.ltp, count, quote.pricePrecision);
@@ -140,7 +127,7 @@ export function createDemoApi() {
     quote.volume = candles.reduce((sum, candle) => sum + candle.volume, 0);
   }
 
-  const holdings: [string, number, number][] = [['RELIANCE', 80, 2860], ['TCS', 35, 3975], ['HDFCBANK', 90, 1650], ['INFY', 60, 1708], ['ITC', 100, 450]];
+  const holdings: [string, number, number][] = [['BTCUSDT', 0.4, 64200], ['ETHUSDT', 6, 2380], ['SOLUSDT', 60, 138], ['EUR/USD', 10000, 1.0842], ['XRPUSDT', 8000, 0.48]];
   const positions = holdings.map(([symbol, quantity, avgPrice]) => {
     const quote = quoteFor(symbol);
     return { id: `holding-${symbol}`, symbol, name: quote.name, exchange: quote.exchange, quantity, avgPrice,
@@ -148,8 +135,8 @@ export function createDemoApi() {
       unrealizedPnlPercent: round((quote.ltp - avgPrice) / avgPrice * 100) };
   });
   const invested = round(positions.reduce((sum, position) => sum + position.quantity * position.avgPrice, 0));
-  const startingBalance = 1_000_000;
-  const realizedPnl = 12_500;
+  const startingBalance = 100_000;
+  const realizedPnl = 1_250;
   const cashBalance = round(startingBalance - invested + realizedPnl);
   const unrealizedPnl = round(positions.reduce((sum, position) => sum + position.unrealizedPnl, 0));
   const totalPnl = round(realizedPnl + unrealizedPnl);
@@ -170,12 +157,12 @@ export function createDemoApi() {
   const postContent = [
     ['EUR/USD', 'My watchlist for the week: focus on the trend, then the entry. In this sample setup, EUR/USD is holding above its previous range. I’m waiting for a retest before adding to my paper position. What is on your watchlist?'],
     ['BTCUSDT', 'A simple trading journal can change how you learn. Record your entry reason, planned risk, and what actually happened. Review the process each week, not just the profit.'],
-    ['TCS', 'Comparing IT names in my practice portfolio today. Relative strength, volume, and position size matter more to me than trying to predict the next candle.'],
+    ['SOLUSDT', 'Comparing large-cap crypto pairs in my practice portfolio today. Relative strength, volume, and position size matter more to me than trying to predict the next candle.'],
     ['ETHUSDT', 'Added Ethereum to my watchlist and kept some cash aside. My goal this month is to follow the plan consistently and write down one lesson after every trade.'],
-    ['INFY', 'Learning note: diversification is about different sources of risk. Five technology stocks can still behave like one large position. A useful exercise is to group your holdings by sector.'],
-    ['HDFCBANK', 'Finished my weekly portfolio review. Trimmed the distractions, checked my allocation, and updated my trading journal. Small steps make the process easier to repeat.'],
+    ['GBP/USD', 'Learning note: diversification is about different sources of risk. Five altcoins can still behave like one large position, and several USD pairs share the same dollar exposure. A useful exercise is to group your holdings by the currency they depend on.'],
+    ['AUD/USD', 'Finished my weekly portfolio review. Trimmed the distractions, checked my allocation, and updated my trading journal. Small steps make the process easier to repeat.'],
   ];
-  const posts = postContent.map(([symbol, content], i) => ({ id: `preview-post-${i}`, content, symbol, exchange: symbol.includes('/') ? 'FOREX' : symbol.endsWith('USDT') ? 'BINANCE' : 'NSE',
+  const posts = postContent.map(([symbol, content], i) => ({ id: `preview-post-${i}`, content, symbol, exchange: symbol.includes('/') ? 'FOREX' : 'BINANCE',
     likeCount: [42, 86, 24, 18, 57, 12][i], commentCount: 2, createdAt: ago(1 + i * 3), liked: false, bookmarked: i === 1,
     isEditorsPick: i === 1 || i === 4, author: authors[i % authors.length] }));
   type Comment = { id: string; content: string; parentId: string | null; createdAt: string; author: typeof authors[number] };
@@ -185,10 +172,10 @@ export function createDemoApi() {
   ]]));
   const following = new Set([authors[0].id, authors[1].id]);
   const sampleAnswer = (kind: AiKind, symbol = 'BTCUSDT') => kind === 'portfolio'
-    ? 'Demo portfolio review\n\nYour sample portfolio holds five Indian equities alongside a cash reserve. Reliance and TCS are the largest positions, while banking, IT, and consumer stocks add variety.\n\nFor your next review:\n• Compare your allocation with your learning goals.\n• Set a position-size limit before each paper trade.\n• Keep a journal of why you entered and what would change your view.\n\nThis is a prepared sample response for the UI preview, not a live portfolio recommendation.'
+    ? 'Demo portfolio review\n\nYour sample portfolio holds four crypto pairs and one forex position alongside a USD cash reserve. Bitcoin and Ethereum are the largest positions, so most of the risk moves with the broader crypto market.\n\nFor your next review:\n• Compare your allocation with your learning goals.\n• Set a position-size limit before each paper trade.\n• Keep a journal of why you entered and what would change your view.\n\nThis is a prepared sample response for the UI preview, not a live portfolio recommendation.'
     : kind === 'analysis'
       ? `Sample ${symbol} analysis\n\nThe demo chart shows a gradual recovery with several pullbacks. Use the marked high and low to practice identifying a range, then compare price action with volume.\n\nA useful learning exercise: write down both a continuation scenario and a reversal scenario before placing a paper trade.\n\nThese prices and this response are fictional preview data, not current market analysis.`
-      : 'Here is a simple framework to explore in your paper-trading journal.\n\n1. Start with the broader market trend.\n2. Define the amount you are willing to risk before entering.\n3. Compare the setup with your plan instead of chasing a price move.\n4. Review both good and bad outcomes to improve the process.\n\nFor example, a sample ₹10,00,000 portfolio risking 1% on a practice trade has a ₹10,000 risk budget. Position size also depends on the distance to the planned stop.\n\nThis is a prepared demo answer so you can preview the chat interface. It is not a live AI response.';
+      : 'Here is a simple framework to explore in your paper-trading journal.\n\n1. Start with the broader market trend.\n2. Define the amount you are willing to risk before entering.\n3. Compare the setup with your plan instead of chasing a price move.\n4. Review both good and bad outcomes to improve the process.\n\nFor example, a sample $100,000 portfolio risking 1% on a practice trade has a $1,000 risk budget. Position size also depends on the distance to the planned stop.\n\nThis is a prepared demo answer so you can preview the chat interface. It is not a live AI response.';
   const conversations: Conversation[] = [
     { id: 'preview-chat-1', title: 'A framework for market risk', kind: 'chat', updatedAt: ago(1), messages: [
       { id: 'chat-1-user', role: 'user', content: 'How can I build a consistent risk-management routine?' },
@@ -236,16 +223,15 @@ export function createDemoApi() {
           const query = (url.searchParams.get('q') ?? '').toLowerCase();
           return { results: quotes.filter(q => `${q.symbol} ${q.name}`.toLowerCase().replace(/[\s/_-]/g,'').includes(query.replace(/[\s/_-]/g,''))) };
         }
-        const indices = quotes.filter(q => ['NIFTY','BANKNIFTY','SENSEX'].includes(q.symbol));
         const crypto = quotes.filter(q => q.exchange === 'BINANCE');
         const forex = quotes.filter(q => q.exchange === 'FOREX');
         const availability = {crypto: 'Demo · fictional prices', forex: 'Demo · fictional prices'};
         const constituents = [...crypto, ...forex];
-        if (parts[2] === 'explore') return { indices: [], crypto, forex, availability, constituents,
+        if (parts[2] === 'explore') return { crypto, forex, availability, constituents,
           gainers: constituents.filter(q => q.change > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 5),
           losers: constituents.filter(q => q.change < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 5),
           active: [...constituents].sort((a, b) => b.volume - a.volume).slice(0, 5), isDemo: true, statusLabel: 'Demo market snapshot' };
-        if (parts[2] === 'overview') return { indices, crypto, forex, availability, statusLabel: 'Demo market snapshot', sentiment: 'Bullish', volatilityLabel: 'Low', isDemo: true,
+        if (parts[2] === 'overview') return { crypto, forex, availability, statusLabel: 'Demo market snapshot', sentiment: 'Bullish', volatilityLabel: 'Low', isDemo: true,
           news: [
             { id: 'news-1', title: 'Sample market wrap: forex and crypto in the practice watchlist', source: 'Demo Market Desk' },
             { id: 'news-2', title: 'Learning corner: understanding quote currencies and price precision', source: 'Gurukul Learning' },
@@ -278,7 +264,8 @@ export function createDemoApi() {
         }
         if (parts[2] === 'posts') {
           if (parts.length === 3 && method === 'POST') {
-            const post = { id: id('post'), content: text('content'), symbol: text('symbol'), exchange: text('exchange') || 'NSE', likeCount: 0,
+            const tagged = text('symbol') ? quoteFor(text('symbol').replace(/^([A-Z]{3})([A-Z]{3})$/i, '$1/$2')) : undefined;
+            const post = { id: id('post'), content: text('content'), symbol: tagged?.symbol ?? '', exchange: tagged?.exchange ?? '', likeCount: 0,
               commentCount: 0, createdAt: new Date().toISOString(), liked: false, bookmarked: false, isEditorsPick: false, author: user };
             posts.unshift(post); comments[post.id] = []; return { post };
           }

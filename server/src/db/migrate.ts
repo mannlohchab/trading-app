@@ -1,4 +1,5 @@
 import { sqlite } from './index';
+import { removeIndianMarketData } from './legacyCleanup';
 
 const statements = `
 CREATE TABLE IF NOT EXISTS users (
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS watchlist_items (
   id TEXT PRIMARY KEY,
   watchlist_id TEXT NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
   symbol TEXT NOT NULL,
-  exchange TEXT NOT NULL DEFAULT 'NSE',
+  exchange TEXT NOT NULL,
   name TEXT NOT NULL,
   token TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -62,16 +63,16 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   account_id TEXT NOT NULL REFERENCES paper_accounts(id) ON DELETE CASCADE,
   symbol TEXT NOT NULL,
-  exchange TEXT NOT NULL DEFAULT 'NSE',
+  exchange TEXT NOT NULL,
   name TEXT NOT NULL,
   side TEXT NOT NULL,
   order_type TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
+  quantity REAL NOT NULL,
   limit_price REAL,
   stop_loss REAL,
   take_profit REAL,
   status TEXT NOT NULL DEFAULT 'PENDING',
-  filled_qty INTEGER NOT NULL DEFAULT 0,
+  filled_qty REAL NOT NULL DEFAULT 0,
   avg_fill_price REAL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -84,9 +85,9 @@ CREATE TABLE IF NOT EXISTS positions (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   account_id TEXT NOT NULL REFERENCES paper_accounts(id) ON DELETE CASCADE,
   symbol TEXT NOT NULL,
-  exchange TEXT NOT NULL DEFAULT 'NSE',
+  exchange TEXT NOT NULL,
   name TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
+  quantity REAL NOT NULL,
   avg_price REAL NOT NULL,
   stop_loss REAL,
   take_profit REAL,
@@ -104,7 +105,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   type TEXT NOT NULL,
   symbol TEXT,
   exchange TEXT,
-  quantity INTEGER,
+  quantity REAL,
   price REAL,
   amount REAL NOT NULL,
   realized_pnl REAL DEFAULT 0,
@@ -211,5 +212,8 @@ CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
 for (const stmt of statements.split(';').map((s) => s.trim()).filter(Boolean)) {
   sqlite.exec(stmt);
 }
+
+const { user_version: schemaVersion } = sqlite.query('PRAGMA user_version').get() as { user_version: number };
+if (schemaVersion < 1) removeIndianMarketData(sqlite);
 
 console.log('Database migrated successfully.');
