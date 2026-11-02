@@ -73,6 +73,9 @@ export const Fonts = Platform.select({
   },
 });
 
+// The AI welcome heading's serif family is the default throughout the app.
+export const AppFont = Fonts.serif;
+
 export const Spacing = {
   half: 2,
   one: 4,

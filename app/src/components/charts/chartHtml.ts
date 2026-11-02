@@ -37,7 +37,7 @@ export function buildChartHtml(
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <style>
-  html,body,#wrap{margin:0;padding:0;height:100%;background:#fff;overflow:hidden;font-family:system-ui,sans-serif;}
+  html,body,#wrap{margin:0;padding:0;height:100%;background:#fff;overflow:hidden;font-family:Georgia,"Times New Roman",serif;}
   #chart{height:${showVolume ? '78%' : '100%'};}
   #vol{height:${showVolume ? '22%' : '0'};display:${showVolume ? 'block' : 'none'};}
   #tip{
@@ -74,7 +74,7 @@ ${drawingToolsCss}
   const drawingKey = ${JSON.stringify(drawingKey).replace(/</g, '\\u003c')};
   const grid = '#F0EDF6';
   const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-    layout: { background: { color: '#FFFFFF' }, textColor: '#64748b', fontSize: 12 },
+    layout: { background: { color: '#FFFFFF' }, textColor: '#64748b', fontFamily: 'Georgia, Times New Roman, serif', fontSize: 12 },
     grid: { vertLines: { color: grid }, horzLines: { color: grid } },
     rightPriceScale: { borderColor: '#E2E8F0', scaleMargins: { top: 0.08, bottom: 0.08 } },
     timeScale: { borderColor: '#E2E8F0', timeVisible: true, secondsVisible: false },
@@ -90,7 +90,7 @@ ${drawingToolsCss}
   let volChart = null;
   if (showVolume) {
     volChart = LightweightCharts.createChart(document.getElementById('vol'), {
-      layout: { background: { color: '#FFFFFF' }, textColor: '#64748b' },
+      layout: { background: { color: '#FFFFFF' }, textColor: '#64748b', fontFamily: 'Georgia, Times New Roman, serif' },
       grid: { vertLines: { visible: false }, horzLines: { color: grid } },
       rightPriceScale: { borderColor: '#E2E8F0' },
       timeScale: { visible: false },

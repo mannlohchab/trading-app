@@ -3,9 +3,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/ui/AppText';
 
-import { Palette } from '@/constants/theme';
+import { AppFont, Palette } from '@/constants/theme';
 import { useAuth } from '@/store/auth';
 import { DEMO_MODE } from '@/lib/demoMode';
 
@@ -37,7 +38,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: Palette.bg },
           headerStyle: { backgroundColor: Palette.bgElevated },
           headerTintColor: Palette.text,
-          headerTitleStyle: { fontWeight: '700' },
+          headerTitleStyle: { fontFamily: AppFont, fontWeight: '700' },
           headerShadowVisible: false,
         }}>
         <Stack.Screen name="index" />

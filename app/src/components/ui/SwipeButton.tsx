@@ -2,6 +2,8 @@ import { type Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef,
 import { ActivityIndicator, PanResponder, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { AppFont } from '@/constants/theme';
+
 import { getSwipeOffset, isSwipeComplete } from './swipe-gesture';
 import { SwipeConfetti } from './SwipeConfetti';
 
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#00c896', borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  label: { color: '#858585', fontSize: 16, fontWeight: '400', textAlign: 'center', marginHorizontal: 54 },
+  label: { fontFamily: AppFont, color: '#858585', fontSize: 16, fontWeight: '400', textAlign: 'center', marginHorizontal: 54 },
   handle: {
     position: 'absolute', left: 3, top: 3, width: HANDLE_WIDTH, height: 48,
     borderRadius: 8, backgroundColor: '#fff',

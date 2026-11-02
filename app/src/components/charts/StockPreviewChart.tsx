@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/AppText';
 
 import { formatMarketPrice, type PriceMetadata } from '@/lib/format';
 import { buildPreviewChart, nearestChartPoint, previewLineSegments } from '@/lib/stockPreview';

@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/AppText';
 import { parseInline, parseResponse } from '@/lib/aiResponse';
 
 function Inline({ content }: { content: string }) {

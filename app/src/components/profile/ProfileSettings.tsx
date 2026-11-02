@@ -1,5 +1,6 @@
 import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
+import { Text, TextInput } from '@/components/ui/AppText';
 import { useMutation } from '@tanstack/react-query';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
 import { api } from '@/lib/api';

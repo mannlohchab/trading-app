@@ -18,5 +18,6 @@ body,
 
 body {
   margin: 0;
+  font-family: var(--font-serif);
   color: #0f172a;
 }

@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassIcon } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { AppFont, Palette } from '@/constants/theme';
 import { useAuth } from '@/store/auth';
 
 export default function AppTabs() {
@@ -57,5 +57,5 @@ const styles = StyleSheet.create({
   },
   item: { paddingVertical: 0, minHeight: 44 },
   iconSlot: { width: 28, height: 28, marginBottom: 2 },
-  label: { fontSize: 11, lineHeight: 15, fontWeight: '400', marginTop: 2 },
+  label: { fontFamily: AppFont, fontSize: 11, lineHeight: 15, fontWeight: '400', marginTop: 2 },
 });

@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/AppText';
 
 import { GlassPressable } from '@/components/ui/GlassIcon';
 
@@ -27,7 +28,7 @@ export function PortfolioDonut({ portfolio, loading }: Props) {
       const midpoint = (offset + length / 2) / circumference * 360;
       const point = portfolioPoint(midpoint);
       const label = segment.share >= 0.12
-        ? `<text x="${point.x}" y="${point.y}" dy="4.5" fill="#fff" font-family="Arial,sans-serif" font-size="14" font-weight="700" text-anchor="middle">${(segment.share * 100).toFixed(1)}%</text>` : '';
+        ? `<text x="${point.x}" y="${point.y}" dy="4.5" fill="#fff" font-family="Georgia,Times New Roman,serif" font-size="14" font-weight="700" text-anchor="middle">${(segment.share * 100).toFixed(1)}%</text>` : '';
       const circle = `<circle cx="160" cy="160" r="118" fill="none" stroke="${COLORS[segment.key]}" stroke-width="48" stroke-dasharray="${length - gap} ${circumference - length + gap}" stroke-dashoffset="${-offset - gap / 2}" transform="rotate(-90 160 160)"/>`;
       offset += length;
       return `<g opacity="${opacity}">${circle}${label}</g>`;

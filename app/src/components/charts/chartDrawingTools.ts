@@ -188,7 +188,7 @@ export const drawingToolsScript = `
     svg('line', { x1, y1, x2, y2, stroke: color, 'stroke-width': strokeWidth, 'stroke-dasharray': dashed ? '5 4' : 'none' });
   }
   function label(x, y, text, color = '#0052D6') {
-    svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': 'system-ui', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, text);
+    svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': 'Georgia, Times New Roman, serif', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, text);
   }
   function renderDrawing(drawing, width, height) {
     const color = drawingColor(drawing);
