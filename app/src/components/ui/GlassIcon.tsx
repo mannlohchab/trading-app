@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { createContext, useContext, type ReactNode } from 'react';
+import { SymbolView } from 'expo-symbols';
+import { createContext, useContext, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, type PressableProps } from 'react-native';
 
 const GlassPressedContext = createContext(false);
@@ -71,6 +72,26 @@ const ICONS = {
 
 export type GlassIconName = keyof typeof ICONS;
 
+// Temporary visual comparison: set true to restore the original glass artwork.
+const USE_GLASS_ICONS = true;
+
+const STANDARD_ICONS = {
+  home: { ios: 'house', android: 'home', web: 'home' },
+  community: { ios: 'person.2', android: 'group', web: 'group' },
+  analytics: { ios: 'chart.pie', android: 'pie_chart', web: 'pie_chart' },
+  profile: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },
+  wallet: { ios: 'wallet.bifold', android: 'account_balance_wallet', web: 'account_balance_wallet' },
+  send: { ios: 'paperplane', android: 'send', web: 'send' },
+  card: { ios: 'creditcard', android: 'credit_card', web: 'credit_card' },
+  add: { ios: 'plus.circle', android: 'add_circle', web: 'add_circle' },
+  up: { ios: 'arrow.up.circle', android: 'arrow_circle_up', web: 'arrow_circle_up' },
+  down: { ios: 'arrow.down.circle', android: 'arrow_circle_down', web: 'arrow_circle_down' },
+  chart: { ios: 'chart.xyaxis.line', android: 'show_chart', web: 'show_chart' },
+  coin: { ios: 'dollarsign.circle', android: 'monetization_on', web: 'monetization_on' },
+} as const satisfies Record<GlassIconName, ComponentProps<typeof SymbolView>['name']>;
+
+const STANDARD_COLORS = { neutral: '#4B5563', purple: '#087AF5', blue: '#087AF5', orange: '#F28C28' };
+
 const ACCENT_ICONS: Partial<Record<GlassIconName, Partial<Record<'orange' | 'blue', number>>>> = {
   send: {
     orange: require('../../../assets/icons/nucleo-glass/paper-plane-orange.png'),
@@ -90,6 +111,16 @@ type Props = {
 export function GlassIcon({ name, size = 24, tone, rotation = 0 }: Props) {
   const pressed = useContext(GlassPressedContext);
   const resolvedTone = tone ?? (pressed ? 'purple' : 'neutral');
+  if (!USE_GLASS_ICONS) {
+    return <SymbolView
+      name={STANDARD_ICONS[name]}
+      size={size}
+      tintColor={STANDARD_COLORS[resolvedTone]}
+      type="monochrome"
+      style={{ width: size, height: size, transform: [{ rotate: `${rotation}deg` }] }}
+      accessible={false}
+    />;
+  }
   const source = resolvedTone === 'orange' || resolvedTone === 'blue'
     ? ACCENT_ICONS[name]?.[resolvedTone] ?? ICONS[name].neutral
     : ICONS[name][resolvedTone];
