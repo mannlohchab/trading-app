@@ -10,25 +10,25 @@ export const drawingToolsCss = `
   #chart{position:relative;}
   #draw-layer{position:absolute;left:0;top:0;z-index:6;pointer-events:none;overflow:hidden;}
   #draw-layer.active{pointer-events:auto;touch-action:none;cursor:crosshair;}
-  #drawing-ui{position:absolute;left:10px;top:10px;z-index:8;color:#414869;font-size:12px;}
-  #drawing-ui button{font:inherit;color:inherit;cursor:pointer;min-height:42px;border:1px solid #E3E7F4;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 10px;}
+  #drawing-ui{position:absolute;left:10px;top:10px;z-index:8;color:#475569;font-size:12px;}
+  #drawing-ui button{font:inherit;color:inherit;cursor:pointer;min-height:42px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 10px;}
   #drawing-ui button:hover{background:#F8F6FC;}
-  #drawing-ui button:focus-visible{outline:2px solid #3385F2;outline-offset:2px;}
-  #drawing-ui button[aria-pressed=true]{background:#E9EFFE;border-color:#B1C2F6;color:#4B62A4;}
+  #drawing-ui button:focus-visible{outline:2px solid #0066FF;outline-offset:2px;}
+  #drawing-ui button[aria-pressed=true]{background:#F1F5F9;border-color:#BCD3FF;color:#0052D6;}
   #drawing-ui button:disabled{opacity:.4;cursor:default;}
   #drawing-ui svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  #tools-toggle{box-shadow:0 2px 10px rgba(51,72,132,.08);font-weight:600!important;}
-  #drawing-menu{margin-top:6px;padding:10px;background:#fff;border:1px solid #D8DEF6;border-radius:14px;box-shadow:0 4px 24px rgba(51,72,132,.12);width:min(260px,calc(100vw - 44px));max-height:calc(100vh - 85px);overflow:auto;}
+  #tools-toggle{box-shadow:0 2px 10px rgba(0,66,173,.08);font-weight:600!important;}
+  #drawing-menu{margin-top:6px;padding:10px;background:#fff;border:1px solid #DBE7FF;border-radius:14px;box-shadow:0 4px 24px rgba(0,66,173,.12);width:min(260px,calc(100vw - 44px));max-height:calc(100vh - 85px);overflow:auto;}
   #drawing-menu[hidden],#drawing-hint[hidden],#clear-confirm[hidden],#drawing-editor[hidden]{display:none;}
   .draw-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   #drawing-menu .draw-grid button{justify-content:flex-start;}
-  .draw-section{font-size:11px;color:#6f7487;margin:2px 0 8px;}
+  .draw-section{font-size:11px;color:#64748b;margin:2px 0 8px;}
   .draw-actions{display:flex;gap:6px;border-top:1px solid #F0ECF5;margin-top:10px;padding-top:10px;flex-wrap:wrap;}
   .draw-actions button{flex:1;}
-  #drawing-hint{margin-top:6px;background:#F8F6FC;border:1px solid #D8DEF6;padding:8px 10px;border-radius:10px;max-width:220px;line-height:1.4;}
+  #drawing-hint{margin-top:6px;background:#F8F6FC;border:1px solid #DBE7FF;padding:8px 10px;border-radius:10px;max-width:220px;line-height:1.4;}
   #drawing-hint button{margin-top:6px;min-height:32px;}
   #clear-confirm{padding-top:10px;line-height:1.5;}
-  #drawing-editor{margin-top:6px;padding:12px;background:#fff;border:1px solid #D8DEF6;border-radius:14px;box-shadow:0 4px 24px rgba(51,72,132,.12);width:min(260px,calc(100vw - 44px));max-height:calc(100vh - 85px);overflow:auto;}
+  #drawing-editor{margin-top:6px;padding:12px;background:#fff;border:1px solid #DBE7FF;border-radius:14px;box-shadow:0 4px 24px rgba(0,66,173,.12);width:min(260px,calc(100vw - 44px));max-height:calc(100vh - 85px);overflow:auto;}
   .drawing-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
   .draw-colors{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;}
   #drawing-ui .draw-color{min-width:0;min-height:44px;padding:4px;}
@@ -116,7 +116,7 @@ export const drawingToolsScript = `
     redoHistory = [];
   }
   function drawingColor(drawing) {
-    return /^#[0-9a-f]{6}$/i.test(drawing.color || '') ? drawing.color : '#3385F2';
+    return /^#[0-9a-f]{6}$/i.test(drawing.color || '') ? drawing.color : '#0066FF';
   }
   function selectDrawing(index) {
     selectedDrawing = index;
@@ -184,10 +184,10 @@ export const drawingToolsScript = `
     drawingLayer.appendChild(element);
     return element;
   }
-  function line(x1, y1, x2, y2, dashed = false, color = '#3385F2', strokeWidth = 1.6) {
+  function line(x1, y1, x2, y2, dashed = false, color = '#0066FF', strokeWidth = 1.6) {
     svg('line', { x1, y1, x2, y2, stroke: color, 'stroke-width': strokeWidth, 'stroke-dasharray': dashed ? '5 4' : 'none' });
   }
-  function label(x, y, text, color = '#4B62A4') {
+  function label(x, y, text, color = '#0052D6') {
     svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': 'system-ui', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, text);
   }
   function renderDrawing(drawing, width, height) {

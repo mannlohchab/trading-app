@@ -42,9 +42,9 @@ export function buildChartHtml(
   #vol{height:${showVolume ? '22%' : '0'};display:${showVolume ? 'block' : 'none'};}
   #tip{
     position:absolute;display:none;pointer-events:none;z-index:5;
-    background:#fff;color:#293049;border:1px solid #D0DAF9;border-radius:10px;padding:8px 12px;
+    background:#fff;color:#1E293B;border:1px solid #BCD3FF;border-radius:10px;padding:8px 12px;
     font-size:12px;line-height:1.25;min-width:72px;text-align:left;
-    box-shadow:0 2px 8px rgba(51,72,132,.12);
+    box-shadow:0 2px 8px rgba(0,66,173,.12);
   }
   #tip b{font-weight:700;}
   #tip.down{border-color:#F2CCD6;}
@@ -74,14 +74,14 @@ ${drawingToolsCss}
   const drawingKey = ${JSON.stringify(drawingKey).replace(/</g, '\\u003c')};
   const grid = '#F0EDF6';
   const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-    layout: { background: { color: '#FFFFFF' }, textColor: '#6f7487', fontSize: 12 },
+    layout: { background: { color: '#FFFFFF' }, textColor: '#64748b', fontSize: 12 },
     grid: { vertLines: { color: grid }, horzLines: { color: grid } },
-    rightPriceScale: { borderColor: '#E3E7F4', scaleMargins: { top: 0.08, bottom: 0.08 } },
-    timeScale: { borderColor: '#E3E7F4', timeVisible: true, secondsVisible: false },
+    rightPriceScale: { borderColor: '#E2E8F0', scaleMargins: { top: 0.08, bottom: 0.08 } },
+    timeScale: { borderColor: '#E2E8F0', timeVisible: true, secondsVisible: false },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#91A0D2', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#4267C4' },
-      horzLine: { color: '#91A0D2', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#4267C4' },
+      vertLine: { color: '#94A3B8', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#0066FF' },
+      horzLine: { color: '#94A3B8', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#0066FF' },
     },
     handleScroll: true,
     handleScale: true,
@@ -90,20 +90,20 @@ ${drawingToolsCss}
   let volChart = null;
   if (showVolume) {
     volChart = LightweightCharts.createChart(document.getElementById('vol'), {
-      layout: { background: { color: '#FFFFFF' }, textColor: '#6f7487' },
+      layout: { background: { color: '#FFFFFF' }, textColor: '#64748b' },
       grid: { vertLines: { visible: false }, horzLines: { color: grid } },
-      rightPriceScale: { borderColor: '#E3E7F4' },
+      rightPriceScale: { borderColor: '#E2E8F0' },
       timeScale: { visible: false },
     });
   }
 
   let series;
   if (chartType === 'line') {
-    series = chart.addLineSeries({ color: '#3385F2', lineWidth: 2, priceLineVisible: false });
+    series = chart.addLineSeries({ color: '#0066FF', lineWidth: 2, priceLineVisible: false });
     series.setData(candles.map(c => ({ time: c.time, value: c.close })));
   } else if (chartType === 'area') {
     series = chart.addAreaSeries({
-      lineColor: '#3385F2', topColor: 'rgba(51,133,242,0.24)', bottomColor: 'rgba(51,133,242,0.02)',
+      lineColor: '#0066FF', topColor: 'rgba(0,102,255,0.24)', bottomColor: 'rgba(0,102,255,0.02)',
       priceLineVisible: false,
     });
     series.setData(candles.map(c => ({ time: c.time, value: c.close })));
@@ -185,12 +185,12 @@ ${drawingToolsCss}
     addIndicator('#B98428', () => sma(20));
   }
   if (indicators.includes('EMA')) {
-    addIndicator('#3385F2', () => ema(20));
+    addIndicator('#0066FF', () => ema(20));
   }
   if (indicators.includes('BB')) {
-    addIndicator('#848E9C', () => bollinger().mid);
-    addIndicator('#5E6673', () => bollinger().upper);
-    addIndicator('#5E6673', () => bollinger().lower);
+    addIndicator('#94A3B8', () => bollinger().mid);
+    addIndicator('#64748B', () => bollinger().upper);
+    addIndicator('#64748B', () => bollinger().lower);
   }
 
   if (volChart) {

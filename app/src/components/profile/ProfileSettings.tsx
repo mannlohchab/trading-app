@@ -165,7 +165,7 @@ function CardHeading({ icon, title, subtitle }: { icon: ComponentProps<typeof Gl
 
 function Field({ label, ...props }: ComponentProps<typeof TextInput> & { label: string }) {
   return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput {...props}
-    accessibilityLabel={label} placeholderTextColor="#758b9d" autoCapitalize={props.secureTextEntry ? 'none' : 'sentences'}
+    accessibilityLabel={label} placeholderTextColor="#64748b" autoCapitalize={props.secureTextEntry ? 'none' : 'sentences'}
     autoCorrect={!props.secureTextEntry} style={[styles.input, props.multiline && styles.bio, !props.editable && styles.disabled]} /></View>;
 }
 
@@ -175,7 +175,7 @@ function PreferenceRow({ title, description, value, disabled, onChange }: {
   return <View style={styles.preferenceRow}><View style={styles.flex}><Text style={styles.preferenceTitle}>{title}</Text>
     <Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={title}
     accessibilityHint={description} disabled={disabled} value={value} onValueChange={onChange}
-    trackColor={{ false: '#DDE1EF', true: '#3385F2' }} thumbColor="#ffffff" ios_backgroundColor="#DDE1EF" /></View>;
+    trackColor={{ false: '#E2E8F0', true: '#0066FF' }} thumbColor="#ffffff" ios_backgroundColor="#E2E8F0" /></View>;
 }
 
 function Status({ feedback }: { feedback: Feedback }) {
@@ -189,36 +189,36 @@ function ActionButton({ title, pendingTitle, pending, disabled, secondary, onPre
   return <GlassPressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled, busy: pending }}
     disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.secondaryButton,
       disabled && styles.disabled, pressed && styles.pressed]}>
-    {pending ? <ActivityIndicator color={secondary ? '#4267C4' : '#ffffff'} size="small" /> : null}
+    {pending ? <ActivityIndicator color={secondary ? '#0066FF' : '#ffffff'} size="small" /> : null}
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{pending ? pendingTitle : title}</Text>
   </GlassPressable>;
 }
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, gap: 16 },
-  card: { padding: 18, borderRadius: 22, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E3E7F4' },
+  card: { padding: 18, borderRadius: 22, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#E9EFFE', alignItems: 'center', justifyContent: 'center' },
+  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
-  headingTitle: { color: '#293049', fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
-  subtitle: { color: '#757995', fontSize: 12, marginTop: 4, lineHeight: 17 },
+  headingTitle: { color: '#1E293B', fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
+  subtitle: { color: '#64748B', fontSize: 12, marginTop: 4, lineHeight: 17 },
   accountDetails: { padding: 14, backgroundColor: '#FAF8FE', borderRadius: 14, marginBottom: 10 },
-  detailLabel: { fontSize: 10, letterSpacing: 1.4, fontWeight: '600', color: '#757995' },
-  detailValue: { color: '#414869', fontSize: 13, marginTop: 5, lineHeight: 19 },
+  detailLabel: { fontSize: 10, letterSpacing: 1.4, fontWeight: '600', color: '#64748B' },
+  detailValue: { color: '#475569', fontSize: 13, marginTop: 5, lineHeight: 19 },
   emailLabel: { marginTop: 14 },
   field: { marginTop: 12 },
-  label: { fontSize: 12, color: '#414869', fontWeight: '500', marginBottom: 7 },
-  input: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#D8DEF6', backgroundColor: '#FCFBFE', color: '#293049', fontSize: 14 },
+  label: { fontSize: 12, color: '#475569', fontWeight: '500', marginBottom: 7 },
+  input: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#DBE7FF', backgroundColor: '#FCFBFE', color: '#1E293B', fontSize: 14 },
   bio: { minHeight: 96, textAlignVertical: 'top', lineHeight: 20 },
-  counter: { color: '#878CA4', textAlign: 'right', fontSize: 10, marginTop: 7 },
-  helper: { color: '#757995', fontSize: 11, marginTop: 8, lineHeight: 16 },
-  preferenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E3E7F4' },
-  preferenceTitle: { fontSize: 14, fontWeight: '500', color: '#414869' },
-  preferenceDescription: { fontSize: 11, color: '#757995', lineHeight: 16, marginTop: 4 },
-  button: { minHeight: 48, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 13, backgroundColor: '#4267C4', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  counter: { color: '#94A3B8', textAlign: 'right', fontSize: 10, marginTop: 7 },
+  helper: { color: '#64748B', fontSize: 11, marginTop: 8, lineHeight: 16 },
+  preferenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0' },
+  preferenceTitle: { fontSize: 14, fontWeight: '500', color: '#475569' },
+  preferenceDescription: { fontSize: 11, color: '#64748B', lineHeight: 16, marginTop: 4 },
+  button: { minHeight: 48, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 13, backgroundColor: '#0066FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   buttonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
-  secondaryButton: { backgroundColor: '#F6F2FC', borderWidth: 1, borderColor: '#D0DAF9' },
-  secondaryText: { color: '#4267C4' },
+  secondaryButton: { backgroundColor: '#F6F2FC', borderWidth: 1, borderColor: '#BCD3FF' },
+  secondaryText: { color: '#0066FF' },
   feedback: { fontSize: 12, lineHeight: 18, marginTop: 10 },
   error: { color: '#a02f45' },
   success: { color: '#23704d' },

@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="480" height="630" viewBox="0 0 480 630" preserveAspectRatio="none">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0.85" y2="1">
-      <stop offset="0" stop-color="#e6f4fa"/>
-      <stop offset="0.4" stop-color="#b4dbf4"/>
-      <stop offset="0.7" stop-color="#65a8df"/>
+      <stop offset="0" stop-color="#e6eefa"/>
+      <stop offset="0.4" stop-color="#b4cef4"/>
+      <stop offset="0.7" stop-color="#6596df"/>
       <stop offset="1" stop-color="#edf5fb"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.12" cy="0.5" r="0.62">
-      <stop offset="0" stop-color="#d2f0ff" stop-opacity="0.9"/>
-      <stop offset="1" stop-color="#bce3ff" stop-opacity="0"/>
+      <stop offset="0" stop-color="#d2e4ff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#bcd7ff" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="depth" cx="0.92" cy="0.65" r="0.46">
-      <stop offset="0" stop-color="#185394" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#3c81c5" stop-opacity="0"/>
+      <stop offset="0" stop-color="#184a94" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#3c73c5" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <path fill="url(#sky)" d="M0 0h480v630H0z"/>

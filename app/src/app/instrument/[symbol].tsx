@@ -71,7 +71,7 @@ export default function InstrumentScreen() {
           <TradingChart key={`${exchange}:${symbol}:${timeframe}`} pricePrecision={metadata.pricePrecision} currency={metadata.currency} candles={candlesQuery.data.candles} chartType={chartType} indicators={indicators} height={chartHeight} symbol={symbol} drawingKey={`${exchange}:${symbol}:${timeframe}`} drawingStore={drawingStore} />
         ) : null : (
           <View style={styles.empty}>
-            {candlesQuery.isPending ? <ActivityIndicator color="#3385F2" /> : null}
+            {candlesQuery.isPending ? <ActivityIndicator color="#0066FF" /> : null}
             <Text style={styles.muted}>{candlesQuery.isPending ? 'Loading chart…' : 'Price history is unavailable'}</Text>
             {candlesQuery.isError ? <Pressable accessibilityRole="button" onPress={() => void candlesQuery.refetch()}><Text style={styles.retry}>Retry</Text></Pressable> : null}
           </View>
@@ -117,25 +117,25 @@ export default function InstrumentScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E3E7F4' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   iconButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 12 },
-  backGlyph: { fontSize: 30, lineHeight: 34, color: '#4B62A4' },
+  backGlyph: { fontSize: 30, lineHeight: 34, color: '#0052D6' },
   identity: { flex: 1 },
-  symbol: { fontSize: 16, fontWeight: '600', color: '#293049' },
-  timeframe: { fontSize: 13, fontWeight: '500', color: '#4267C4' },
-  source: { fontSize: 11, color: '#6f7487', marginTop: 2 },
+  symbol: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+  timeframe: { fontSize: 13, fontWeight: '500', color: '#0066FF' },
+  source: { fontSize: 11, color: '#64748b', marginTop: 2 },
   chart: { flex: 1, minHeight: 0 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  muted: { fontSize: 13, color: '#6f7487' },
-  retry: { fontSize: 14, fontWeight: '600', color: '#4267C4', padding: 12 },
-  settings: { position: 'absolute', bottom: 12, left: 12, right: 12, maxWidth: 440, maxHeight: '90%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#D8DEF6', borderRadius: 18, boxShadow: '0 4px 24px rgba(51,72,132,0.14)' },
+  muted: { fontSize: 13, color: '#64748b' },
+  retry: { fontSize: 14, fontWeight: '600', color: '#0066FF', padding: 12 },
+  settings: { position: 'absolute', bottom: 12, left: 12, right: 12, maxWidth: 440, maxHeight: '90%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#DBE7FF', borderRadius: 18, boxShadow: '0 4px 24px rgba(0,66,173,0.14)' },
   settingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, paddingRight: 4, borderBottomWidth: 1, borderBottomColor: '#F0ECF5' },
-  heading: { fontSize: 16, fontWeight: '600', color: '#293049' },
+  heading: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
   settingsContent: { padding: 16, gap: 12 },
-  label: { fontSize: 13, fontWeight: '600', color: '#414869' },
+  label: { fontSize: 13, fontWeight: '600', color: '#475569' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { minWidth: 44, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#F8F6FC', borderWidth: 1, borderColor: '#E3E7F4' },
-  selected: { backgroundColor: '#E9EFFE', borderColor: '#B1C2F6' },
-  pillText: { fontSize: 13, color: '#68708A' },
-  selectedText: { color: '#4B62A4', fontWeight: '600' },
+  pill: { minWidth: 44, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#F8F6FC', borderWidth: 1, borderColor: '#E2E8F0' },
+  selected: { backgroundColor: '#F1F5F9', borderColor: '#BCD3FF' },
+  pillText: { fontSize: 13, color: '#64748B' },
+  selectedText: { color: '#0052D6', fontWeight: '600' },
 });

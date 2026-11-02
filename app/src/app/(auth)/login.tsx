@@ -136,7 +136,7 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   value={emailOrUsername}
                   onChangeText={setEmailOrUsername}
-                  placeholderTextColor="#abbad3"
+                  placeholderTextColor="#94a3b8"
                   autoComplete="username"
                   placeholder="demo"
                 />
@@ -147,7 +147,7 @@ export default function LoginScreen() {
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
-                  placeholderTextColor="#abbad3"
+                  placeholderTextColor="#94a3b8"
                   autoComplete="current-password"
                   returnKeyType="go"
                   onSubmitEditing={() => { void swipeButton.current?.submit(); }}
@@ -206,14 +206,14 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 14 },
   welcomeButton: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, height: 48 },
   loginButton: { overflow: 'hidden', backgroundColor: '#fff', borderColor: '#fff' },
-  loginButtonText: { color: '#101523', fontWeight: '500' },
+  loginButtonText: { color: '#0F172A', fontWeight: '500' },
   loginGradient: { position: 'absolute', top: 0, bottom: 0, left: '-100%', width: '300%' },
-  form: { gap: 10, backgroundColor: 'rgba(8, 23, 43, 0.86)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.18)', padding: 24 },
+  form: { gap: 10, backgroundColor: 'rgba(15, 23, 42, 0.86)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.18)', padding: 24 },
   backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 16 },
-  backText: { color: '#e7f0ff', fontSize: 14 },
+  backText: { color: '#f1f5f9', fontSize: 14 },
   formTitle: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.8 },
-  formSubtitle: { color: '#cbd9f1', fontSize: 14, marginBottom: 16 },
-  label: { color: '#e7f0ff', fontSize: 12, fontWeight: '600', marginTop: 8 },
+  formSubtitle: { color: '#bcd3ff', fontSize: 14, marginBottom: 16 },
+  label: { color: '#f1f5f9', fontSize: 12, fontWeight: '600', marginTop: 8 },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
@@ -236,8 +236,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonPressed: { opacity: 0.75 },
-  buttonText: { color: '#101523', fontWeight: '500', fontSize: 14 },
+  buttonText: { color: '#0F172A', fontWeight: '500', fontSize: 14 },
   error: { color: '#ffbdc8', marginTop: 8 },
-  hint: { color: '#cbd9f1', fontSize: 12, textAlign: 'center', marginTop: 12 },
+  hint: { color: '#bcd3ff', fontSize: 12, textAlign: 'center', marginTop: 12 },
   link: { color: '#fff', textAlign: 'center', marginTop: 16, fontWeight: '600', paddingVertical: 12 },
 });

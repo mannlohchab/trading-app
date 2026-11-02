@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   symbol: { color: Palette.text, fontSize: 13, fontWeight: '600', letterSpacing: -0.2 },
   name: { color: '#858998', fontSize: 11 },
   right: { alignItems: 'flex-end', flexShrink: 0, gap: 5 },
-  ltp: { color: '#1E2028', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
+  ltp: { color: '#1E293B', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
   removeBtn: { position: 'absolute', right: 6, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 6, zIndex: 2 },
   removeText: { color: Palette.textMuted, fontSize: 22, fontWeight: '400', lineHeight: 24 },
 });

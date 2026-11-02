@@ -53,8 +53,8 @@ export default function RootLayout() {
         />
         <Stack.Screen name="community/post/[id]" options={{ headerShown: true, title: 'Post' }} />
       </Stack>
-      {DEMO_MODE && <View style={{ backgroundColor: '#e6ecfc', paddingVertical: 6, paddingHorizontal: 12 }}>
-        <Text style={{ color: '#4a5a8f', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
+      {DEMO_MODE && <View style={{ backgroundColor: '#e2e8f0', paddingVertical: 6, paddingHorizontal: 12 }}>
+        <Text style={{ color: '#0052d6', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
       </View>}
       </View>
     </QueryClientProvider>

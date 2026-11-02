@@ -90,7 +90,7 @@ const STANDARD_ICONS = {
   coin: { ios: 'dollarsign.circle', android: 'monetization_on', web: 'monetization_on' },
 } as const satisfies Record<GlassIconName, ComponentProps<typeof SymbolView>['name']>;
 
-const STANDARD_COLORS = { neutral: '#4B5563', purple: '#087AF5', blue: '#087AF5', orange: '#F28C28' };
+const STANDARD_COLORS = { neutral: '#475569', purple: '#0066FF', blue: '#0066FF', orange: '#F28C28' };
 
 const ACCENT_ICONS: Partial<Record<GlassIconName, Partial<Record<'orange' | 'blue', number>>>> = {
   send: {

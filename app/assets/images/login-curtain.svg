@@ -3,23 +3,23 @@
     <linearGradient id="base" x2="0" y2="1">
       <stop stop-color="#191a18"/>
       <stop offset=".25" stop-color="#191a1b"/>
-      <stop offset=".46" stop-color="#233d5e"/>
-      <stop offset=".68" stop-color="#4c9af5"/>
-      <stop offset=".86" stop-color="#077dd9"/>
-      <stop offset="1" stop-color="#087ad4"/>
+      <stop offset=".46" stop-color="#233b5e"/>
+      <stop offset=".68" stop-color="#4c90f5"/>
+      <stop offset=".86" stop-color="#075bd9"/>
+      <stop offset="1" stop-color="#085ad4"/>
     </linearGradient>
     <linearGradient id="light" x2="0" y2="1">
-      <stop offset=".18" stop-color="#dfe6ff" stop-opacity="0"/>
-      <stop offset=".43" stop-color="#c5c8ff" stop-opacity=".18"/>
-      <stop offset=".57" stop-color="#e2e9ff" stop-opacity=".85"/>
-      <stop offset=".71" stop-color="#b9bbff" stop-opacity=".45"/>
-      <stop offset=".87" stop-color="#5ea4fe" stop-opacity="0"/>
+      <stop offset=".18" stop-color="#dfecff" stop-opacity="0"/>
+      <stop offset=".43" stop-color="#c5dcff" stop-opacity=".18"/>
+      <stop offset=".57" stop-color="#e2eeff" stop-opacity=".85"/>
+      <stop offset=".71" stop-color="#b9d5ff" stop-opacity=".45"/>
+      <stop offset=".87" stop-color="#5e9efe" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="shadow" x2="0" y2="1">
       <stop stop-color="#080a08" stop-opacity=".12"/>
       <stop offset=".36" stop-color="#0c0d0c" stop-opacity=".58"/>
-      <stop offset=".62" stop-color="#013057" stop-opacity=".25"/>
-      <stop offset=".87" stop-color="#0165af" stop-opacity="0"/>
+      <stop offset=".62" stop-color="#012357" stop-opacity=".25"/>
+      <stop offset=".87" stop-color="#0147af" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="fold">
       <stop stop-color="#000" stop-opacity=".16"/>
@@ -27,8 +27,8 @@
       <stop offset="1" stop-color="#000" stop-opacity=".1"/>
     </linearGradient>
     <linearGradient id="fade" x2="0" y2="1">
-      <stop offset=".66" stop-color="#017bd8" stop-opacity="0"/>
-      <stop offset="1" stop-color="#017bd8"/>
+      <stop offset=".66" stop-color="#0157d8" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0157d8"/>
     </linearGradient>
   </defs>
   <path fill="url(#base)" d="M0 0h390v844H0z"/>
