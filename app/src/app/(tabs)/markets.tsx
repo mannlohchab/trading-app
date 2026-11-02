@@ -18,8 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InstrumentRow, type QuoteLike } from '@/components/markets/InstrumentRow';
 import { HomeQuoteCard } from '@/components/markets/HomeQuoteCard';
-import { SymbolIcon } from '@/components/markets/SymbolIcon';
-import { GlassDirectionIcon, GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
+import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
 import { WatchlistSection } from '@/components/markets/WatchlistSection';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -27,6 +26,7 @@ import { InstrumentRowSkeleton } from '@/components/ui/Skeleton';
 import { Palette, Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { formatPct } from '@/lib/format';
+import { marketAssets } from '@/lib/marketAssets';
 import { groupQuotes } from '@/lib/marketGroups';
 import { useLiveMarket } from '@/hooks/use-live-market';
 import { useAuth } from '@/store/auth';
@@ -150,7 +150,6 @@ export default function MarketsScreen() {
   const discovery = [...(exploreQuery.data?.crypto ?? []), ...(exploreQuery.data?.forex ?? [])];
   const feedStatus = useLiveMarket([...(itemsQuery.data?.items ?? []), ...discovery].map(q => `${q.exchange}:${q.symbol}`));
 
-  const isDemo = itemsQuery.data?.isDemo || exploreQuery.data?.isDemo || overviewQuery.data?.isDemo;
 
   function promptAddList() {
     if (Platform.OS === 'web') {
@@ -199,8 +198,17 @@ export default function MarketsScreen() {
   ].slice(0, 6);
   const cardWidth = Math.min(214, Math.max(156, (pageWidth - 20) / 2));
   const marketHeadline = watchlistQuotes.length
-    ? marketsUp ? 'Markets are\nUp Today' : 'Markets are\nDown Today'
-    : 'Forex & Crypto\nAt a Glance';
+    ? marketsUp ? 'Markets are\nup today' : 'Markets are\ndown today'
+    : 'Forex & crypto,\nat a glance';
+  const pillLabel = (q: QuoteLike) => q.exchange === 'FOREX' ? q.symbol : marketAssets(q.symbol, q.exchange)?.[0] ?? q.symbol;
+  const shortcuts: { label: string; icon: GlassIconName; onPress: () => void }[] = [
+    { label: 'Add pair', icon: 'add', onPress: () => setSearchOpen(true) },
+    { label: 'Markets', icon: 'chart', onPress: () => { setTab('Explore'); setDirectory(true); } },
+    { label: 'Portfolio', icon: 'wallet', onPress: () => router.push('/(tabs)/profile') },
+    { label: 'AI Insight', icon: 'analytics', onPress: () => router.push('/(tabs)/ai') },
+    { label: 'Community', icon: 'community', onPress: () => router.push('/(tabs)/community') },
+    { label: 'Share idea', icon: 'send', onPress: () => router.push('/community/compose') },
+  ];
 
   function openQuote(q: QuoteLike) {
     router.push({
@@ -254,51 +262,53 @@ export default function MarketsScreen() {
       {!directory ? (
         <ScrollView contentContainerStyle={styles.homePad} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <Image source={require('@/assets/images/market-glow.svg')} style={StyleSheet.absoluteFill} contentFit="fill" accessible={false} pointerEvents="none" />
-            <Text style={styles.heroTitle}>{marketHeadline}</Text>
-            {isDemo ? <Text style={styles.heroHint}>Demo · Forex / Crypto</Text> : null}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <Text style={styles.heroTitle} accessibilityRole="header">{marketHeadline}</Text>
+            <Text style={styles.heroSubtitle}>
+              {'✦ '}
+              {watchlistQuotes.length ? (
+                <>Your watchlist is <Text style={[styles.heroHighlight, { color: marketsUp ? Palette.green : Palette.red }]}>{formatPct(avgChange)}</Text> today</>
+              ) : (
+                <>Live prices for <Text style={styles.heroHighlight}>crypto &amp; forex</Text></>
+              )}
+              {' ✦'}
+            </Text>
+            <View style={styles.heroPills}>
               {itemsQuery.isLoading
-              ? Array.from({ length: 3 }).map((_, i) => <View key={i} style={styles.tickerSkeleton} />)
-              : chips.map((q) => {
-                  const up = q.changePercent >= 0;
-                  return (
-                    <GlassPressable accessibilityRole="button" accessibilityLabel={`Open ${q.name}`} key={q.symbol} style={styles.ticker} onPress={() => openQuote(q)}>
-                      <SymbolIcon symbol={q.symbol} exchange={q.exchange} size={30} />
-                      <View>
-                        <Text style={styles.tickerName} numberOfLines={1}>
-                          {q.name.split(' ')[0]}
-                        </Text>
-                        <View style={styles.tickerChange}>
-                          <Text style={[styles.tickerPct, { color: up ? Palette.green : Palette.red }]}>
-                            {formatPct(q.changePercent)}
-                          </Text>
-                          <GlassDirectionIcon up={up} size={14} />
-                        </View>
-                      </View>
-                    </GlassPressable>
-                  );
-                })}
-            </ScrollView>
+                ? Array.from({ length: 3 }).map((_, i) => <View key={i} style={styles.pillSkeleton} />)
+                : chips.slice(0, 3).map((q) => (
+                    <Pressable
+                      key={`${q.exchange}:${q.symbol}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${q.name}, ${formatPct(q.changePercent)}`}
+                      style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+                      onPress={() => openQuote(q)}>
+                      <Text style={styles.pillSymbol}>{pillLabel(q)}</Text>
+                      <Text style={[styles.pillChange, { color: q.changePercent >= 0 ? Palette.green : Palette.red }]}>
+                        {formatPct(q.changePercent)}
+                      </Text>
+                    </Pressable>
+                  ))}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.heroCta, pressed && styles.heroCtaPressed]}
+              onPress={() => {
+                if (!watchlistQuotes.length) { setSearchOpen(true); return; }
+                setTab('Explore');
+                setDirectory(true);
+              }}>
+              <Text style={styles.heroCtaText}>{watchlistQuotes.length ? 'Explore markets' : 'Add your first pair'}</Text>
+            </Pressable>
           </View>
 
-          <View style={styles.actions}>
-            <GlassPressable accessibilityRole="button" style={styles.action} onPress={() => router.push('/(tabs)/profile')}>
-              <Image source={require('@/assets/images/market-glow.svg')} style={StyleSheet.absoluteFill} contentFit="fill" accessible={false} />
-              <Text style={styles.actionLabel}>Deposit</Text>
-              <GlassIcon name="wallet" size={24} />
-            </GlassPressable>
-            <GlassPressable accessibilityRole="button" style={styles.action} onPress={() => router.push('/community/compose')}>
-              <Image source={require('@/assets/images/market-glow.svg')} style={StyleSheet.absoluteFill} contentFit="fill" accessible={false} />
-              <Text style={styles.actionLabel}>Send</Text>
-              <GlassIcon name="send" size={24} />
-            </GlassPressable>
-            <GlassPressable accessibilityRole="button" style={styles.action} onPress={() => setSearchOpen(true)}>
-              <Image source={require('@/assets/images/market-glow.svg')} style={StyleSheet.absoluteFill} contentFit="fill" accessible={false} />
-              <Text style={styles.actionLabel}>Add pair</Text>
-              <GlassIcon name="card" size={24} />
-            </GlassPressable>
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.shortcutScroll} contentContainerStyle={styles.shortcuts}>
+            {shortcuts.map(item => (
+              <GlassPressable key={item.label} accessibilityRole="button" accessibilityLabel={item.label} style={styles.shortcut} onPress={item.onPress}>
+                <GlassIcon name={item.icon} size={28} />
+                <Text style={styles.shortcutLabel} numberOfLines={2}>{item.label}</Text>
+              </GlassPressable>
+            ))}
+          </ScrollView>
 
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>{watchlistQuotes.length ? 'Your watchlist' : 'Discover markets'}</Text>
@@ -319,17 +329,6 @@ export default function MarketsScreen() {
               ))}
             </ScrollView>
           )}
-          <GlassPressable
-            accessibilityRole="button"
-            accessibilityLabel="Explore markets"
-            style={styles.allStocksButton}
-            onPress={() => {
-              setTab('Explore');
-              setDirectory(true);
-            }}>
-            <Text style={styles.allStocksLabel}>Explore markets</Text>
-            <GlassIcon name="up" size={20} rotation={90} />
-          </GlassPressable>
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.homePad}>
@@ -436,7 +435,7 @@ export default function MarketsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f8fafb', width: '100%', maxWidth: 480, alignSelf: 'center' },
+  safe: { flex: 1, backgroundColor: '#ffffff', width: '100%', maxWidth: 480, alignSelf: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingTop: 16, paddingBottom: 24,
@@ -456,39 +455,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#dbe7ff', alignItems: 'center', justifyContent: 'center',
   },
   homePad: { paddingHorizontal: 18, paddingBottom: 28 },
-  hero: {
-    minHeight: 186, backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden',
-    borderWidth: 1, borderColor: '#e9e9f0', paddingTop: 22,
-  },
-  heroTitle: { color: '#0f172a', fontSize: 34, fontWeight: '600', lineHeight: 35, letterSpacing: -1.8, paddingHorizontal: 20 },
-  heroHint: { color: '#64748b', position: 'absolute', top: 12, right: 12, fontSize: 9 },
-  chipRow: { gap: 10, paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18 },
-  ticker: {
-    flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#fff',
-    borderRadius: 14, paddingHorizontal: 9, paddingVertical: 7,
-    boxShadow: '0 4px 10px rgba(30, 41, 59, 0.06)',
-  },
-  tickerSkeleton: { width: 112, height: 44, borderRadius: 14, backgroundColor: '#f5f4f9' },
-  tickerName: { color: '#0F172A', fontWeight: '500', fontSize: 12, maxWidth: 80 },
-  tickerChange: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  tickerPct: { fontWeight: '500', fontSize: 10 },
-  actions: { flexDirection: 'row', gap: 9, marginTop: 26, marginBottom: 6 },
-  action: {
-    flex: 1, backgroundColor: '#fff', overflow: 'hidden', borderWidth: 1, borderColor: '#e9e9f0',
-    borderRadius: 6, minHeight: 38, paddingVertical: 8, alignItems: 'center',
-    flexDirection: 'row', justifyContent: 'center', gap: 5,
-  },
-  actionLabel: { color: '#0f172a', fontWeight: '400', fontSize: 13 },
+  hero: { alignItems: 'center', paddingTop: 28, paddingBottom: 8 },
+  heroTitle: { color: '#0f172a', fontSize: 38, fontWeight: '700', lineHeight: 44, letterSpacing: -1.2, textAlign: 'center' },
+  heroSubtitle: { color: '#0f172a', fontSize: 16, lineHeight: 22, textAlign: 'center', marginTop: 18 },
+  heroHighlight: { color: Palette.accent, fontWeight: '700' },
+  heroPills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 16 },
+  pill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, backgroundColor: '#f1f5f9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  pillSkeleton: { width: 96, height: 32, borderRadius: 8, backgroundColor: '#f1f5f9' },
+  pillSymbol: { color: '#0f172a', fontSize: 14, fontWeight: '600' },
+  pillChange: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  pressed: { opacity: 0.6 },
+  heroCta: { alignSelf: 'stretch', marginTop: 28, height: 56, borderRadius: 28, backgroundColor: Palette.accent, alignItems: 'center', justifyContent: 'center' },
+  heroCtaPressed: { backgroundColor: '#0052D6' },
+  heroCtaText: { color: '#ffffff', fontSize: 18, fontWeight: '600', letterSpacing: -0.2 },
+  shortcutScroll: { marginTop: 26, marginHorizontal: -18 },
+  shortcuts: { paddingHorizontal: 10, gap: 2 },
+  shortcut: { width: 76, alignItems: 'center', gap: 8, paddingVertical: 6 },
+  shortcutLabel: { color: '#334155', fontSize: 13, textAlign: 'center', lineHeight: 17 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 16 },
   sectionTitle: { color: '#0F172A', fontSize: 20, fontWeight: '600', letterSpacing: -0.7 },
   seeAllButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: '#dfe2e9', borderRadius: 7, paddingHorizontal: 10, minHeight: 30 },
   seeAll: { color: '#1e293b', fontSize: 11, fontWeight: '400' },
-  allStocksButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginTop: 16, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12,
-    borderWidth: 1, borderColor: '#dfe2e9', borderRadius: 12, backgroundColor: '#fff',
-  },
-  allStocksLabel: { color: '#1e293b', fontSize: 14, fontWeight: '500' },
   cardScroll: { marginHorizontal: -18 },
   cardRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 18, paddingBottom: 10 },
   cardName: { color: Palette.text, fontWeight: '600', fontSize: 16 },
