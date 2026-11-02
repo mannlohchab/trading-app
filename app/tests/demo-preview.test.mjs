@@ -143,3 +143,14 @@ test('demo discovery has only crypto and forex with correct precision and a USD-
   const { results } = await request(demo, '/api/market/search?q=');
   assert.ok(results.every(q => ['BINANCE', 'FOREX'].includes(q.exchange) && ['USD', 'USDT', 'JPY', 'CHF', 'CAD'].includes(q.currency)));
 });
+
+test('demo conversations can be deleted locally', async () => {
+  const demo = createDemoApi();
+  const { conversations } = await request(demo, '/api/ai/conversations');
+  await request(demo, `/api/ai/conversations/${conversations[0].id}`, 'DELETE');
+  const after = (await request(demo, '/api/ai/conversations')).conversations;
+  assert.equal(after.length, conversations.length - 1);
+  assert.ok(!after.some(c => c.id === conversations[0].id));
+  await assert.rejects(request(demo, `/api/ai/conversations/${conversations[0].id}`, 'DELETE'), /not found/);
+  assert.equal((await request(createDemoApi(), '/api/ai/conversations')).conversations.length, conversations.length);
+});

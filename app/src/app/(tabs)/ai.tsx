@@ -456,6 +456,6 @@ const styles = StyleSheet.create({
   historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: MUTED, fontSize: 12 }, historyList: { gap: 4, paddingTop: 5, paddingBottom: 20 },
   historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, confirmItem: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, gap: 8 }, confirmTitle: { color: INK, fontSize: 14, fontWeight: '600' },
   confirmButton: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }, confirmCancel: { color: BODY, fontSize: 13, fontWeight: '500' },
-  deleteButton: { backgroundColor: '#C2410C' }, deleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  deleteButton: { backgroundColor: '#DC2626' }, deleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
 });
