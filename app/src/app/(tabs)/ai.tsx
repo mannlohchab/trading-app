@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Animated, Easing, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -59,6 +60,9 @@ export default function AiScreen() {
   const drawerClosing = useRef(false);
   const drawerWidth = Math.min(useWindowDimensions().width * 0.88, 370);
   const [search, setSearch] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<string>();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
   const gate = useRef(createAiRequestGate()).current;
   const listRef = useRef<FlatList<Message>>(null);
   const nearBottom = useRef(true);
@@ -85,6 +89,8 @@ export default function AiScreen() {
 
   function closeDrawer() {
     Keyboard.dismiss();
+    setPendingDelete(undefined);
+    setDeleteError(undefined);
     drawerClosing.current = true;
     drawerProgress.stopAnimation();
     Animated.timing(drawerProgress, {
@@ -115,6 +121,29 @@ export default function AiScreen() {
     setNeedsNewChat(false);
     activeAssistant.current = undefined;
     nearBottom.current = true;
+  }
+
+  function askDelete(id: string) {
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setDeleteError(undefined);
+    setPendingDelete(id);
+  }
+
+  async function deleteConversation(id: string) {
+    setDeleting(true);
+    setDeleteError(undefined);
+    try {
+      await api(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      queryClient.setQueryData<{ conversations: Conversation[] }>(historyKey, (data) =>
+        data ? { conversations: data.conversations.filter((item) => item.id !== id) } : data);
+      if (id === conversationId) reset(kind, symbol || 'BTCUSDT');
+      setPendingDelete(undefined);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this chat. Please try again.');
+    } finally {
+      setDeleting(false);
+      void queryClient.invalidateQueries({ queryKey: historyKey });
+    }
   }
 
   function newChat() {
@@ -333,7 +362,23 @@ export default function AiScreen() {
               {historyQuery.isPending && <ActivityIndicator color={MUTED} style={styles.historyLoading} />}
               {historyQuery.isError && <Text accessibilityRole="alert" style={styles.errorText}>Could not load conversations. Tap Refresh to retry.</Text>}
               {!historyQuery.isPending && !historyQuery.isError && !history.length && <Text style={styles.emptyHistory}>{search ? 'No matching conversations.' : 'Your conversations will appear here after your first message.'}</Text>}
-              {history.map((conversation) => <GlassPressable key={conversation.id} accessibilityRole="button" onPress={() => openConversation(conversation)}
+              {!!deleteError && <Text accessibilityRole="alert" style={styles.errorText}>{deleteError}</Text>}
+              {history.map((conversation) => pendingDelete === conversation.id ? (
+                <View key={conversation.id} style={[styles.historyItem, styles.confirmItem]} accessibilityLiveRegion="polite">
+                  <View style={styles.flex}><Text style={styles.confirmTitle}>Delete this chat?</Text><Text style={styles.historyKind} numberOfLines={1}>{conversation.title}</Text></View>
+                  <Pressable accessibilityRole="button" disabled={deleting} onPress={() => setPendingDelete(undefined)} style={({ pressed }) => [styles.confirmButton, pressed && styles.pressed]}>
+                    <Text style={styles.confirmCancel}>Cancel</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${conversation.title}`} disabled={deleting} onPress={() => deleteConversation(conversation.id)}
+                    style={({ pressed }) => [styles.confirmButton, styles.deleteButton, (pressed || deleting) && styles.pressed]}>
+                    {deleting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.deleteText}>Delete</Text>}
+                  </Pressable>
+                </View>
+              ) : <GlassPressable key={conversation.id} accessibilityRole="button" accessibilityHint="Long press to delete"
+                accessibilityActions={[{ name: 'delete', label: 'Delete conversation' }]}
+                onAccessibilityAction={({ nativeEvent }) => { if (nativeEvent.actionName === 'delete') askDelete(conversation.id); }}
+                onPress={() => { if (pendingDelete) { setPendingDelete(undefined); return; } void openConversation(conversation); }}
+                onLongPress={() => askDelete(conversation.id)} delayLongPress={400}
                 style={[styles.historyItem, conversation.id === conversationId && styles.activeHistoryItem]}>
                 <GlassIcon name={MODES.find((mode) => mode.kind === conversation.kind)?.icon ?? 'community'} size={23} />
                 <View style={styles.flex}><Text style={styles.historyTitle} numberOfLines={2}>{conversation.title}</Text><Text style={styles.historyKind}>{MODES.find((mode) => mode.kind === conversation.kind)?.label ?? 'Chat'}</Text></View>
@@ -409,5 +454,8 @@ const styles = StyleSheet.create({
   newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, borderRadius: 10, paddingHorizontal: 13, backgroundColor: SOFT }, newChatText: { color: INK, fontSize: 13, fontWeight: '500' },
   historySearch: { paddingHorizontal: 13, paddingVertical: 12, minHeight: 44, marginTop: 12, borderWidth: 1, borderColor: LINE, backgroundColor: '#FFFFFF', borderRadius: 10, color: INK, fontSize: 13 },
   historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: MUTED, fontSize: 12 }, historyList: { gap: 4, paddingTop: 5, paddingBottom: 20 },
-  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
+  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, confirmItem: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, gap: 8 }, confirmTitle: { color: INK, fontSize: 14, fontWeight: '600' },
+  confirmButton: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }, confirmCancel: { color: BODY, fontSize: 13, fontWeight: '500' },
+  deleteButton: { backgroundColor: '#C2410C' }, deleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
 });

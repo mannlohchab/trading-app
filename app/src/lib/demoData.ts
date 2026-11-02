@@ -287,6 +287,7 @@ export function createDemoApi() {
         if (!parts[3]) return { conversations: conversations.map(({ messages: _messages, ...conversation }) => conversation) };
         const conversation = conversations.find(c => c.id === parts[3]);
         if (!conversation) throw new Error('Demo conversation not found.');
+        if (method === 'DELETE') { conversations.splice(conversations.indexOf(conversation), 1); return { ok: true }; }
         return { conversation, messages: conversation.messages };
       }
       throw new Error('This action is not available in demo preview.');

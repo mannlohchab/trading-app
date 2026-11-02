@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db';
 import { aiConversations, aiMessages } from '../../db/schema';
@@ -54,6 +54,19 @@ aiRouter.get('/conversations/:id', async (req, res, next) => {
       orderBy: [asc(sql`rowid`)],
     });
     res.json({ conversation: conv, messages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+aiRouter.delete('/conversations/:id', async (req, res, next) => {
+  try {
+    // Scoped to the owner: another user's conversation is indistinguishable from a missing one.
+    const deleted = await db.delete(aiConversations)
+      .where(and(eq(aiConversations.id, param(req, 'id')), eq(aiConversations.userId, req.user!.userId)))
+      .returning({ id: aiConversations.id });
+    if (!deleted.length) throw new AppError(404, 'Conversation not found');
+    res.json({ ok: true }); // Messages are removed by ON DELETE CASCADE.
   } catch (err) {
     next(err);
   }
