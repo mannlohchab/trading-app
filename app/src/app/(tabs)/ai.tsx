@@ -1,13 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Easing, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform,
+  ActivityIndicator, Animated, Easing, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { api, streamAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
 import { useAuth } from '@/store/auth';
@@ -15,20 +16,33 @@ import { AiResponse } from '@/components/ai/AiResponse';
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error' };
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
-const MODES: { kind: AiKind; label: string; icon: GlassIconName }[] = [
-  { kind: 'chat', label: 'Chat', icon: 'community' },
-  { kind: 'analysis', label: 'Market', icon: 'chart' },
-  { kind: 'portfolio', label: 'Portfolio', icon: 'wallet' },
+const MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
+  { kind: 'chat', label: 'Chat', hint: 'Ask anything about markets', icon: 'community' },
+  { kind: 'analysis', label: 'Market', hint: 'Analyze one crypto or forex pair', icon: 'chart' },
+  { kind: 'portfolio', label: 'Portfolio', hint: 'Review your paper portfolio', icon: 'wallet' },
 ];
 const STARTERS = [
   { title: 'Check Bitcoin right now', prompt: 'What is Bitcoin trading at right now? Show the latest available price and daily change.', icon: 'chart' as const },
   { title: 'Compare two markets', prompt: 'Compare the latest Bitcoin and Ethereum prices and daily changes. What should I watch?', icon: 'analytics' as const },
 ];
-const INK = '#1E293B';
-const MUTED = '#737780';
+// Warm, monochrome chat palette.
+const INK = '#1F1F1E';
+const BODY = '#3D3D3A';
+const MUTED = '#8A8A86';
+const PAGE = '#F7F7F5';
+const SOFT = '#EDEDEA';
+const LINE = '#E6E6E2';
+const LOGO = 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837cb6f4498b.jpg';
+
+function greeting(date = new Date()) {
+  const hour = date.getHours();
+  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+}
 
 export default function AiScreen() {
   const userId = useAuth((state) => state.user?.id);
+  const firstName = useAuth((state) => (state.user?.displayName || state.user?.username || '').trim().split(/\s+/)[0]);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<AiKind>('chat');
   const [symbol, setSymbol] = useState('BTCUSDT');
@@ -193,14 +207,18 @@ export default function AiScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
-          <GlassPressable accessibilityRole="button" accessibilityLabel="Open conversation history" style={styles.iconButton}
+          <Pressable accessibilityRole="button" accessibilityLabel="Open conversation history" style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
             onPress={showDrawer}>
-            <View style={styles.menuGlyph}><View style={styles.menuLine} /><View style={[styles.menuLine, { width: 12 }]} /></View>
-          </GlassPressable>
-          <View style={styles.headerTitle}><Text style={styles.title}>AI Insight</Text>{(messages.length > 0 || loadingConversation) && <Text style={styles.headerSubtitle} numberOfLines={1}>{title}</Text>}</View>
-          <GlassPressable accessibilityRole="button" accessibilityLabel="Start a new chat" style={styles.iconButton} onPress={newChat}>
-            <GlassIcon name="add" size={26} />
-          </GlassPressable>
+            <View style={styles.menuGlyph}><View style={styles.menuLine} /><View style={[styles.menuLine, { width: 10 }]} /></View>
+          </Pressable>
+          <View style={styles.headerPill}>
+            {messages.length > 0 || loadingConversation
+              ? <Text style={styles.headerPillText} numberOfLines={1}>{title}</Text>
+              : <Text style={styles.headerPillText} numberOfLines={1}>AI Insight · <Text style={styles.headerPillMuted}>For learning</Text></Text>}
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Start a new chat" style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]} onPress={newChat}>
+            <View style={styles.plusGlyph}><View style={styles.plusH} /><View style={styles.plusV} /></View>
+          </Pressable>
         </View>
 
         <View style={styles.panel}>
@@ -227,29 +245,30 @@ export default function AiScreen() {
             onScroll={({ nativeEvent }) => { nearBottom.current = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height - nativeEvent.contentOffset.y < 100; }}
             scrollEventThrottle={100}
             onContentSizeChange={() => { if (messages.length && nearBottom.current) listRef.current?.scrollToEnd({ animated: false }); }}
-            ListEmptyComponent={loadingConversation ? <View style={styles.loading}><ActivityIndicator color={Palette.accent} /><Text style={styles.muted}>Opening conversation…</Text></View> : (
+            ListEmptyComponent={loadingConversation ? <View style={styles.loading}><ActivityIndicator color={MUTED} /><Text style={styles.muted}>Opening conversation…</Text></View> : (
               <View style={styles.welcome}>
-                <View style={styles.heroIcon}><GlassIcon name="analytics" size={38} tone="purple" /></View>
-                <Text style={styles.welcomeTitle}>{kind === 'portfolio' ? 'Know your portfolio' : kind === 'analysis' ? 'Explore a pair' : 'How can I help?'}</Text>
-                <Text style={styles.welcomeSubtitle}>{kind === 'portfolio' ? 'Understand your allocation and risk.' : kind === 'analysis' ? 'Choose a symbol above to get started.' : 'Ask about markets, trading, or your portfolio.'}</Text>
-                {kind === 'chat' && <View style={styles.starterCards}>{STARTERS.map((starter) => (
-                  <GlassPressable key={starter.title} accessibilityRole="button" style={styles.starterCard} onPress={() => send(starter.prompt)}>
-                    <GlassIcon name={starter.icon} size={22} /><Text style={styles.starterTitle}>{starter.title}</Text>
-                  </GlassPressable>
+                <Image source={{ uri: LOGO }} style={styles.welcomeLogo} contentFit="cover" accessibilityLabel="Gurukul" />
+                <Text style={styles.welcomeTitle} accessibilityRole="header">
+                  {kind === 'portfolio' ? 'Know your portfolio' : kind === 'analysis' ? 'Explore a pair' : `${greeting()}${firstName ? `, ${firstName}` : ''}`}
+                </Text>
+                {kind !== 'chat' && <Text style={styles.welcomeSubtitle}>{kind === 'portfolio' ? 'Understand your allocation and risk.' : 'Choose a symbol above to get started.'}</Text>}
+                {kind === 'chat' && <View style={styles.starterChips}>{STARTERS.map((starter) => (
+                  <Pressable key={starter.title} accessibilityRole="button" style={({ pressed }) => [styles.starterChip, pressed && styles.pressed]} onPress={() => send(starter.prompt)}>
+                    <Text style={styles.starterTitle}>{starter.title}</Text>
+                  </Pressable>
                 ))}</View>}
-                {kind === 'portfolio' && <GlassPressable accessibilityRole="button" style={styles.portfolioCard}
+                {kind === 'portfolio' && <View style={styles.starterChips}><Pressable accessibilityRole="button" style={({ pressed }) => [styles.starterChip, pressed && styles.pressed]}
                   onPress={() => send('Analyze my paper-trading portfolio: allocation, risk, and educational next steps.')}>
-                  <GlassIcon name="wallet" size={22} /><Text style={styles.starterTitle}>Review my paper portfolio</Text>
-                </GlassPressable>}
+                  <Text style={styles.starterTitle}>Review my paper portfolio</Text>
+                </Pressable></View>}
               </View>
             )}
             renderItem={({ item }) => item.role === 'user' ? (
               <View style={styles.userMessage}><Text selectable style={styles.messageText}>{item.content}</Text></View>
             ) : (
-              <View style={styles.assistantMessage}>
-                <View style={styles.assistantLabel}><GlassIcon name="analytics" size={22} /><Text style={styles.assistantName}>AI Insight</Text>
-                  {item.status === 'streaming' && <ActivityIndicator size="small" color={Palette.accent} />}</View>
+              <View style={styles.assistantMessage} accessibilityLabel="AI Insight response">
                 {!!item.content && <AiResponse content={item.content} />}
+                {item.status === 'streaming' && !!item.content && <ActivityIndicator size="small" color={MUTED} style={styles.streamingDot} />}
                 {!item.content && <Text style={styles.muted}>{item.status === 'streaming' ? 'Looking into it…' : item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
                 {item.status === 'stopped' && !!item.content && <Text style={styles.responseStatus}>Stopped · partial response</Text>}
                 {item.status === 'error' && !!item.content && <Text style={styles.responseStatus}>Incomplete response</Text>}
@@ -261,23 +280,33 @@ export default function AiScreen() {
             <Text style={styles.restartText}>Start a new chat to continue</Text><GlassIcon name="add" size={20} />
           </GlassPressable>}
           <View style={styles.composerWrap}>
+            {modeMenuOpen && <View style={styles.modeMenu} accessibilityRole="menu">
+              {MODES.map((mode) => (
+                <Pressable key={mode.kind} accessibilityRole="menuitem" accessibilityState={{ selected: kind === mode.kind }}
+                  style={({ pressed }) => [styles.modeOption, pressed && styles.modeOptionPressed]}
+                  onPress={() => { setModeMenuOpen(false); if (kind !== mode.kind) reset(mode.kind, symbol || 'BTCUSDT'); }}>
+                  <View style={styles.flex}><Text style={styles.modeOptionLabel}>{mode.label}</Text><Text style={styles.modeOptionHint}>{mode.hint}</Text></View>
+                  {kind === mode.kind && <Text style={styles.modeCheck}>✓</Text>}
+                </Pressable>
+              ))}
+            </View>}
             <View style={styles.composer}>
               <TextInput accessibilityLabel="Message AI Insight" style={styles.input} value={input} onChangeText={setInput}
-                editable={!disabled} multiline maxLength={4000} textAlignVertical="top" placeholderTextColor="#92959D"
-                placeholder={kind === 'portfolio' ? 'Ask about your paper portfolio…' : kind === 'analysis' ? `Ask about ${symbol || 'an instrument'}…` : 'Ask a question…'} />
+                editable={!disabled} multiline maxLength={4000} textAlignVertical="top" placeholderTextColor={MUTED}
+                onFocus={() => setModeMenuOpen(false)}
+                placeholder={kind === 'portfolio' ? 'Ask about your paper portfolio…' : kind === 'analysis' ? `Ask about ${symbol || 'an instrument'}…` : 'How can I help you today?'} />
               <View style={styles.composerToolbar}>
-                <View style={styles.modes}>{MODES.map((mode) => (
-                  <GlassPressable key={mode.kind} accessibilityRole="button" accessibilityState={{ selected: kind === mode.kind }}
-                    onPress={() => { if (kind !== mode.kind) reset(mode.kind, symbol || 'BTCUSDT'); }}
-                    style={[styles.mode, kind === mode.kind && styles.activeMode]}>
-                    <Text style={[styles.modeLabel, kind === mode.kind && styles.activeModeLabel]}>{mode.label}</Text>
-                  </GlassPressable>
-                ))}</View>
-                <GlassPressable accessibilityRole="button" accessibilityLabel={streaming ? 'Stop response' : 'Send message'}
+                <Pressable accessibilityRole="button" accessibilityLabel={`Mode: ${MODES.find((mode) => mode.kind === kind)?.label}. Change mode`}
+                  accessibilityState={{ expanded: modeMenuOpen }} onPress={() => setModeMenuOpen((open) => !open)}
+                  style={({ pressed }) => [styles.modePicker, pressed && styles.pressed]}>
+                  <Text style={styles.modePickerText}>{MODES.find((mode) => mode.kind === kind)?.label}</Text>
+                  <View style={[styles.chevron, modeMenuOpen && styles.chevronUp]} />
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={streaming ? 'Stop response' : 'Send message'}
                   disabled={!streaming && (disabled || !input.trim())} onPress={streaming ? stopResponse : () => send(input)}
-                  style={[styles.sendButton, !streaming && (disabled || !input.trim()) && styles.disabled]}>
-                  {streaming ? <View style={styles.stopGlyph} /> : <GlassIcon name="send" size={24} tone="blue" />}
-                </GlassPressable>
+                  style={({ pressed }) => [styles.sendButton, !streaming && (disabled || !input.trim()) && styles.sendDisabled, pressed && styles.pressed]}>
+                  {streaming ? <View style={styles.stopGlyph} /> : <Text style={styles.sendGlyph}>↑</Text>}
+                </Pressable>
               </View>
             </View>
             <Text style={styles.disclaimer}>For learning only. AI can make mistakes.</Text>
@@ -301,7 +330,7 @@ export default function AiScreen() {
               <GlassPressable accessibilityRole="button" onPress={() => { void historyQuery.refetch(); }} style={styles.refreshButton}><Text style={styles.refreshText}>Refresh</Text></GlassPressable>
             </View>
             <ScrollView style={styles.flex} contentContainerStyle={styles.historyList} keyboardShouldPersistTaps="handled">
-              {historyQuery.isPending && <ActivityIndicator color={Palette.accent} style={styles.historyLoading} />}
+              {historyQuery.isPending && <ActivityIndicator color={MUTED} style={styles.historyLoading} />}
               {historyQuery.isError && <Text accessibilityRole="alert" style={styles.errorText}>Could not load conversations. Tap Refresh to retry.</Text>}
               {!historyQuery.isPending && !historyQuery.isError && !history.length && <Text style={styles.emptyHistory}>{search ? 'No matching conversations.' : 'Your conversations will appear here after your first message.'}</Text>}
               {history.map((conversation) => <GlassPressable key={conversation.id} accessibilityRole="button" onPress={() => openConversation(conversation)}
@@ -320,53 +349,65 @@ export default function AiScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#fff' },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle: { flex: 1, minWidth: 0 },
-  title: { fontSize: 18, fontWeight: '600', color: INK, letterSpacing: -0.4 },
-  headerSubtitle: { fontSize: 12, color: MUTED, marginTop: 3 },
-  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
-  menuGlyph: { gap: 6 }, menuLine: { width: 18, height: 1.5, backgroundColor: '#475569', borderRadius: 2 },
-  panel: { flex: 1, backgroundColor: '#fff' },
-  messages: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24, gap: 28 },
+  pressed: { opacity: 0.6 },
+  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: PAGE },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: SOFT },
+  menuGlyph: { gap: 5 }, menuLine: { width: 16, height: 1.5, backgroundColor: INK, borderRadius: 1 },
+  plusGlyph: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
+  plusH: { position: 'absolute', width: 14, height: 1.5, backgroundColor: INK, borderRadius: 1 },
+  plusV: { position: 'absolute', width: 1.5, height: 14, backgroundColor: INK, borderRadius: 1 },
+  headerPill: { flexShrink: 1, maxWidth: '62%', paddingHorizontal: 12, height: 32, borderRadius: 8, backgroundColor: SOFT, justifyContent: 'center' },
+  headerPillText: { color: INK, fontSize: 13, fontWeight: '500' },
+  headerPillMuted: { color: MUTED, fontWeight: '400' },
+  panel: { flex: 1, backgroundColor: PAGE },
+  messages: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, gap: 22 },
   emptyList: { flexGrow: 1, justifyContent: 'center' },
-  welcome: { alignItems: 'center', paddingVertical: 28 },
-  heroIcon: { width: 60, height: 60, borderRadius: 20, backgroundColor: '#F6F4FB', alignItems: 'center', justifyContent: 'center', marginBottom: 22 },
-  welcomeTitle: { fontSize: 28, lineHeight: 35, fontWeight: '600', letterSpacing: -0.8, color: INK, textAlign: 'center' },
-  welcomeSubtitle: { fontSize: 14, lineHeight: 21, color: MUTED, marginTop: 10, maxWidth: 270, textAlign: 'center' },
-  starterCards: { width: '100%', maxWidth: 300, gap: 10, marginTop: 30 },
-  starterCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, minHeight: 52, borderRadius: 14, backgroundColor: '#F7F7F9' },
-  starterTitle: { flex: 1, color: '#475569', fontSize: 13, lineHeight: 20, fontWeight: '500' },
-  portfolioCard: { width: '100%', maxWidth: 300, flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16, minHeight: 52, borderRadius: 14, backgroundColor: '#F7F7F9', marginTop: 30 },
+  welcome: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 12 },
+  welcomeLogo: { width: 44, height: 44, borderRadius: 12, marginBottom: 16, backgroundColor: SOFT },
+  welcomeTitle: { fontFamily: Fonts?.serif, fontSize: 26, lineHeight: 34, color: INK, textAlign: 'center', letterSpacing: -0.3 },
+  welcomeSubtitle: { fontSize: 14, lineHeight: 21, color: MUTED, marginTop: 8, maxWidth: 270, textAlign: 'center' },
+  starterChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 26, maxWidth: 340 },
+  starterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: '#FFFFFF' },
+  starterTitle: { color: BODY, fontSize: 13, fontWeight: '500' },
   promptLabel: { fontSize: 12, color: MUTED, fontWeight: '500' },
-  userMessage: { alignSelf: 'flex-end', maxWidth: '91%', borderRadius: 16, borderBottomRightRadius: 5, backgroundColor: '#F3F2F7', paddingHorizontal: 15, paddingVertical: 12 },
-  messageText: { color: '#334155', fontSize: 15, lineHeight: 24 }, assistantMessage: { gap: 10 },
-  assistantLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 }, assistantName: { fontSize: 12, color: INK, fontWeight: '600' },
+  userMessage: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 10, backgroundColor: SOFT, paddingHorizontal: 14, paddingVertical: 10 },
+  messageText: { color: INK, fontSize: 14, lineHeight: 21 },
+  assistantMessage: { gap: 6, paddingRight: 8 },
+  streamingDot: { alignSelf: 'flex-start' },
   responseStatus: { fontSize: 11, color: MUTED, fontStyle: 'italic', marginTop: 3 },
-  loading: { paddingVertical: 50, alignItems: 'center', gap: 15 }, muted: { color: MUTED, fontSize: 12 },
-  instrumentSection: { paddingHorizontal: 17, paddingTop: 12, paddingBottom: 4 }, instrumentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#EDEEF2', borderRadius: 12, paddingLeft: 12, paddingRight: 5, paddingVertical: 4 },
-  exchange: { color: MUTED, fontSize: 10, fontWeight: '600' }, symbolInput: { flex: 1, minWidth: 50, fontSize: 12, color: INK, paddingVertical: 10, paddingHorizontal: 6, minHeight: 40 },
-  analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 10, backgroundColor: '#ECF0FA', borderRadius: 8 }, analyzeText: { color: '#0052d6', fontSize: 11, fontWeight: '600' },
-  instrumentHint: { fontSize: 10, lineHeight: 16, color: MUTED, paddingTop: 7 },
-  composerWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, backgroundColor: '#fff' },
-  composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8, borderWidth: 1, borderColor: '#E8E7ED', borderRadius: 20, backgroundColor: '#FAFAFC' },
-  input: { color: INK, fontSize: 15, lineHeight: 22, minHeight: 52, maxHeight: 120, paddingHorizontal: 4, paddingTop: 8, paddingBottom: 12 },
-  composerToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  modes: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap' },
-  mode: { justifyContent: 'center', paddingHorizontal: 9, minHeight: 44, borderRadius: 12 },
-  activeMode: { backgroundColor: '#E9EDF7' },
-  modeLabel: { color: '#767982', fontSize: 12, fontWeight: '500' }, activeModeLabel: { color: '#0052D6' },
-  sendButton: { width: 44, height: 44, flexShrink: 0, borderRadius: 14, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
-  stopGlyph: { height: 13, width: 13, borderRadius: 3, backgroundColor: '#0066FF' }, disabled: { opacity: 0.4 },
-  disclaimer: { textAlign: 'center', color: '#858993', fontSize: 10, lineHeight: 15, paddingTop: 10, paddingBottom: 2 },
-  errorBox: { padding: 10, backgroundColor: '#FFF3F4', borderRadius: 9, marginHorizontal: 17, marginTop: 6 }, errorText: { color: '#AE4454', fontSize: 11, lineHeight: 17 },
-  restart: { minHeight: 44, flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center', marginHorizontal: 17 }, restartText: { color: '#0052D6', fontSize: 12, fontWeight: '500' },
-  modalBackdrop: { backgroundColor: 'rgba(15,23,42,0.28)' },
-  drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: '#fff', boxShadow: '8px 0 32px rgba(15,23,42,0.12)' },
+  loading: { paddingVertical: 50, alignItems: 'center', gap: 15 }, muted: { color: MUTED, fontSize: 13 },
+  instrumentSection: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }, instrumentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: '#FFFFFF', paddingLeft: 12, paddingRight: 5, paddingVertical: 4 },
+  exchange: { color: MUTED, fontSize: 10, fontWeight: '600', letterSpacing: 0.4 }, symbolInput: { flex: 1, minWidth: 50, fontSize: 13, color: INK, paddingVertical: 10, paddingHorizontal: 6, minHeight: 40 },
+  analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, backgroundColor: INK, borderRadius: 8 }, analyzeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  instrumentHint: { fontSize: 11, lineHeight: 16, color: MUTED, paddingTop: 7 },
+  composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, backgroundColor: PAGE },
+  composer: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, boxShadow: '0 1px 2px rgba(31,31,30,0.04)' },
+  input: { color: INK, fontSize: 15, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 4, paddingTop: 8, paddingBottom: 8 },
+  composerToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
+  modePicker: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 10, borderRadius: 8 },
+  modePickerText: { color: BODY, fontSize: 13, fontWeight: '500' },
+  chevron: { width: 6, height: 6, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: BODY, transform: [{ rotate: '45deg' }], marginTop: -3 },
+  chevronUp: { transform: [{ rotate: '-135deg' }], marginTop: 3 },
+  modeMenu: { position: 'absolute', right: 12, bottom: '100%', width: 248, padding: 6, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
+  modeOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 9, minHeight: 44 },
+  modeOptionPressed: { backgroundColor: PAGE },
+  modeOptionLabel: { color: INK, fontSize: 14, fontWeight: '500' },
+  modeOptionHint: { color: MUTED, fontSize: 12, marginTop: 2 },
+  modeCheck: { color: INK, fontSize: 14, fontWeight: '600' },
+  sendButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: INK, alignItems: 'center', justifyContent: 'center' },
+  sendDisabled: { backgroundColor: '#D4D4D0' },
+  sendGlyph: { color: '#FFFFFF', fontSize: 18, lineHeight: 20, fontWeight: '600' },
+  stopGlyph: { height: 11, width: 11, borderRadius: 2, backgroundColor: '#FFFFFF' }, disabled: { opacity: 0.4 },
+  disclaimer: { textAlign: 'center', color: MUTED, fontSize: 10, lineHeight: 15, paddingTop: 8, paddingBottom: 2 },
+  errorBox: { padding: 10, backgroundColor: '#FBEFEF', borderRadius: 9, marginHorizontal: 16, marginTop: 6 }, errorText: { color: '#A23E3E', fontSize: 12, lineHeight: 17 },
+  restart: { minHeight: 44, flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center', marginHorizontal: 16 }, restartText: { color: INK, fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
+  modalBackdrop: { backgroundColor: 'rgba(31,31,30,0.28)' },
+  drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: PAGE, boxShadow: '8px 0 32px rgba(31,31,30,0.12)' },
   drawerContent: { flex: 1, paddingHorizontal: 18 },
-  drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 20, gap: 8 }, drawerTitle: { fontSize: 18, color: INK, fontWeight: '600', letterSpacing: -0.5, flex: 1 }, closeGlyph: { fontSize: 24, color: MUTED },
-  newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 49, borderRadius: 12, paddingHorizontal: 13, backgroundColor: '#F3F1F8' }, newChatText: { color: '#475569', fontSize: 12, fontWeight: '600' },
-  historySearch: { paddingHorizontal: 13, paddingVertical: 13, minHeight: 46, marginTop: 13, borderWidth: 1, borderColor: '#E8E9EE', backgroundColor: '#fff', borderRadius: 11, color: INK, fontSize: 12 },
-  historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: '#64748B', fontSize: 12 }, historyList: { gap: 5, paddingTop: 5, paddingBottom: 20 },
-  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 11 }, activeHistoryItem: { backgroundColor: '#E9EDF7' }, historyTitle: { color: '#475569', fontSize: 14, lineHeight: 21 }, historyKind: { color: '#9296A1', fontSize: 11, marginTop: 5 }, emptyHistory: { color: MUTED, fontSize: 12, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
+  drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 20, gap: 8 }, drawerTitle: { fontFamily: Fonts?.serif, fontSize: 20, color: INK, flex: 1 }, closeGlyph: { fontSize: 22, color: INK },
+  newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, borderRadius: 10, paddingHorizontal: 13, backgroundColor: SOFT }, newChatText: { color: INK, fontSize: 13, fontWeight: '500' },
+  historySearch: { paddingHorizontal: 13, paddingVertical: 12, minHeight: 44, marginTop: 12, borderWidth: 1, borderColor: LINE, backgroundColor: '#FFFFFF', borderRadius: 10, color: INK, fontSize: 13 },
+  historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: MUTED, fontSize: 12 }, historyList: { gap: 4, paddingTop: 5, paddingBottom: 20 },
+  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
 });
