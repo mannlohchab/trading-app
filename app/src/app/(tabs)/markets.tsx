@@ -193,7 +193,7 @@ export default function MarketsScreen() {
   const pillLabel = (q: QuoteLike) => q.exchange === 'FOREX' ? q.symbol : marketAssets(q.symbol, q.exchange)?.[0] ?? q.symbol;
   const shortcuts: { label: string; icon: GlassIconName; onPress: () => void }[] = [
     { label: 'Add pair', icon: 'add', onPress: () => setSearchOpen(true) },
-    { label: 'Markets', icon: 'chart', onPress: () => { setTab('Explore'); setDirectory(true); } },
+    { label: 'Markets', icon: 'chart', onPress: () => router.push('/(tabs)/market') },
     { label: 'Portfolio', icon: 'wallet', onPress: () => router.push('/(tabs)/profile') },
     { label: 'AI Insight', icon: 'analytics', onPress: () => router.push('/(tabs)/ai') },
     { label: 'Community', icon: 'community', onPress: () => router.push('/(tabs)/community') },
@@ -284,8 +284,7 @@ export default function MarketsScreen() {
               style={({ pressed }) => [styles.heroCta, pressed && styles.heroCtaPressed]}
               onPress={() => {
                 if (!watchlistQuotes.length) { setSearchOpen(true); return; }
-                setTab('Explore');
-                setDirectory(true);
+                router.push('/(tabs)/market');
               }}>
               <Text style={styles.heroCtaText}>{watchlistQuotes.length ? 'Explore markets' : 'Add your first pair'}</Text>
             </Pressable>

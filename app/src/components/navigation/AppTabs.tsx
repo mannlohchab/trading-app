@@ -33,6 +33,10 @@ export default function AppTabs() {
         title: 'Home',
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="home" tone={focused ? 'purple' : 'neutral'} />,
       }} />
+      <Tabs.Screen name="market" options={{
+        title: 'Market',
+        tabBarIcon: ({ focused }) => <GlassIcon size={26} name="chart" tone={focused ? 'purple' : 'neutral'} />,
+      }} />
       <Tabs.Screen name="community" options={{
         title: 'Community',
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="community" tone={focused ? 'purple' : 'neutral'} />,
