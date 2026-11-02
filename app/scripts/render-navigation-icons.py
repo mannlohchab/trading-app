@@ -37,6 +37,7 @@ for path in sorted(ASSETS.glob("*.svg")):
         variants["-negative"] = dict(zip(SELECTED_COLORS, ["#f58da4", "#d7395d", "#ffe6ed", "#e8afbc"]))
     if path.stem == "paper-plane":
         variants["-orange"] = dict(zip(SELECTED_COLORS, ["#ffb15c", "#e77820", "#fff0df", "#f6bd86"]))
+        variants["-blue"] = {"#575757": "#2800ff", "#151515": "#0005ff"}
     if path.stem in {"users", "user"}:
         variants["-blue"] = dict(zip(SELECTED_COLORS, ["#6aaeff", "#2872dc", "#e6f2ff", "#a3c8f4"]))
     for suffix, colors in variants.items():

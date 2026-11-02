@@ -276,7 +276,7 @@ export default function AiScreen() {
                 <GlassPressable accessibilityRole="button" accessibilityLabel={streaming ? 'Stop response' : 'Send message'}
                   disabled={!streaming && (disabled || !input.trim())} onPress={streaming ? stopResponse : () => send(input)}
                   style={[styles.sendButton, !streaming && (disabled || !input.trim()) && styles.disabled]}>
-                  {streaming ? <View style={styles.stopGlyph} /> : <GlassIcon name="up" size={29} tone="purple" />}
+                  {streaming ? <View style={styles.stopGlyph} /> : <GlassIcon name="send" size={24} tone="blue" />}
                 </GlassPressable>
               </View>
             </View>

@@ -72,7 +72,10 @@ const ICONS = {
 export type GlassIconName = keyof typeof ICONS;
 
 const ACCENT_ICONS: Partial<Record<GlassIconName, Partial<Record<'orange' | 'blue', number>>>> = {
-  send: { orange: require('../../../assets/icons/nucleo-glass/paper-plane-orange.png') },
+  send: {
+    orange: require('../../../assets/icons/nucleo-glass/paper-plane-orange.png'),
+    blue: require('../../../assets/icons/nucleo-glass/paper-plane-blue.png'),
+  },
   community: { blue: require('../../../assets/icons/nucleo-glass/users-blue.png') },
   profile: { blue: require('../../../assets/icons/nucleo-glass/user-blue.png') },
 };
