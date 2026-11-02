@@ -29,6 +29,20 @@ export function findMentionedInstruments(message: string): Instrument[] {
 
 type Request = { message: string; history?: string[]; symbol?: string; exchange?: string; kind?: string };
 
+function conversationSelection(message: string, prior: Instrument[]): Instrument[] {
+  const mentioned = findMentionedInstruments(message);
+  const pairs = message.match(/\b[a-z0-9]{2,10}\s*\/\s*[a-z0-9]{2,10}\b|\b[a-z0-9]{2,8}(?:usdt|usd)\b/gi) ?? [];
+  const unsupported = pairs.some(pair => !resolveInstrument(pair));
+  const refersBack = /\b(it|its|that pair|that coin|that market|those|them|these pairs|same pair)\b|^(?:refresh|update)(?: please)?[.!?]*$/i.test(message);
+  // An unsupported explicit pair or a new topic resets reference context.
+  if (unsupported || !refersBack) return mentioned;
+  if (!mentioned.length) return prior;
+  if (/\b(compare|versus|vs|against)\b/i.test(message)) {
+    return [...prior, ...mentioned.filter(i => !prior.some(p => p.symbol === i.symbol))];
+  }
+  return mentioned;
+}
+
 function describeQuote(q: Quote): string {
   const time = q.asOf && Number.isFinite(q.asOf) ? new Date(q.asOf * 1000).toISOString() : 'unknown';
   const freshness = q.stale || !q.asOf ? 'stale or freshness unknown; do not describe as live' : 'latest available observation';
@@ -39,20 +53,14 @@ function describeQuote(q: Quote): string {
 
 export async function buildMarketContext(request: Request, provider: MarketDataProvider, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();
-  let instruments = findMentionedInstruments(request.message);
+  let prior: Instrument[] = [];
+  for (const previous of request.history ?? []) prior = conversationSelection(previous, prior);
+  let instruments = conversationSelection(request.message, prior);
   if (request.symbol) {
     let selected: Instrument | undefined;
     try { selected = resolveInstrument(request.symbol, request.exchange); } catch { /* Report without substituting another asset. */ }
     if (!selected) return 'The requested instrument is unsupported on the selected exchange. No quote supplied. Ask for a supported crypto or forex pair; do not substitute a different instrument.';
     instruments = [selected, ...instruments.filter(i => i.symbol !== selected.symbol)];
-  } else if ((!instruments.length || /\b(compare|versus|vs|against)\b/i.test(request.message)) && /\b(it|its|that pair|that coin|that market|those|them|these pairs|same pair)\b|^(?:refresh|update)(?: please)?[.!?]*$/i.test(request.message)) {
-    for (const previous of [...(request.history ?? [])].reverse()) {
-      const prior = findMentionedInstruments(previous);
-      if (prior.length) {
-        instruments = [...prior, ...instruments.filter(i => !prior.some(p => p.symbol === i.symbol))];
-        break;
-      }
-    }
   }
   if (!instruments.length) return 'No current market observations supplied for this request. If asked for a price, ask the user to name a supported pair; never use a remembered price as current.';
   const selected = instruments.slice(0, 3);

@@ -27,6 +27,23 @@ test('a comparison follow-up refreshes both the earlier asset and the newly name
   const p = provider();
   await buildMarketContext({ message: 'Compare it with Ethereum', history: ['Bitcoin price?'] }, p.value);
   expect(p.calls).toEqual(['BTCUSDT', 'ETHUSDT']);
+  p.calls.length = 0;
+  await buildMarketContext({ message: 'Compare them again', history: ['Bitcoin price?', 'Compare it with Ethereum'] }, p.value);
+  expect(p.calls).toEqual(['BTCUSDT', 'ETHUSDT']);
+});
+
+test('unsupported or unrelated newer topics cannot resurrect an older instrument', async () => {
+  for (const request of [
+    { message: 'Tell me about LTC/USDT. What is its price?', history: ['Bitcoin price'] },
+    { message: 'What is its price?', history: ['Bitcoin price', 'What about LTC/USDT?'] },
+    { message: 'What is its price?', history: ['Bitcoin price', 'What about Litecoin?'] },
+    { message: 'Explain it further', history: ['Bitcoin price', 'What is position sizing?'] },
+  ]) {
+    const p = provider();
+    const context = await buildMarketContext(request, p.value);
+    expect(p.calls).toEqual([]);
+    expect(context).not.toContain('70000');
+  }
 });
 
 test('normal chat receives sourced timestamped prices with actual quote currency', async () => {
