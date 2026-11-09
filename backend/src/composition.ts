@@ -67,6 +67,8 @@ export function composeModules() {
 export async function startJobRunner(modules: ReturnType<typeof composeModules>, workerId: string) {
   const log = createLogger('jobs');
   const { backtesting } = modules;
+  // Without a sandbox, backtest jobs are not run, but paper trading (resting orders, liquidations) still is.
+  let sandboxReady = false;
   try {
     await backtesting.workers.prepare();
     const check = await verifySandboxIsolation(backtesting.workers, new URL('..', import.meta.url).pathname);
@@ -76,13 +78,13 @@ export async function startJobRunner(modules: ReturnType<typeof composeModules>,
     } else {
       log('info', 'Backtest sandbox verified', { mode: config.backtesting.sandbox.mode });
     }
+    sandboxReady = true;
   } catch (error) {
-    log('error', 'Backtest sandbox unavailable; backtest jobs will not run', { error: error instanceof Error ? error.message : String(error) });
-    return async () => {};
+    log('error', 'Backtest sandbox unavailable; backtest jobs will not run (paper trading continues)', { error: error instanceof Error ? error.message : String(error) });
   }
   const runner = new JobRunner({
     queue: backtesting.queue,
-    handlers: [backtesting.jobHandler, modules.paperTrading.jobHandler],
+    handlers: sandboxReady ? [backtesting.jobHandler, modules.paperTrading.jobHandler] : [modules.paperTrading.jobHandler],
     workerId,
     concurrency: config.backtesting.jobConcurrency,
     leaseMs: backtesting.leaseMs,
