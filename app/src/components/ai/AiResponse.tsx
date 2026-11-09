@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
+import { InsightPalette as P } from '@/constants/theme';
 import { parseInline, parseResponse } from '@/lib/aiResponse';
 
 function Inline({ content }: { content: string }) {
@@ -36,18 +37,18 @@ export const AiResponse = memo(function AiResponse({ content }: { content: strin
 
 const styles = StyleSheet.create({
   body: { gap: 10, paddingTop: 2, paddingBottom: 2 },
-  text: { color: '#3D3D3A', fontSize: 14, lineHeight: 22 },
-  heading: { color: '#1F1F1E', fontSize: 16, lineHeight: 23, fontWeight: '700', marginTop: 8 },
+  text: { color: P.body, fontSize: 14, lineHeight: 22 },
+  heading: { color: P.text, fontSize: 16, lineHeight: 23, fontWeight: '700', marginTop: 8 },
   title: { fontSize: 20, lineHeight: 28 },
-  bold: { fontWeight: '700', color: '#1F1F1E' },
+  bold: { fontWeight: '700', color: P.text },
   italic: { fontStyle: 'italic' },
-  code: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 13, backgroundColor: '#EDEDEA' },
-  codeBlock: { backgroundColor: '#EFEFEC', borderRadius: 12, padding: 14 },
+  code: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 13, backgroundColor: P.soft },
+  codeBlock: { backgroundColor: P.soft, borderRadius: 12, padding: 14 },
   list: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
-  marker: { minWidth: 14, color: '#3D3D3A', fontSize: 14, lineHeight: 22, fontWeight: '600' },
+  marker: { minWidth: 14, color: P.body, fontSize: 14, lineHeight: 22, fontWeight: '600' },
   listText: { flex: 1 },
-  quote: { borderLeftWidth: 2, borderLeftColor: '#C9C9C4', backgroundColor: 'transparent', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 4 },
-  quoteText: { fontSize: 13, lineHeight: 21, color: '#6B6B67' },
-  divider: { height: 1, backgroundColor: '#E6E6E2', marginTop: 4 },
-  note: { fontSize: 11, lineHeight: 18, color: '#8A8A86' },
+  quote: { borderLeftWidth: 2, borderLeftColor: P.border, backgroundColor: 'transparent', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 4 },
+  quoteText: { fontSize: 13, lineHeight: 21, color: P.textSecondary },
+  divider: { height: 1, backgroundColor: P.border, marginTop: 4 },
+  note: { fontSize: 11, lineHeight: 18, color: P.textMuted },
 });

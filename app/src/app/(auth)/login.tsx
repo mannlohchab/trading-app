@@ -15,7 +15,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { api, ApiError } from '@/lib/api';
+import { authClient } from '@/lib/authClient';
+import { DEMO_MODE } from '@/lib/demoMode';
+import { demoApi } from '@/lib/demoData';
 import { SwipeButton, type SwipeButtonHandle } from '@/components/ui/SwipeButton';
 import { useAuth, type User } from '@/store/auth';
 
@@ -59,14 +61,16 @@ function LoginButtonGradient() {
 
 export default function LoginScreen() {
   const setSession = useAuth((s) => s.setSession);
+  const refresh = useAuth((s) => s.refresh);
   const [showLogin, setShowLogin] = useState(false);
-  const [emailOrUsername, setEmailOrUsername] = useState('demo');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const nextRoute = useRef<'/(tabs)/markets' | '/(auth)/verify-phone'>('/(tabs)/markets');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
   const swipeButton = useRef<SwipeButtonHandle>(null);
-  const onSignInSuccess = useCallback(() => router.replace('/(tabs)/markets'), []);
+  const onSignInSuccess = useCallback(() => router.replace(nextRoute.current), []);
 
   useFocusEffect(useCallback(() => {
     setStatusBarStyle('light');
@@ -79,14 +83,24 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api<{ user: User; accessToken: string; refreshToken: string }>(
-        '/api/auth/login',
-        { method: 'POST', body: { emailOrUsername, password }, auth: false },
-      );
-      await setSession(data);
+      if (DEMO_MODE) {
+        await setSession(demoApi.session() as unknown as { user: User });
+        return true;
+      }
+      const { error: signInError } = await authClient.signIn.email({ email: email.trim(), password });
+      if (signInError) {
+        setError(signInError.message || 'Email or password is incorrect.');
+        return false;
+      }
+      const user = await refresh();
+      if (!user) {
+        setError('Signed in, but the session could not be loaded. Please try again.');
+        return false;
+      }
+      nextRoute.current = user.status === 'ACTIVE' ? '/(tabs)/markets' : '/(auth)/verify-phone';
       return true;
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Login failed');
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
       return false;
     } finally {
       submitting.current = false;
@@ -120,17 +134,18 @@ export default function LoginScreen() {
                 </Pressable>
                 <Text style={styles.formTitle}>Welcome back</Text>
                 <Text style={styles.formSubtitle}>Log in to TradingGurukul</Text>
-                <Text style={styles.label}>Email or username</Text>
+                <Text style={styles.label}>Email</Text>
                 <TextInput
-                  accessibilityLabel="Email or username"
+                  accessibilityLabel="Email"
                   style={styles.input}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  value={emailOrUsername}
-                  onChangeText={setEmailOrUsername}
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
                   placeholderTextColor="#94a3b8"
-                  autoComplete="username"
-                  placeholder="demo"
+                  autoComplete="email"
+                  placeholder="you@email.com"
                 />
                 <Text style={styles.label}>Password</Text>
                 <TextInput
@@ -147,7 +162,7 @@ export default function LoginScreen() {
                 />
                 {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
                 <SwipeButton ref={swipeButton} loading={loading} onSwipeComplete={onSubmit} onSuccess={onSignInSuccess} />
-                <Text style={styles.hint}>Demo: demo / password123</Text>
+                {DEMO_MODE ? <Text style={styles.hint}>Demo preview: any details sign you in</Text> : null}
                 <Link href="/(auth)/register" style={styles.link}>
                   Create an account
                 </Link>

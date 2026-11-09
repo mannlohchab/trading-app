@@ -91,6 +91,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
   input: { flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: P.card, borderWidth: 1, borderColor: P.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: P.text },
   send: { backgroundColor: P.text, minHeight: 44, borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center' },
-  sendText: { color: '#fff', fontWeight: '600', fontSize: 13 }, disabled: { opacity: 0.4 },
+  sendText: { color: P.onSolid, fontWeight: '600', fontSize: 13 }, disabled: { opacity: 0.4 },
   counter: { textAlign: 'right', fontSize: 11, color: P.textMuted, marginTop: 4 },
 });

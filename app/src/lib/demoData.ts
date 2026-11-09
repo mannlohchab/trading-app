@@ -58,9 +58,8 @@ export function createDemoApi() {
   const id = (prefix: string) => `preview-${prefix}-${++sequence}`;
   const user: User = {
     id: 'demo-preview-user', username: 'aarav.trades', email: 'aarav@example.com',
-    displayName: 'Aarav Sharma', bio: 'Learning the markets, one thoughtful trade at a time. Forex & crypto enthusiast • Paper trader',
-    avatarUrl: 'https://i.pinimg.com/1200x/35/16/9f/35169f77d14878a39f31ec1ffac3e115.jpg',
-    theme: 'light', notifyPush: true, notifyEmail: false, privacyPublicProfile: true, createdAt: ago(24 * 120),
+    displayName: 'Aarav Sharma', avatarUrl: 'https://i.pinimg.com/1200x/35/16/9f/35169f77d14878a39f31ec1ffac3e115.jpg',
+    status: 'ACTIVE', phoneNumber: '+919800000000', timezone: 'Asia/Kolkata', createdAt: ago(24 * 120),
   };
   const session = () => ({ user: copy(user), accessToken: 'demo-preview-access', refreshToken: 'demo-preview-refresh' });
   const instruments: [string, string, string, number, number][] = [
@@ -204,9 +203,13 @@ export function createDemoApi() {
       if (['/api/auth/login', '/api/auth/register', '/api/auth/refresh'].includes(url.pathname)) return session();
       if (url.pathname === '/api/auth/me') return { user };
       if (url.pathname === '/api/users/me/password') throw new Error('Passwords cannot be changed in demo preview. Switch to live mode to manage your account.');
+      if (url.pathname === '/api/v1/me/profile' && method === 'PATCH') {
+        if (typeof body.name === 'string') user.displayName = body.name;
+        if (typeof body.username === 'string' || body.username === null) user.username = body.username as string | null;
+        return { name: user.displayName, username: user.username, image: user.avatarUrl, phoneNumber: user.phoneNumber, timezone: user.timezone };
+      }
       if (url.pathname === '/api/users/me' && method === 'PATCH') {
-        for (const key of ['displayName', 'bio'] as const) if (typeof body[key] === 'string') user[key] = body[key] as string;
-        for (const key of ['notifyPush', 'notifyEmail', 'privacyPublicProfile'] as const) if (typeof body[key] === 'boolean') user[key] = body[key] as boolean;
+        if (typeof body.displayName === 'string') user.displayName = body.displayName;
         return { user };
       }
       if (url.pathname === '/api/users/me/overview') return { user, portfolio,
@@ -253,6 +256,28 @@ export function createDemoApi() {
           }
           return { items: items.filter(i => i.watchlistId === parts[2]), isDemo: true };
         }
+      }
+      if (parts[1] === 'economics' && method === 'GET') {
+        const fetchedAt = new Date().toISOString();
+        const metadata = { source: 'Demo preview', sourceUrl: 'https://data.worldbank.org', fetchedAt, stale: false, isDemo: true,
+          notice: 'Fictional sample data for the UI preview. These are not current economic releases.', truncated: false };
+        if (parts[2] === 'calendar') {
+          const day = url.searchParams.get('start') || fetchedAt.slice(0, 10);
+          const forex = url.searchParams.get('source') === 'forex';
+          return { ...metadata, items: [{ id: 'sample-release', event: 'Sample inflation release', country: forex ? 'USD' : 'US', currency: 'USD', day,
+            date: `${day}T13:30:00.000Z`, estimated: false, actual: forex ? null : '2.5%', forecast: forex ? '2.4%' : null,
+            previous: '2.3%', unit: '%', reference: 'Sample period', importance: 3, status: forex ? null : 'released',
+            source: 'Demo preview', url: null, sourceUrl: null, updatedAt: fetchedAt, dataStale: false }] };
+        }
+        if (parts[2] === 'indicators') {
+          const indicators: Record<string, [string, string]> = { growth: ['GDP growth', '% annual'], inflation: ['Consumer inflation', '% annual'],
+            unemployment: ['Unemployment', '% of labor force'], gdp: ['GDP', 'current US$'], interest: ['Real interest rate', '%'] };
+          const [name, unit] = indicators[url.searchParams.get('indicator') || 'growth'] ?? indicators.growth;
+          return { ...metadata, items: [{ id: 'sample-economy', country: 'Sample economy', name, latest: '2.5', previous: '2.3',
+            period: String(new Date().getUTCFullYear() - 1), previousPeriod: String(new Date().getUTCFullYear() - 2), unit, url: 'https://data.worldbank.org' }] };
+        }
+        if (parts[2] === 'news') return { ...metadata, items: [{ id: 'sample-news', title: 'Sample: investors watch the next inflation release',
+          publisher: 'Demo preview', date: fetchedAt, country: 'Sample economy', url: 'https://www.gdeltproject.org' }] };
       }
       if (parts[1] === 'community') {
         if (parts[2] === 'feed') {

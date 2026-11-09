@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/AppText';
 
 import { AppFont, Palette } from '@/constants/theme';
 import { useAuth } from '@/store/auth';
+import { setAuthProblemHandler } from '@/lib/api';
 import { DEMO_MODE } from '@/lib/demoMode';
 
 SplashScreen.preventAutoHideAsync();
@@ -26,11 +27,26 @@ export default function RootLayout() {
     void hydrate().finally(() => SplashScreen.hideAsync());
   }, [hydrate]);
 
+  // The backend ended the session, or the account still needs its phone verified.
+  useEffect(() => {
+    setAuthProblemHandler((problem) => {
+      if (problem === 'signed-out') {
+        if (!useAuth.getState().user) return;
+        useAuth.setState({ user: null });
+        queryClient.clear();
+        router.replace('/(auth)/login');
+      } else {
+        void useAuth.getState().refresh().then(() => router.replace('/(auth)/verify-phone'));
+      }
+    });
+    return () => setAuthProblemHandler(undefined);
+  }, []);
+
   if (!hydrated) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: Palette.bg }}>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -54,8 +70,8 @@ export default function RootLayout() {
         />
         <Stack.Screen name="community/post/[id]" options={{ headerShown: true, title: 'Post' }} />
       </Stack>
-      {DEMO_MODE && <View style={{ backgroundColor: '#e2e8f0', paddingVertical: 6, paddingHorizontal: 12 }}>
-        <Text style={{ color: '#0052d6', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
+      {DEMO_MODE && <View style={{ backgroundColor: Palette.card, paddingVertical: 6, paddingHorizontal: 12 }}>
+        <Text style={{ color: '#0052D6', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
       </View>}
       </View>
     </QueryClientProvider>

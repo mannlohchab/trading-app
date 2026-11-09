@@ -34,8 +34,8 @@ export function WatchlistMiniChart({ chart, width, metadata }: Props) {
 
 const styles = StyleSheet.create({
   line: { position: 'absolute', height: 1.8, borderRadius: 1 },
-  dot: { position: 'absolute', width: 7, height: 7, borderRadius: 4, borderWidth: 1.5, borderColor: '#fff' },
+  dot: { position: 'absolute', width: 7, height: 7, borderRadius: 4, borderWidth: 1.5, borderColor: '#FFFFFF' },
   bubble: { position: 'absolute', height: 22, justifyContent: 'center', alignItems: 'center', borderRadius: 11,
-    paddingHorizontal: 8, backgroundColor: '#0f172a', boxShadow: '0 3px 8px rgba(0,0,0,0.15)' },
-  bubbleText: { color: '#fff', fontSize: 9, fontWeight: '500' },
+    paddingHorizontal: 8, backgroundColor: '#16181D' },
+  bubbleText: { color: '#FFFFFF', fontSize: 9, fontWeight: '500' },
 });

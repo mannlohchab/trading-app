@@ -9,8 +9,9 @@ export class QuoteSubscriptions {
   private event: string;
   private subscribeEvent: string;
   private unsubscribeEvent: string;
-  constructor(socket: SocketLike, candle = false) {
-    this.socket = socket; this.event = candle ? 'candle' : 'quote';
+  private limit: number;
+  constructor(socket: SocketLike, candle = false, limit = 50) {
+    this.socket = socket; this.limit = limit; this.event = candle ? 'candle' : 'quote';
     this.subscribeEvent = candle ? 'subscribe-candles' : 'subscribe'; this.unsubscribeEvent = candle ? 'unsubscribe-candles' : 'unsubscribe';
   }
   private send(event: string, keys: string[]) {
@@ -22,7 +23,7 @@ export class QuoteSubscriptions {
     for (const c of this.consumers) if (c.keys.has(key)) c.callback(data);
   };
   private reconcile() {
-    const next = new Set([...this.counts.keys()].slice(0,50));
+    const next = new Set([...this.counts.keys()].slice(0,this.limit));
     const removed = [...this.active].filter(k => !next.has(k));
     const added = [...next].filter(k => !this.active.has(k));
     if (removed.length) this.send(this.unsubscribeEvent, removed);

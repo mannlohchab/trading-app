@@ -4,29 +4,34 @@ import { ActivityIndicator, Animated, Easing, FlatList, Keyboard, KeyboardAvoidi
 import { Text, TextInput } from '@/components/ui/AppText';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
 import { Fonts, InsightPalette } from '@/constants/theme';
-import { api, streamAiChat } from '@/lib/api';
+import { streamAiMessage, streamDemoAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
+import { conversationMessages, createConversation, deleteConversation as removeConversation, listConversations, promptFor } from '@/lib/aiApi';
+import { DEMO_MODE } from '@/lib/demoMode';
 import { useAuth } from '@/store/auth';
 import { AiResponse } from '@/components/ai/AiResponse';
+import { MovingMist } from '@/components/ai/MovingMist';
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error' };
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
-const MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
+const ALL_MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
   { kind: 'chat', label: 'Chat', hint: 'Ask anything about markets', icon: 'community' },
-  { kind: 'analysis', label: 'Market', hint: 'Analyze one crypto or forex pair', icon: 'chart' },
+  { kind: 'analysis', label: 'Market', hint: 'Analyze one crypto pair', icon: 'chart' },
   { kind: 'portfolio', label: 'Portfolio', hint: 'Review your paper portfolio', icon: 'wallet' },
 ];
+// The backend assistant has live market tools but cannot read the paper portfolio yet.
+const MODES = DEMO_MODE ? ALL_MODES : ALL_MODES.filter((mode) => mode.kind !== 'portfolio');
 const STARTERS = [
   { title: 'Check Bitcoin right now', prompt: 'What is Bitcoin trading at right now? Show the latest available price and daily change.', icon: 'chart' as const },
   { title: 'Compare two markets', prompt: 'Compare the latest Bitcoin and Ethereum prices and daily changes. What should I watch?', icon: 'analytics' as const },
 ];
 // Warm, monochrome chat palette.
-const { text: INK, body: BODY, textMuted: MUTED, bg: PAGE, soft: SOFT, border: LINE } = InsightPalette;
-const LOGO = 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837cb6f4498b.jpg';
+const { text: INK, body: BODY, textMuted: MUTED, bg: PAGE, soft: SOFT, border: LINE, card: CARD, onSolid: ON_SOLID } = InsightPalette;
 
 function greeting(date = new Date()) {
   const hour = date.getHours();
@@ -62,6 +67,15 @@ export default function AiScreen() {
   const activeAssistant = useRef<string | undefined>(undefined);
   const historyKey = ['ai-conversations', userId];
 
+  // Welcome-state backdrop: fades out once the conversation starts.
+  const showMist = messages.length === 0 && !loadingConversation;
+  const [mistOpacity] = useState(() => new Animated.Value(showMist ? 1 : 0));
+  useEffect(() => {
+    Animated.timing(mistOpacity, {
+      toValue: showMist ? 1 : 0, duration: 450, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [showMist, mistOpacity]);
+
   useEffect(() => () => gate.reset(), [gate]);
   useEffect(() => () => drawerProgress.stopAnimation(), [drawerProgress]);
 
@@ -95,7 +109,7 @@ export default function AiScreen() {
 
   const historyQuery = useQuery({
     queryKey: historyKey,
-    queryFn: ({ signal }) => api<{ conversations: Conversation[] }>('/api/ai/conversations', { signal }),
+    queryFn: ({ signal }) => listConversations(signal),
     enabled: drawerOpen,
     staleTime: 0,
   });
@@ -126,7 +140,7 @@ export default function AiScreen() {
     setDeleting(true);
     setDeleteError(undefined);
     try {
-      await api(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await removeConversation(id);
       queryClient.setQueryData<{ conversations: Conversation[] }>(historyKey, (data) =>
         data ? { conversations: data.conversations.filter((item) => item.id !== id) } : data);
       if (id === conversationId) reset(kind, symbol || 'BTCUSDT');
@@ -152,12 +166,10 @@ export default function AiScreen() {
     const request = gate.begin();
     if (!request) return;
     try {
-      const result = await api<{ conversation: Conversation; messages: Message[] }>(
-        `/api/ai/conversations/${encodeURIComponent(conversation.id)}`, { signal: request.signal },
-      );
+      const loaded = await conversationMessages(conversation.id, request.signal);
       if (!gate.isCurrent(request)) return;
-      setConversationId(result.conversation.id);
-      setMessages(result.messages.filter((message) => message.role === 'user' || message.role === 'assistant'));
+      setConversationId(conversation.id);
+      setMessages(loaded);
     } catch (err) {
       if (gate.isCurrent(request)) setError(err instanceof Error ? err.message : 'Could not open this conversation.');
     } finally {
@@ -183,17 +195,28 @@ export default function AiScreen() {
     setStreaming(true);
     nearBottom.current = true;
     try {
-      await streamAiChat({
-        conversationId, message: trimmed, kind,
-        ...(kind === 'analysis' ? { symbol: symbol.trim().toUpperCase(), exchange: symbol.includes('/') || /^(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD)$/i.test(symbol.trim()) ? 'FOREX' : 'BINANCE' } : {}),
-      }, (event) => {
+      const append = (text: string) => setMessages((previous) => previous.map((message) => message.id === assistantId
+        ? { ...message, content: message.content + text } : message));
+      if (DEMO_MODE) {
+        await streamDemoAiChat({ conversationId, message: trimmed, kind, ...(kind === 'analysis' ? { symbol: symbol.trim().toUpperCase(), exchange: 'BINANCE' } : {}) }, (event) => {
+          if (!gate.isCurrent(request)) return;
+          if (event.type === 'meta' && event.conversationId) setConversationId(event.conversationId);
+          if (event.type === 'token' && event.content) append(event.content);
+        }, request.signal);
+      } else {
+        const id = conversationId ?? (await createConversation(trimmed)).id;
         if (!gate.isCurrent(request)) return;
-        if (event.type === 'meta' && event.conversationId) setConversationId(event.conversationId);
-        if (event.type === 'token' && event.content) {
-          setMessages((previous) => previous.map((message) => message.id === assistantId
-            ? { ...message, content: message.content + event.content } : message));
-        }
-      }, request.signal);
+        setConversationId(id);
+        await streamAiMessage(id, promptFor(kind, trimmed, symbol), (event) => {
+          if (!gate.isCurrent(request)) return;
+          if (event.type === 'delta' && event.text) append(event.text);
+          // The saved reply is authoritative (it also covers replies that arrived without deltas).
+          if (event.type === 'assistant_message' && typeof event.message?.content === 'string') {
+            const content: string = event.message.content;
+            setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, content } : message));
+          }
+        }, request.signal);
+      }
       if (gate.isCurrent(request)) {
         setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: undefined } : message));
       }
@@ -226,20 +249,29 @@ export default function AiScreen() {
   const disabled = loadingConversation || needsNewChat || (kind === 'analysis' && !symbol.trim());
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.safe}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: mistOpacity }]}>
+        <MovingMist active={showMist} />
+      </Animated.View>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Open conversation history" style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-            onPress={showDrawer}>
-            <View style={styles.menuGlyph}><View style={styles.menuLine} /><View style={[styles.menuLine, { width: 10 }]} /></View>
-          </Pressable>
+          <View style={styles.headerStart}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back to Home" hitSlop={4} style={({ pressed }) => [styles.newChatIcon, pressed && styles.pressed]}
+              onPress={() => router.navigate('/(tabs)/markets')}>
+              <GlassIcon name="home" size={36} tone="purple" />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open conversation history" hitSlop={4} style={({ pressed }) => [styles.newChatIcon, pressed && styles.pressed]}
+              onPress={showDrawer}>
+              <GlassIcon name="history" size={36} tone="purple" />
+            </Pressable>
+          </View>
           <View style={styles.headerPill}>
             {messages.length > 0 || loadingConversation
               ? <Text style={styles.headerPillText} numberOfLines={1}>{title}</Text>
               : <Text style={styles.headerPillText} numberOfLines={1}>AI Insight · <Text style={styles.headerPillMuted}>For learning</Text></Text>}
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Start a new chat" style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]} onPress={newChat}>
-            <View style={styles.plusGlyph}><View style={styles.plusH} /><View style={styles.plusV} /></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Start a new chat" hitSlop={4} style={({ pressed }) => [styles.newChatIcon, pressed && styles.pressed]} onPress={newChat}>
+            <GlassIcon name="add" size={36} tone="purple" />
           </Pressable>
         </View>
 
@@ -269,7 +301,7 @@ export default function AiScreen() {
             onContentSizeChange={() => { if (messages.length && nearBottom.current) listRef.current?.scrollToEnd({ animated: false }); }}
             ListEmptyComponent={loadingConversation ? <View style={styles.loading}><ActivityIndicator color={MUTED} /><Text style={styles.muted}>Opening conversation…</Text></View> : (
               <View style={styles.welcome}>
-                <Image source={{ uri: LOGO }} style={styles.welcomeLogo} contentFit="cover" accessibilityLabel="Gurukul" />
+                <Image source={require('@/assets/images/home-ai.png')} style={styles.welcomeArt} contentFit="contain" accessibilityLabel="AI Insight" />
                 <Text style={styles.welcomeTitle} accessibilityRole="header">
                   {kind === 'portfolio' ? 'Know your portfolio' : kind === 'analysis' ? 'Explore a pair' : `${greeting()}${firstName ? `, ${firstName}` : ''}`}
                 </Text>
@@ -327,7 +359,7 @@ export default function AiScreen() {
                 <Pressable accessibilityRole="button" accessibilityLabel={streaming ? 'Stop response' : 'Send message'}
                   disabled={!streaming && (disabled || !input.trim())} onPress={streaming ? stopResponse : () => send(input)}
                   style={({ pressed }) => [styles.sendButton, !streaming && (disabled || !input.trim()) && styles.sendDisabled, pressed && styles.pressed]}>
-                  {streaming ? <View style={styles.stopGlyph} /> : <Text style={styles.sendGlyph}>↑</Text>}
+                  {streaming ? <View style={styles.stopButton}><View style={styles.stopGlyph} /></View> : <GlassIcon name="send" size={34} tone={disabled || !input.trim() ? 'neutral' : 'purple'} />}
                 </Pressable>
               </View>
             </View>
@@ -388,66 +420,64 @@ export default function AiScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   pressed: { opacity: 0.6 },
-  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: PAGE },
+  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#FFFFFF' },
   header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  headerStart: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: SOFT },
-  menuGlyph: { gap: 5 }, menuLine: { width: 16, height: 1.5, backgroundColor: INK, borderRadius: 1 },
-  plusGlyph: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
-  plusH: { position: 'absolute', width: 14, height: 1.5, backgroundColor: INK, borderRadius: 1 },
-  plusV: { position: 'absolute', width: 1.5, height: 14, backgroundColor: INK, borderRadius: 1 },
+  newChatIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerPill: { flexShrink: 1, maxWidth: '62%', paddingHorizontal: 12, height: 32, borderRadius: 8, backgroundColor: SOFT, justifyContent: 'center' },
   headerPillText: { color: INK, fontSize: 13, fontWeight: '500' },
   headerPillMuted: { color: MUTED, fontWeight: '400' },
-  panel: { flex: 1, backgroundColor: PAGE },
+  panel: { flex: 1 },
   messages: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, gap: 22 },
   emptyList: { flexGrow: 1, justifyContent: 'center' },
-  welcome: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 12 },
-  welcomeLogo: { width: 44, height: 44, borderRadius: 12, marginBottom: 16, backgroundColor: SOFT },
+  welcome: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12 },
+  welcomeArt: { width: 148, height: 148, marginBottom: 4 },
   welcomeTitle: { fontFamily: Fonts?.serif, fontSize: 26, lineHeight: 34, color: INK, textAlign: 'center', letterSpacing: -0.3 },
   welcomeSubtitle: { fontSize: 14, lineHeight: 21, color: MUTED, marginTop: 8, maxWidth: 270, textAlign: 'center' },
   starterChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 26, maxWidth: 340 },
-  starterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: '#FFFFFF' },
+  starterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
   starterTitle: { color: BODY, fontSize: 13, fontWeight: '500' },
   promptLabel: { fontSize: 12, color: MUTED, fontWeight: '500' },
-  userMessage: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 10, backgroundColor: SOFT, paddingHorizontal: 14, paddingVertical: 10 },
+  userMessage: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 14, backgroundColor: '#EFE8FF', paddingHorizontal: 14, paddingVertical: 10 },
   messageText: { color: INK, fontSize: 14, lineHeight: 21 },
   assistantMessage: { gap: 6, paddingRight: 8 },
   streamingDot: { alignSelf: 'flex-start' },
   responseStatus: { fontSize: 11, color: MUTED, fontStyle: 'italic', marginTop: 3 },
   loading: { paddingVertical: 50, alignItems: 'center', gap: 15 }, muted: { color: MUTED, fontSize: 13 },
-  instrumentSection: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }, instrumentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: '#FFFFFF', paddingLeft: 12, paddingRight: 5, paddingVertical: 4 },
+  instrumentSection: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }, instrumentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: CARD, paddingLeft: 12, paddingRight: 5, paddingVertical: 4 },
   exchange: { color: MUTED, fontSize: 10, fontWeight: '600', letterSpacing: 0.4 }, symbolInput: { flex: 1, minWidth: 50, fontSize: 13, color: INK, paddingVertical: 10, paddingHorizontal: 6, minHeight: 40 },
-  analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, backgroundColor: INK, borderRadius: 8 }, analyzeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, backgroundColor: INK, borderRadius: 8 }, analyzeText: { color: ON_SOLID, fontSize: 12, fontWeight: '600' },
   instrumentHint: { fontSize: 11, lineHeight: 16, color: MUTED, paddingTop: 7 },
-  composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, backgroundColor: PAGE },
-  composer: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, boxShadow: '0 1px 2px rgba(31,31,30,0.04)' },
+  composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
+  composer: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10, borderRadius: 16, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 1px 2px rgba(31,31,30,0.04)' },
   input: { color: INK, fontSize: 15, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 4, paddingTop: 8, paddingBottom: 8 },
   composerToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   modePicker: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 10, borderRadius: 8 },
   modePickerText: { color: BODY, fontSize: 13, fontWeight: '500' },
   chevron: { width: 6, height: 6, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: BODY, transform: [{ rotate: '45deg' }], marginTop: -3 },
   chevronUp: { transform: [{ rotate: '-135deg' }], marginTop: 3 },
-  modeMenu: { position: 'absolute', right: 12, bottom: '100%', width: 248, padding: 6, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
+  modeMenu: { position: 'absolute', right: 12, bottom: '100%', width: 248, padding: 6, borderRadius: 14, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
   modeOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 9, minHeight: 44 },
   modeOptionPressed: { backgroundColor: PAGE },
   modeOptionLabel: { color: INK, fontSize: 14, fontWeight: '500' },
   modeOptionHint: { color: MUTED, fontSize: 12, marginTop: 2 },
   modeCheck: { color: INK, fontSize: 14, fontWeight: '600' },
-  sendButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: INK, alignItems: 'center', justifyContent: 'center' },
-  sendDisabled: { backgroundColor: '#D4D4D0' },
-  sendGlyph: { color: '#FFFFFF', fontSize: 18, lineHeight: 20, fontWeight: '600' },
-  stopGlyph: { height: 11, width: 11, borderRadius: 2, backgroundColor: '#FFFFFF' }, disabled: { opacity: 0.4 },
+  sendButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  sendDisabled: { opacity: 0.4 },
+  stopButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#6E5CE6', alignItems: 'center', justifyContent: 'center' },
+  stopGlyph: { height: 10, width: 10, borderRadius: 2, backgroundColor: '#FFFFFF' }, disabled: { opacity: 0.4 },
   disclaimer: { textAlign: 'center', color: MUTED, fontSize: 10, lineHeight: 15, paddingTop: 8, paddingBottom: 2 },
-  errorBox: { padding: 10, backgroundColor: '#FBEFEF', borderRadius: 9, marginHorizontal: 16, marginTop: 6 }, errorText: { color: '#A23E3E', fontSize: 12, lineHeight: 17 },
+  errorBox: { padding: 10, backgroundColor: '#FEF2F2', borderRadius: 9, marginHorizontal: 16, marginTop: 6 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 },
   restart: { minHeight: 44, flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center', marginHorizontal: 16 }, restartText: { color: INK, fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
-  modalBackdrop: { backgroundColor: 'rgba(31,31,30,0.28)' },
+  modalBackdrop: { backgroundColor: 'rgba(17,18,28,0.4)' },
   drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: PAGE, boxShadow: '8px 0 32px rgba(31,31,30,0.12)' },
   drawerContent: { flex: 1, paddingHorizontal: 18 },
   drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 20, gap: 8 }, drawerTitle: { fontFamily: Fonts?.serif, fontSize: 20, color: INK, flex: 1 }, closeGlyph: { fontSize: 22, color: INK },
   newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, borderRadius: 10, paddingHorizontal: 13, backgroundColor: SOFT }, newChatText: { color: INK, fontSize: 13, fontWeight: '500' },
-  historySearch: { paddingHorizontal: 13, paddingVertical: 12, minHeight: 44, marginTop: 12, borderWidth: 1, borderColor: LINE, backgroundColor: '#FFFFFF', borderRadius: 10, color: INK, fontSize: 13 },
+  historySearch: { paddingHorizontal: 13, paddingVertical: 12, minHeight: 44, marginTop: 12, borderWidth: 1, borderColor: LINE, backgroundColor: CARD, borderRadius: 10, color: INK, fontSize: 13 },
   historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: MUTED, fontSize: 12 }, historyList: { gap: 4, paddingTop: 5, paddingBottom: 20 },
-  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, confirmItem: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: LINE, gap: 8 }, confirmTitle: { color: INK, fontSize: 14, fontWeight: '600' },
+  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, confirmItem: { backgroundColor: CARD, borderWidth: 1, borderColor: LINE, gap: 8 }, confirmTitle: { color: INK, fontSize: 14, fontWeight: '600' },
   confirmButton: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }, confirmCancel: { color: BODY, fontSize: 13, fontWeight: '500' },
   deleteButton: { backgroundColor: '#DC2626' }, deleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },

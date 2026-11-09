@@ -18,86 +18,70 @@ export function GlassPressable({ children, ...props }: Omit<PressableProps, 'chi
   );
 }
 
-// Nucleo Isometric artwork (scripts/render-isometric-icons.py renders every tone from the bundled SVGs).
+// Nucleo Glass artwork. Bundled PNGs preserve the original SVG blur on native.
 const ICONS = {
   home: {
-    neutral: require('../../../assets/icons/nucleo-isometric/home.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/home-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/home-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/home-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/house.png'),
+    purple: require('../../../assets/icons/nucleo-glass/house-selected.png'),
   },
   community: {
-    neutral: require('../../../assets/icons/nucleo-isometric/community.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/community-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/community-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/community-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/users.png'),
+    purple: require('../../../assets/icons/nucleo-glass/users-selected.png'),
   },
   analytics: {
-    neutral: require('../../../assets/icons/nucleo-isometric/analytics.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/analytics-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/analytics-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/analytics-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/circle-chart-line.png'),
+    purple: require('../../../assets/icons/nucleo-glass/circle-chart-line-selected.png'),
   },
   profile: {
-    neutral: require('../../../assets/icons/nucleo-isometric/profile.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/profile-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/profile-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/profile-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/user.png'),
+    purple: require('../../../assets/icons/nucleo-glass/user-selected.png'),
   },
   wallet: {
-    neutral: require('../../../assets/icons/nucleo-isometric/wallet.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/wallet-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/wallet-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/wallet-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/wallet-content.png'),
+    purple: require('../../../assets/icons/nucleo-glass/wallet-content-selected.png'),
   },
   send: {
-    neutral: require('../../../assets/icons/nucleo-isometric/send.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/send-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/send-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/send-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/paper-plane.png'),
+    purple: require('../../../assets/icons/nucleo-glass/paper-plane-selected.png'),
   },
   card: {
-    neutral: require('../../../assets/icons/nucleo-isometric/card.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/card-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/card-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/card-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/credit-cards.png'),
+    purple: require('../../../assets/icons/nucleo-glass/credit-cards-selected.png'),
   },
   add: {
-    neutral: require('../../../assets/icons/nucleo-isometric/add.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/add-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/add-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/add-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/circle-copy-plus.png'),
+    purple: require('../../../assets/icons/nucleo-glass/circle-copy-plus-selected.png'),
   },
   up: {
-    neutral: require('../../../assets/icons/nucleo-isometric/up.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/up-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/up-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/up-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/circle-arrow-up.png'),
+    purple: require('../../../assets/icons/nucleo-glass/circle-arrow-up-selected.png'),
   },
   down: {
-    neutral: require('../../../assets/icons/nucleo-isometric/down.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/down-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/down-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/down-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/circle-arrow-down.png'),
+    purple: require('../../../assets/icons/nucleo-glass/circle-arrow-down-selected.png'),
   },
   chart: {
-    neutral: require('../../../assets/icons/nucleo-isometric/chart.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/chart-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/chart-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/chart-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/square-chart-line.png'),
+    purple: require('../../../assets/icons/nucleo-glass/square-chart-line-selected.png'),
+  },
+  bell: {
+    neutral: require('../../../assets/icons/nucleo-glass/bell.png'),
+    purple: require('../../../assets/icons/nucleo-glass/bell-selected.png'),
+  },
+  history: {
+    neutral: require('../../../assets/icons/nucleo-glass/msgs.png'),
+    purple: require('../../../assets/icons/nucleo-glass/msgs-selected.png'),
   },
   coin: {
-    neutral: require('../../../assets/icons/nucleo-isometric/coin.png'),
-    purple: require('../../../assets/icons/nucleo-isometric/coin-selected.png'),
-    blue: require('../../../assets/icons/nucleo-isometric/coin-blue.png'),
-    orange: require('../../../assets/icons/nucleo-isometric/coin-orange.png'),
+    neutral: require('../../../assets/icons/nucleo-glass/circle-coin.png'),
+    purple: require('../../../assets/icons/nucleo-glass/circle-coin-selected.png'),
   },
 } as const;
 
 export type GlassIconName = keyof typeof ICONS;
 
-// Set false to use monochrome platform symbols instead of the isometric artwork.
-const USE_ARTWORK_ICONS = true;
+// Temporary visual comparison: set true to restore the original glass artwork.
+const USE_GLASS_ICONS = true;
 
 const STANDARD_ICONS = {
   home: { ios: 'house', android: 'home', web: 'home' },
@@ -111,10 +95,21 @@ const STANDARD_ICONS = {
   up: { ios: 'arrow.up.circle', android: 'arrow_circle_up', web: 'arrow_circle_up' },
   down: { ios: 'arrow.down.circle', android: 'arrow_circle_down', web: 'arrow_circle_down' },
   chart: { ios: 'chart.xyaxis.line', android: 'show_chart', web: 'show_chart' },
+  bell: { ios: 'bell', android: 'notifications', web: 'notifications' },
+  history: { ios: 'bubble.left.and.bubble.right', android: 'forum', web: 'forum' },
   coin: { ios: 'dollarsign.circle', android: 'monetization_on', web: 'monetization_on' },
 } as const satisfies Record<GlassIconName, ComponentProps<typeof SymbolView>['name']>;
 
-const STANDARD_COLORS = { neutral: '#475569', purple: '#0066FF', blue: '#0066FF', orange: '#F28C28' };
+const STANDARD_COLORS = { neutral: '#3A4050', purple: '#0066FF', blue: '#0066FF', orange: '#F28C28' };
+
+const ACCENT_ICONS: Partial<Record<GlassIconName, Partial<Record<'orange' | 'blue', number>>>> = {
+  send: {
+    orange: require('../../../assets/icons/nucleo-glass/paper-plane-orange.png'),
+    blue: require('../../../assets/icons/nucleo-glass/paper-plane-blue.png'),
+  },
+  community: { blue: require('../../../assets/icons/nucleo-glass/users-blue.png') },
+  profile: { blue: require('../../../assets/icons/nucleo-glass/user-blue.png') },
+};
 
 type Props = {
   name: GlassIconName;
@@ -126,7 +121,7 @@ type Props = {
 export function GlassIcon({ name, size = 24, tone, rotation = 0 }: Props) {
   const pressed = useContext(GlassPressedContext);
   const resolvedTone = tone ?? (pressed ? 'purple' : 'neutral');
-  if (!USE_ARTWORK_ICONS) {
+  if (!USE_GLASS_ICONS) {
     return <SymbolView
       name={STANDARD_ICONS[name]}
       size={size}
@@ -136,7 +131,9 @@ export function GlassIcon({ name, size = 24, tone, rotation = 0 }: Props) {
       accessible={false}
     />;
   }
-  const source = ICONS[name][resolvedTone];
+  const source = resolvedTone === 'orange' || resolvedTone === 'blue'
+    ? ACCENT_ICONS[name]?.[resolvedTone] ?? ICONS[name].neutral
+    : ICONS[name][resolvedTone];
   return (
     <Image
       source={source}

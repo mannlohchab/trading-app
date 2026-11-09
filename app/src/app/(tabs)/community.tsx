@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppTopBar } from '@/components/navigation/AppTopBar';
 import { Text } from '@/components/ui/AppText';
 import { PostCard } from '@/components/community/PostCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -28,6 +29,7 @@ export default function CommunityScreen() {
   });
   const posts = [...new Map(feed.data?.pages.flatMap(page => page.posts).map(post => [post.id, post])).values()];
   return <SafeAreaView style={styles.safe} edges={['top']}>
+    <AppTopBar />
     <View style={styles.header}>
       <Text style={styles.title}>Community</Text>
       <Pressable accessibilityRole="button" style={styles.compose} onPress={() => router.push('/community/compose')}><Text style={styles.composeText}>Post</Text></Pressable>
@@ -55,10 +57,10 @@ export default function CommunityScreen() {
 }
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: P.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
-  header: { paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: { paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: P.text, fontSize: 26, lineHeight: 34, fontWeight: '400', letterSpacing: -0.3 },
   compose: { backgroundColor: P.text, paddingHorizontal: 16, minHeight: 40, justifyContent: 'center', borderRadius: 8 },
-  composeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  composeText: { color: P.onSolid, fontSize: 13, fontWeight: '600' },
   tabs: { paddingHorizontal: 16, marginBottom: 12 }, list: { paddingBottom: 32 },
   loading: { padding: 16, gap: 12 }, footer: { padding: 16 },
 });

@@ -12,6 +12,7 @@ export default function AppTabs() {
   const bottomPadding = Math.max(insets.bottom, 12);
 
   if (!user) return <Redirect href="/(auth)/login" />;
+  if (user.status !== 'ACTIVE') return <Redirect href="/(auth)/verify-phone" />;
 
   return (
     <Tabs
@@ -23,11 +24,13 @@ export default function AppTabs() {
         tabBarIconStyle: styles.iconSlot,
         tabBarLabelStyle: styles.label,
         tabBarLabelPosition: 'below-icon',
-        tabBarActiveTintColor: '#0F172A',
-        tabBarInactiveTintColor: '#334155',
-        tabBarActiveBackgroundColor: '#fff',
-        tabBarInactiveBackgroundColor: '#fff',
+        tabBarActiveTintColor: Palette.text,
+        tabBarInactiveTintColor: Palette.textSecondary,
+        tabBarActiveBackgroundColor: '#FFFFFF',
+        tabBarInactiveBackgroundColor: '#FFFFFF',
         tabBarHideOnKeyboard: true,
+        // Hidden tabs keep receiving live prices; freezing skips their re-renders until refocused.
+        freezeOnBlur: true,
       }}>
       <Tabs.Screen name="markets" options={{
         title: 'Home',
@@ -35,18 +38,25 @@ export default function AppTabs() {
       }} />
       <Tabs.Screen name="market" options={{
         title: 'Market',
+        sceneStyle: { backgroundColor: '#FFFFFF' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="chart" tone={focused ? 'purple' : 'neutral'} />,
       }} />
+      {/* Community has no backend yet, so the tab is hidden (the screens are kept). */}
       <Tabs.Screen name="community" options={{
+        href: null,
         title: 'Community',
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="community" tone={focused ? 'purple' : 'neutral'} />,
       }} />
       <Tabs.Screen name="ai" options={{
         title: 'Insights',
+        sceneStyle: { backgroundColor: '#FFFFFF' },
+        // Full-screen chat: the header's home button replaces the dock.
+        tabBarStyle: { display: 'none' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="analytics" tone={focused ? 'purple' : 'neutral'} />,
       }} />
       <Tabs.Screen name="profile" options={{
         title: 'Profile',
+        sceneStyle: { backgroundColor: '#FFFFFF' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="profile" tone={focused ? 'purple' : 'neutral'} />,
       }} />
     </Tabs>
@@ -55,8 +65,8 @@ export default function AppTabs() {
 
 const styles = StyleSheet.create({
   bar: {
-    width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#fff',
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e9ecf0',
+    width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#FFFFFF',
+    borderTopWidth: 0,
     paddingTop: 10, paddingHorizontal: 8, elevation: 0, boxShadow: 'none',
   },
   item: { paddingVertical: 0, minHeight: 44 },

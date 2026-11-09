@@ -9,15 +9,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StockPreviewChart } from '@/components/charts/StockPreviewChart';
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
-import type { QuoteLike } from '@/components/markets/InstrumentRow';
-import { api } from '@/lib/api';
+import { Palette } from '@/constants/theme';
+import { fetchHistory, fetchQuote } from '@/lib/marketData';
 import { useLiveMarket } from '@/hooks/use-live-market';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { formatCompact, formatMarketPrice, formatPct, marketMetadata, marketSourceLabel } from '@/lib/format';
-import type { HistoryResponse } from '@/lib/marketHistory';
 import { buildPreviewChart, PREVIEW_RANGES, type PreviewRange } from '@/lib/stockPreview';
 
-type DetailQuote = QuoteLike & { open?: number; high?: number; low?: number; close?: number; volume?: number };
 const date = (time: number) => new Date(time * 1000).toLocaleDateString('en-US', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function StockDetailScreen() {
@@ -28,14 +26,14 @@ export default function StockDetailScreen() {
   const timeframe = PREVIEW_RANGES.find(item => item.label === range)!.timeframe;
   const quoteQuery = useQuery({
     queryKey: ['quote', symbol, exchange],
-    queryFn: ({ signal }) => api<{ quote: DetailQuote; isDemo: boolean }>(`/api/market/quote/${encodeURIComponent(symbol)}?exchange=${encodeURIComponent(exchange)}`, { signal, auth: false }),
+    queryFn: ({ signal }) => fetchQuote(symbol, signal),
     refetchInterval: 60_000,
   });
   const historyQuery = useQuery({
     queryKey: ['stock-preview-history', symbol, exchange, timeframe],
-    queryFn: ({ signal }) => api<HistoryResponse>(`/api/market/candles/${encodeURIComponent(symbol)}?exchange=${encodeURIComponent(exchange)}&timeframe=${timeframe}&liveOnly=true`, { signal, auth: false }),
-    staleTime: exchange === 'FOREX' ? 300_000 : 60_000,
-    refetchInterval: exchange === 'FOREX' ? 300_000 : 60_000,
+    queryFn: ({ signal }) => fetchHistory(symbol, timeframe, 500, signal),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
     retry: false,
   });
   const chart = useMemo(() => buildPreviewChart(historyQuery.data, range, DEMO_MODE), [historyQuery.data, range]);
@@ -113,40 +111,40 @@ export default function StockDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f8fafc' },
+  safe: { flex: 1, backgroundColor: Palette.bg },
   page: { flex: 1, width: '100%', maxWidth: 620, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-  back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#e4e5ed', alignItems: 'center', justifyContent: 'center' },
-  backGlyph: { fontSize: 30, lineHeight: 32, color: '#1e293b' },
-  title: { fontSize: 20, fontWeight: '600', color: '#0F172A' },
+  back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: Palette.border, alignItems: 'center', justifyContent: 'center' },
+  backGlyph: { fontSize: 30, lineHeight: 32, color: Palette.text },
+  title: { fontSize: 20, fontWeight: '600', color: Palette.text },
   headerSpacer: { width: 44 },
   content: { paddingHorizontal: 20, paddingBottom: 28 },
-  identity: { backgroundColor: '#fff', padding: 16, borderRadius: 19, borderWidth: 1, borderColor: '#e3e5ed', flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', minHeight: 94, boxShadow: '0 2px 5px rgba(30,41,59,0.025)' },
+  identity: { backgroundColor: Palette.card, padding: 16, borderRadius: 19, borderWidth: 1, borderColor: Palette.border, flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', minHeight: 94 },
   nameWrap: { flex: 1 },
-  name: { color: '#0f172a', fontSize: 20, fontWeight: '600', letterSpacing: -0.5 },
-  symbol: { color: '#7e8592', fontSize: 13, marginTop: 5 },
+  name: { color: Palette.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.5 },
+  symbol: { color: Palette.textSecondary, fontSize: 13, marginTop: 5 },
   priceWrap: { alignItems: 'flex-start', width: '100%', marginTop: 4 },
-  price: { color: '#0f172a', fontSize: 32, fontWeight: '600', letterSpacing: -0.6 },
-  currency: { color: '#9299a7', fontSize: 12, marginTop: 2 },
+  price: { color: Palette.text, fontSize: 32, fontWeight: '600', letterSpacing: -0.6 },
+  currency: { color: Palette.textMuted, fontSize: 12, marginTop: 2 },
   change: { fontSize: 14, fontWeight: '500', marginTop: 4 },
   sourceRow: { gap: 4, paddingTop: 10, paddingBottom: 19 },
-  source: { color: '#64748b', fontSize: 12 },
-  asOf: { color: '#8f939d', fontSize: 12 },
-  ranges: { padding: 4, borderRadius: 10, borderWidth: 1, borderColor: '#e5e5ee', flexDirection: 'row', gap: 4 },
+  source: { color: Palette.textSecondary, fontSize: 12 },
+  asOf: { color: Palette.textMuted, fontSize: 12 },
+  ranges: { padding: 4, borderRadius: 10, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.pill, flexDirection: 'row', gap: 4 },
   range: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
-  rangeActive: { backgroundColor: '#fff', boxShadow: '0 2px 5px rgba(30,41,59,0.09)' },
-  rangeText: { fontSize: 14, color: '#334155' },
-  rangeTextActive: { color: '#0066ff', fontWeight: '600' },
+  rangeActive: { backgroundColor: Palette.card },
+  rangeText: { fontSize: 14, color: Palette.textSecondary },
+  rangeTextActive: { color: '#0052D6', fontWeight: '600' },
   chartEmpty: { height: 245, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyText: { color: '#94a3b8', fontSize: 14, textAlign: 'center' },
-  retry: { color: '#0066ff', fontSize: 13, paddingVertical: 8 },
+  emptyText: { color: Palette.textMuted, fontSize: 14, textAlign: 'center' },
+  retry: { color: '#0052D6', fontSize: 13, paddingVertical: 8 },
   historyInfo: { marginTop: 12, gap: 4, marginBottom: 20 },
-  historyCaption: { color: '#9096a5', fontSize: 12 },
-  stats: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#eeedf3', borderRadius: 18, padding: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  historyCaption: { color: Palette.textMuted, fontSize: 12 },
+  stats: { backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border, borderRadius: 18, padding: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
   stat: { width: '46%', gap: 6 },
-  statLabel: { color: '#475569', fontSize: 13 },
-  statValue: { color: '#1E293B', fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  statLabel: { color: Palette.textSecondary, fontSize: 13 },
+  statValue: { color: Palette.text, fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
   footer: { paddingHorizontal: 20, paddingBottom: 18, paddingTop: 12 },
-  openButton: { backgroundColor: '#fff', borderRadius: 14, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1, borderColor: '#BCD3FF', overflow: 'hidden', boxShadow: '0 3px 9px rgba(0,82,214,0.10)' },
+  openButton: { backgroundColor: Palette.card, borderRadius: 14, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1, borderColor: '#0066FF', overflow: 'hidden' },
   openText: { color: '#0052D6', fontSize: 17, fontWeight: '600' },
 });

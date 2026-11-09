@@ -1,7 +1,7 @@
 import { createContext, useContext, type ComponentProps } from 'react';
 import { StyleSheet, Text as NativeText, TextInput as NativeTextInput } from 'react-native';
 
-import { AppFont } from '@/constants/theme';
+import { AppFont, Palette } from '@/constants/theme';
 
 const InsideText = createContext(false);
 
@@ -20,5 +20,5 @@ export function TextInput({ style, ...props }: ComponentProps<typeof NativeTextI
 }
 
 const styles = StyleSheet.create({
-  defaultFont: { fontFamily: AppFont },
+  defaultFont: { fontFamily: AppFont, color: Palette.text },
 });

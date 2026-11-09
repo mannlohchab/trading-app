@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.3)',
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   label: { color: '#FFFFFF', fontWeight: '800' },
 });

@@ -4,9 +4,11 @@ import { buildHistoryChart, buildWatchlistChart, watchlistLineSegments } from '.
 
 const candle = (date, close) => ({ time: Date.parse(date) / 1000, close });
 
-test('draws only the latest UTC forex session, sorted by actual timestamps', () => {
+test('draws only the latest available hour, sorted by actual timestamps', () => {
   const chart = buildHistoryChart({ isDemo: false, candles: [
     candle('2026-10-29T20:55:00Z', 200),
+    candle('2026-10-30T08:30:00Z', 999),
+    candle('2026-10-30T08:25:00Z', 999),
     candle('2026-10-30T09:30:00Z', 105),
     candle('2026-10-30T09:15:00Z', 100),
     candle('2026-10-30T09:20:00Z', 110),
@@ -40,29 +42,38 @@ test('flat prices stay centered and duplicate timestamps do not add invented poi
   assert.ok(!chart.path.includes('NaN'));
 });
 
-test('watchlist uses the quote series immediately when detailed history is absent', () => {
-  const chart = buildWatchlistChart(undefined, { source: 'twelvedata', sparkline: [100, 112, 104, 109] });
-  assert.deepEqual(chart.points.map(point => point.value), [100, 112, 104, 109]);
-  assert.equal(chart.peak.value, 112);
-  assert.equal(chart.caption, 'Recent prices');
-  assert.equal(chart.positive, true);
+test('watchlist stays empty without timestamped history', () => {
+  assert.equal(buildWatchlistChart(undefined), null);
 });
 
-test('watchlist prefers dated history, and demo quote series require preview opt-in', () => {
+test('watchlist labels the hour and demo history requires preview opt-in', () => {
   const history = { isDemo: false, candles: [candle('2026-10-30T09:15:00Z', 200), candle('2026-10-30T09:20:00Z', 190)] };
-  const sample = { source: 'demo', sparkline: [50, 60] };
-  assert.equal(buildWatchlistChart(undefined, sample), null);
-  assert.equal(buildWatchlistChart(undefined, sample, true).caption, 'Demo prices');
-  assert.equal(buildWatchlistChart(history, sample).peak.value, 200);
-  assert.match(buildWatchlistChart(history, sample).caption, /2026-10-30/);
-  assert.equal(buildWatchlistChart(undefined, { sparkline: [10, 20] }), null);
-  assert.equal(buildWatchlistChart(undefined, { source: 'twelvedata', sparkline: [10, NaN] }), null);
-  const flat = buildWatchlistChart(undefined, { source: 'binance', sparkline: [25, 25] });
-  assert.ok(flat.points.every(point => Number.isFinite(point.y)));
+  assert.equal(buildWatchlistChart(history).peak.value, 200);
+  assert.match(buildWatchlistChart(history).caption, /1H/);
+  const demo = { ...history, isDemo: true };
+  assert.equal(buildWatchlistChart(demo), null);
+  assert.match(buildWatchlistChart(demo, true).caption, /Demo.*1H/);
+});
+
+test('a full day of five-minute candles produces only twelve mini-chart points', () => {
+  const start = Date.parse('2026-10-30T00:00:00Z') / 1000;
+  const chart = buildHistoryChart({ isDemo: false, source: 'binance', candles:
+    Array.from({ length: 288 }, (_, i) => ({ time: start + i * 300, close: 100 + i })),
+  });
+  assert.equal(chart.points.length, 12);
+  assert.equal(chart.points[0].value, 376);
+  assert.equal(chart.points.at(-1).value, 387);
+  assert.equal(watchlistLineSegments(chart.points, 160).length, 11);
+});
+
+test('a gap longer than an hour does not connect older observations', () => {
+  assert.equal(buildHistoryChart({ isDemo: false, candles: [
+    candle('2026-10-30T08:00:00Z', 100), candle('2026-10-30T09:20:00Z', 110),
+  ] }), null);
 });
 
 test('native watchlist line segments meet at exact endpoints at different card widths', () => {
-  const chart = buildWatchlistChart(undefined, { source: 'twelvedata', sparkline: [100, 110, 95, 105] });
+  const chart = buildWatchlistChart({ isDemo: false, candles: [100, 110, 95, 105].map((close, i) => ({ time: 100000 + i * 300, close })) });
   for (const width of [118, 160, 176]) {
     const segments = watchlistLineSegments(chart.points, width);
     assert.equal(segments.length, chart.points.length - 1);

@@ -45,3 +45,22 @@ test('request gate blocks double send and rejects stale results after switching 
   gate.finish(next);
   assert.ok(gate.begin());
 });
+
+test('backend named events: deltas and the saved reply arrive, done ends the stream, errors throw their message', async () => {
+  const events = [];
+  const body = [
+    'event: user_message', 'data: {"type":"user_message","message":{"id":"u1","content":"hi"}}', '',
+    'event: delta', 'data: {"type":"delta","text":"Bit"}', '',
+    'event: delta', 'data: {"type":"delta","text":"coin ₹"}', '',
+    'event: assistant_message', 'data: {"type":"assistant_message","message":{"id":"a1","content":"Bitcoin ₹"}}', '',
+    'event: done', 'data: {}', '', '',
+  ].join('\n');
+  await consumeAiStream(stream(body, 3), event => events.push(event));
+  assert.deepEqual(events.map(e => e.type), ['user_message', 'delta', 'delta', 'assistant_message', 'done']);
+  assert.equal(events.filter(e => e.type === 'delta').map(e => e.text).join(''), 'Bitcoin ₹');
+  assert.equal(events[3].message.content, 'Bitcoin ₹');
+  await assert.rejects(
+    consumeAiStream(stream('event: error\ndata: {"error":"Daily AI limit reached.","code":"QUOTA_EXCEEDED"}\n\n'), () => {}),
+    /Daily AI limit reached/,
+  );
+});

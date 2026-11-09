@@ -12,12 +12,12 @@
 html,
 body,
 #root {
-  background: #e7e9f2;
+  background: #f4f5fb;
   min-height: 100%;
 }
 
 body {
   margin: 0;
   font-family: var(--font-serif);
-  color: #0f172a;
+  color: #16181d;
 }

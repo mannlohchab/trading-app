@@ -1,10 +1,14 @@
-export function prepareProfileUpdate(displayName: string, bio: string):
-  { error: string; body?: never } | { error?: never; body: { displayName: string; bio: string } } {
-  const name = displayName.trim();
+const USERNAME = /^[A-Za-z0-9_]{3,30}$/;
+
+/** Body for PATCH /api/v1/me/profile. An empty username clears it (null). */
+export function prepareProfileUpdate(displayName: string, username: string):
+  { error: string; body?: never } | { error?: never; body: { name: string; username: string | null } } {
+  const name = displayName.trim().replace(/\s+/g, ' ');
   if (!name) return { error: 'Enter a display name.' };
-  if (name.length > 64) return { error: 'Keep your display name to 64 characters or fewer.' };
-  if (bio.length > 280) return { error: 'Keep your bio to 280 characters or fewer.' };
-  return { body: { displayName: name, bio } };
+  if (name.length > 100) return { error: 'Keep your display name to 100 characters or fewer.' };
+  const handle = username.trim().replace(/^@/, '');
+  if (handle && !USERNAME.test(handle)) return { error: 'Usernames are 3 to 30 letters, numbers or underscores.' };
+  return { body: { name, username: handle || null } };
 }
 
 export function validatePasswordChange(currentPassword: string, newPassword: string, confirmation: string): string | null {

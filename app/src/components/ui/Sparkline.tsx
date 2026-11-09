@@ -33,7 +33,7 @@ export function Sparkline({ data = [], times, label = 'Recent price history', wi
 }
 
 const styles = StyleSheet.create({
-  baseline: { position: 'absolute', left: 3, right: 3, borderTopWidth: 1, borderColor: '#E5E7EE', borderStyle: 'dashed' },
+  baseline: { position: 'absolute', left: 3, right: 3, borderTopWidth: 1, borderColor: Palette.border, borderStyle: 'dashed' },
   line: { position: 'absolute', height: 1.8, borderRadius: 1 },
   dot: { position: 'absolute', width: 5, height: 5, borderRadius: 3 },
   empty: { color: Palette.textMuted, textAlign: 'center', lineHeight: 36 },

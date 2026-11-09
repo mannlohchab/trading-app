@@ -1,14 +1,16 @@
 import { fetch as streamingFetch } from 'expo/fetch';
 import { consumeAiStream, type AiEvent } from './aiChat';
+import { authHeaders } from './authClient';
 import { API_URL } from './config';
 import { DEMO_MODE } from './demoMode';
 import { demoApi } from './demoData';
-import { useAuth } from '@/store/auth';
 
+/** Error from the backend: `{ error, code, fields? }`. */
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
     public details?: unknown,
   ) {
     super(message);
@@ -18,117 +20,81 @@ export class ApiError extends Error {
 type RequestOptions = {
   method?: string;
   body?: unknown;
-  token?: string | null;
-  auth?: boolean;
   signal?: AbortSignal;
+  headers?: Record<string, string>;
 };
 
-async function refreshTokens(): Promise<string | null> {
-  const { refreshToken, setSession, clearSession } = useAuth.getState();
-  if (!refreshToken) return null;
-  const res = await fetch(`${API_URL}/api/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
-  if (!res.ok) {
-    await clearSession();
-    return null;
+/** Called when the backend says the session is gone or the phone still needs verifying. */
+let onAuthProblem: ((problem: 'signed-out' | 'phone-verification') => void) | undefined;
+export function setAuthProblemHandler(handler: typeof onAuthProblem) { onAuthProblem = handler; }
+
+async function errorFrom(res: Response): Promise<ApiError> {
+  let message = res.statusText || 'Request failed';
+  let code: string | undefined;
+  let details: unknown;
+  try {
+    const json = (await res.json()) as { error?: string; message?: string; code?: string; fields?: Record<string, string> };
+    const fieldMessage = json.fields ? Object.values(json.fields)[0] : undefined;
+    message = fieldMessage ?? json.error ?? json.message ?? message;
+    code = json.code;
+    details = json.fields;
+  } catch {
+    // Not JSON.
   }
-  const data = (await res.json()) as {
-    user: Parameters<typeof setSession>[0]['user'];
-    accessToken: string;
-    refreshToken: string;
-  };
-  await setSession(data);
-  return data.accessToken;
+  if (res.status === 401) onAuthProblem?.('signed-out');
+  if (res.status === 403 && code === 'PHONE_VERIFICATION_REQUIRED') onAuthProblem?.('phone-verification');
+  return new ApiError(res.status, message, code, details);
 }
 
+/** JSON request to the backend (`/api/v1/...`), authenticated with the Better Auth session. */
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   if (DEMO_MODE) return await demoApi.request(path, options) as T;
-  const { method = 'GET', body, auth = true, signal } = options;
-  let token = options.token ?? useAuth.getState().accessToken;
-
-  const doFetch = async (access?: string | null) =>
-    fetch(`${API_URL}${path}`, {
-      method,
-      signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(access ? { Authorization: `Bearer ${access}` } : {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-  let res = await doFetch(auth ? token : null);
-  if (res.status === 401 && auth) {
-    token = await refreshTokens();
-    if (token) res = await doFetch(token);
-  }
-
-  if (!res.ok) {
-    let message = res.statusText;
-    let details: unknown;
-    try {
-      const json = (await res.json()) as { error?: string; details?: unknown };
-      message = json.error ?? message;
-      details = json.details;
-    } catch {
-      // ignore
-    }
-    throw new ApiError(res.status, message, details);
-  }
-
+  const { method = 'GET', body, signal } = options;
+  const auth = await authHeaders();
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    signal,
+    credentials: auth.credentials,
+    headers: {
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...auth.headers,
+      ...options.headers,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw await errorFrom(res);
   if (res.status === 204) return undefined as T;
-  const contentType = res.headers.get('content-type') ?? '';
-  if (contentType.includes('text/event-stream')) {
-    return res as unknown as T;
-  }
   return (await res.json()) as T;
 }
 
-export async function streamAiChat(
-  body: {
-    conversationId?: string;
-    message: string;
-    kind?: 'chat' | 'analysis' | 'portfolio';
-    symbol?: string;
-    exchange?: string;
-  },
+/**
+ * Sends one message to an AI conversation and streams the reply (server-sent events:
+ * `user_message`, `status`, `delta`, `block`, `assistant_message`, `done` or `error`).
+ */
+export async function streamAiMessage(
+  conversationId: string,
+  content: string,
   onEvent: (event: AiEvent) => void,
   signal?: AbortSignal,
 ) {
-  if (DEMO_MODE) return demoApi.stream(body, onEvent, signal);
-  let token = useAuth.getState().accessToken;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-
-  let res = await streamingFetch(`${API_URL}/api/ai/chat`, {
+  const auth = await authHeaders();
+  const res = await streamingFetch(`${API_URL}/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
     signal,
-    headers,
-    body: JSON.stringify(body),
+    credentials: auth.credentials,
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...auth.headers },
+    body: JSON.stringify({ content }),
   });
-
-  if (res.status === 401) {
-    token = await refreshTokens();
-    if (token) {
-      signal?.throwIfAborted();
-      res = await streamingFetch(`${API_URL}/api/ai/chat`, {
-        method: 'POST',
-        signal,
-        headers: { ...headers, Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-    }
-  }
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => null) as { error?: string } | null;
-    throw new ApiError(res.status, error?.error || 'AI request failed. Please try again.');
-  }
+  if (!res.ok) throw await errorFrom(res as unknown as Response);
   if (!res.body) throw new Error('Streaming is unavailable. Please try again.');
   await consumeAiStream(res.body, onEvent);
+}
+
+/** Demo preview keeps its local, fictional assistant. */
+export function streamDemoAiChat(
+  body: { conversationId?: string; message: string; kind?: 'chat' | 'analysis' | 'portfolio'; symbol?: string; exchange?: string },
+  onEvent: (event: AiEvent) => void,
+  signal?: AbortSignal,
+) {
+  return demoApi.stream(body, onEvent, signal);
 }

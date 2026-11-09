@@ -16,11 +16,15 @@ type Props = {
   currency?: string;
   drawingKey: string;
   drawingStore: { current: Record<string, ChartDrawing[]> };
+  exchange?: string;
+  timeframe?: string;
+  /** Increment to open the in-chart drawing menu from native controls. */
+  drawingMenuRequest?: number;
 };
 
 export type { ChartCandle };
 
-export function TradingChart({ candles, chartType, indicators, height = 360, symbol = '', pricePrecision = 2, currency = 'USD', drawingKey, drawingStore }: Props) {
+export function TradingChart({ candles, chartType, indicators, height = 360, symbol = '', pricePrecision = 2, currency = 'USD', drawingKey, drawingStore, exchange, timeframe, drawingMenuRequest = 0 }: Props) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const webview = useRef<WebView<{}>>(null);
   const initialCandles = useRef(candles);
@@ -32,6 +36,12 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
     webview.current?.postMessage(data);
   }, []);
   useEffect(() => { sendCandles(); }, [candles, sendCandles]);
+  useEffect(() => {
+    if (!drawingMenuRequest) return;
+    const data = JSON.stringify({ type: 'open-drawing-tools' });
+    iframe.current?.contentWindow?.postMessage(data, '*');
+    webview.current?.postMessage(data);
+  }, [drawingMenuRequest]);
   const saveDrawings = useCallback((data: unknown) => {
     if (typeof data !== 'string') return;
     try {
@@ -51,8 +61,8 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
   }, [saveDrawings]);
 
   const html = useMemo(
-    () => buildChartHtml(initialCandles.current, chartType, indicators, symbol, drawingStore.current[drawingKey] ?? [], drawingKey, pricePrecision, currency),
-    [chartType, indicators, symbol, drawingKey, drawingStore, pricePrecision, currency],
+    () => buildChartHtml(initialCandles.current, chartType, indicators, symbol, drawingStore.current[drawingKey] ?? [], drawingKey, pricePrecision, currency, { exchange, timeframe }),
+    [chartType, indicators, symbol, drawingKey, drawingStore, pricePrecision, currency, exchange, timeframe],
   );
 
   if (!candles.length) {
@@ -71,7 +81,7 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
           ref: iframe,
           srcDoc: html,
           onLoad: sendCandles,
-          style: { width: '100%', height: '100%', border: 'none', background: '#fff' },
+          style: { width: '100%', height: '100%', border: 'none', background: '#FFFFFF' },
           sandbox: 'allow-scripts',
         })}
       </View>
@@ -97,6 +107,6 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: '#fff', overflow: 'hidden' },
-  webview: { flex: 1, backgroundColor: '#fff' },
+  wrap: { backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  webview: { flex: 1, backgroundColor: '#FFFFFF' },
 });

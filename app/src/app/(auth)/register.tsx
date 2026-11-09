@@ -4,14 +4,14 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleShee
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { api, ApiError } from '@/lib/api';
+import { authClient } from '@/lib/authClient';
 import { Palette, Spacing } from '@/constants/theme';
-import { useAuth, type User } from '@/store/auth';
+import { useAuth } from '@/store/auth';
 
 export default function RegisterScreen() {
-  const setSession = useAuth((s) => s.setSession);
+  const refresh = useAuth((s) => s.refresh);
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,14 +20,15 @@ export default function RegisterScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api<{ user: User; accessToken: string; refreshToken: string }>(
-        '/api/auth/register',
-        { method: 'POST', body: { email, username, password }, auth: false },
-      );
-      await setSession(data);
-      router.replace('/(tabs)/markets');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Registration failed');
+      if (!name.trim()) { setError('Enter your name.'); return; }
+      if (password.length < 8) { setError('Use at least 8 characters for your password.'); return; }
+      const { error: signUpError } = await authClient.signUp.email({ name: name.trim(), email: email.trim(), password });
+      if (signUpError) { setError(signUpError.message || 'Registration failed'); return; }
+      await refresh();
+      // New accounts verify a phone number before they become active.
+      router.replace('/(auth)/verify-phone');
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -37,14 +38,14 @@ export default function RegisterScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
         <Text style={styles.brand}>Create account</Text>
-        <Text style={styles.subtitle}>Start with a $100,000 virtual balance</Text>
+        <Text style={styles.subtitle}>Practice with 100,000 virtual USDT on live crypto prices</Text>
         <View style={styles.form}>
+          <Text style={styles.label}>Name</Text>
+          <TextInput accessibilityLabel="Name" style={styles.input} value={name} onChangeText={setName} autoComplete="name" placeholderTextColor={Palette.textMuted} placeholder="Your name" />
           <Text style={styles.label}>Email</Text>
-          <TextInput style={styles.input} autoCapitalize="none" value={email} onChangeText={setEmail} placeholderTextColor={Palette.textMuted} placeholder="you@email.com" />
-          <Text style={styles.label}>Username</Text>
-          <TextInput style={styles.input} autoCapitalize="none" value={username} onChangeText={setUsername} placeholderTextColor={Palette.textMuted} placeholder="trader_in" />
+          <TextInput accessibilityLabel="Email" style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} placeholderTextColor={Palette.textMuted} placeholder="you@email.com" />
           <Text style={styles.label}>Password</Text>
-          <TextInput style={styles.input} secureTextEntry value={password} onChangeText={setPassword} placeholderTextColor={Palette.textMuted} placeholder="min 8 characters" />
+          <TextInput accessibilityLabel="Password" style={styles.input} secureTextEntry autoComplete="new-password" value={password} onChangeText={setPassword} placeholderTextColor={Palette.textMuted} placeholder="min 8 characters" />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable style={styles.button} onPress={onSubmit} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}

@@ -16,11 +16,11 @@ test('watchlist groups only crypto and forex, dropping unsupported exchanges',()
   const g=groupQuotes([{symbol:'BTCUSDT',exchange:'BINANCE'},{symbol:'EUR/USD',exchange:'FOREX'},{symbol:'TCS',exchange:'NSE'}]);
   assert.deepEqual(Object.keys(g),['crypto','forex']);assert.equal(g.crypto.length,1);assert.equal(g.forex.length,1);
 });
-test('crypto mini-chart keeps a rolling day crossing UTC midnight',()=>{
+test('crypto mini-chart keeps a rolling hour crossing UTC midnight',()=>{
   const chart=buildHistoryChart({isDemo:false,source:'binance',candles:[
     {time:Date.parse('2026-10-29T23:00:00Z')/1000,close:10},
-    {time:Date.parse('2026-10-30T22:00:00Z')/1000,close:12},
-    {time:Date.parse('2026-10-31T01:00:00Z')/1000,close:13},
+    {time:Date.parse('2026-10-30T23:40:00Z')/1000,close:12},
+    {time:Date.parse('2026-10-31T00:20:00Z')/1000,close:13},
   ]});
   assert.equal(chart.points.length,2);assert.equal(chart.points[0].value,12);
 });

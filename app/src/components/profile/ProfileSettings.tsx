@@ -1,11 +1,17 @@
 import { useState, type ComponentProps } from 'react';
 import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
+import { Palette } from '@/constants/theme';
 import { api } from '@/lib/api';
+import { authClient } from '@/lib/authClient';
+import { DEMO_MODE } from '@/lib/demoMode';
 import { prepareProfileUpdate, validatePasswordChange } from '@/lib/profileSettings';
 import type { User } from '@/store/auth';
+
+type Profile = { name: string | null; username: string | null; image: string | null; phoneNumber: string | null; timezone: string | null };
+type Preferences = { general: { notificationsEnabled: boolean } };
 
 type Props = {
   user: User;
@@ -13,7 +19,6 @@ type Props = {
   onLogout: () => Promise<void>;
 };
 
-type Preference = 'notifyPush' | 'notifyEmail' | 'privacyPublicProfile';
 type Feedback = { message: string; error?: boolean } | null;
 
 export function ProfileSettings(props: Props) {
@@ -21,11 +26,12 @@ export function ProfileSettings(props: Props) {
 }
 
 function SettingsForm({ user, onUserSaved, onLogout }: Props) {
-  // An explicit empty string is a draft too: clearing a bio must reach the API.
+  // An explicit empty string is a draft too: clearing a username must reach the API.
   const [nameDraft, setNameDraft] = useState<string>();
-  const [bioDraft, setBioDraft] = useState<string>();
-  const displayName = nameDraft ?? user.displayName ?? user.username;
-  const bio = bioDraft ?? user.bio ?? '';
+  const [usernameDraft, setUsernameDraft] = useState<string>();
+  const displayName = nameDraft ?? user.displayName ?? '';
+  const username = usernameDraft ?? user.username ?? '';
+  const qc = useQueryClient();
   const [profileFeedback, setProfileFeedback] = useState<Feedback>(null);
   const [preferenceFeedback, setPreferenceFeedback] = useState<Feedback>(null);
   const [passwordFeedback, setPasswordFeedback] = useState<Feedback>(null);
@@ -34,27 +40,34 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
   const [confirmation, setConfirmation] = useState('');
 
   const profileMutation = useMutation({
-    mutationFn: (body: Partial<User>) => api<{ user: User }>('/api/users/me', { method: 'PATCH', body }),
-    onSuccess: ({ user: savedUser }) => {
-      onUserSaved(savedUser);
+    mutationFn: (body: { name: string; username: string | null }) => api<Profile>('/api/v1/me/profile', { method: 'PATCH', body }),
+    onSuccess: profile => {
+      onUserSaved({ ...user, displayName: profile.name, username: profile.username, avatarUrl: profile.image, timezone: profile.timezone });
       setNameDraft(undefined);
-      setBioDraft(undefined);
+      setUsernameDraft(undefined);
       setProfileFeedback({ message: 'Your profile has been saved.' });
     },
     onError: error => setProfileFeedback({ error: true, message: error.message || 'Could not save your profile. Please try again.' }),
   });
+  const preferences = useQuery({
+    queryKey: ['preferences', user.id],
+    enabled: !DEMO_MODE,
+    queryFn: ({ signal }) => api<Preferences>('/api/v1/me/preferences', { signal }),
+  });
   const preferenceMutation = useMutation({
-    mutationFn: ({ key, value }: { key: Preference; value: boolean }) =>
-      api<{ user: User }>('/api/users/me', { method: 'PATCH', body: { [key]: value } }),
-    onSuccess: ({ user: savedUser }) => {
-      onUserSaved(savedUser);
+    mutationFn: (notificationsEnabled: boolean) =>
+      api<Preferences>('/api/v1/me/preferences', { method: 'PATCH', body: { general: { notificationsEnabled } } }),
+    onSuccess: saved => {
+      qc.setQueryData(['preferences', user.id], saved);
       setPreferenceFeedback({ message: 'Preference saved.' });
     },
     onError: error => setPreferenceFeedback({ error: true, message: error.message || 'Could not save this preference. Please try again.' }),
   });
   const passwordMutation = useMutation({
-    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
-      api('/api/users/me/password', { method: 'POST', body }),
+    mutationFn: async (body: { currentPassword: string; newPassword: string }) => {
+      const { error } = await authClient.changePassword({ ...body, revokeOtherSessions: true });
+      if (error) throw new Error(error.message || 'Could not change your password.');
+    },
     onSuccess: () => {
       setCurrentPassword('');
       setNewPassword('');
@@ -69,7 +82,7 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
 
   function saveProfile() {
     if (busy) return;
-    const update = prepareProfileUpdate(displayName, bio);
+    const update = prepareProfileUpdate(displayName, username);
     if (!update.body) {
       setProfileFeedback({ error: true, message: update.error });
       return;
@@ -89,32 +102,29 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
     passwordMutation.mutate({ currentPassword, newPassword });
   }
 
-  function setPreference(key: Preference, value: boolean) {
-    if (busy) return;
+  function setNotifications(value: boolean) {
+    if (busy || !preferences.data) return;
     setPreferenceFeedback(null);
-    preferenceMutation.mutate({ key, value });
+    preferenceMutation.mutate(value);
   }
 
-  function preferenceValue(key: Preference) {
-    return preferenceMutation.isPending && preferenceMutation.variables.key === key
-      ? preferenceMutation.variables.value : user[key];
-  }
+  const notificationsEnabled = preferenceMutation.isPending ? preferenceMutation.variables : preferences.data?.general.notificationsEnabled ?? false;
 
   return (
     <View style={styles.container}>
       <View style={styles.card}>
         <CardHeading icon="profile" title="Your account" subtitle="A little more about you" />
         <View style={styles.accountDetails}>
-          <Text style={styles.detailLabel}>USERNAME</Text>
-          <Text selectable style={styles.detailValue}>@{user.username}</Text>
-          <Text style={[styles.detailLabel, styles.emailLabel]}>EMAIL ADDRESS</Text>
+          <Text style={styles.detailLabel}>EMAIL ADDRESS</Text>
           <Text selectable style={styles.detailValue}>{user.email}</Text>
+          <Text style={[styles.detailLabel, styles.emailLabel]}>VERIFIED PHONE</Text>
+          <Text selectable style={styles.detailValue}>{user.phoneNumber ?? '—'}</Text>
         </View>
-        <Field label="Display name" value={displayName} editable={!busy} maxLength={64}
+        <Field label="Display name" value={displayName} editable={!busy} maxLength={100}
           autoComplete="name" onChangeText={value => { setNameDraft(value); setProfileFeedback(null); }} />
-        <Field label="Bio" value={bio} editable={!busy} maxLength={280} multiline
-          placeholder="Share a little about yourself" onChangeText={value => { setBioDraft(value); setProfileFeedback(null); }} />
-        <Text style={styles.counter}>{bio.length}/280 characters</Text>
+        <Field label="Username" value={username} editable={!busy} maxLength={31} autoCapitalize="none" autoCorrect={false}
+          placeholder="Optional, e.g. trader_in" onChangeText={value => { setUsernameDraft(value); setProfileFeedback(null); }} />
+        <Text style={styles.counter}>3–30 letters, numbers or underscores. Leave empty for none.</Text>
         <Status feedback={profileFeedback} />
         <ActionButton title="Save profile" pendingTitle="Saving profile…" pending={profileMutation.isPending}
           disabled={busy} onPress={saveProfile} />
@@ -122,12 +132,9 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
 
       <View style={styles.card}>
         <CardHeading icon="send" title="Your preferences" subtitle="Stay connected on your terms" />
-        <PreferenceRow title="Push notifications" description="Allow app notification updates" value={preferenceValue('notifyPush')}
-          disabled={busy} onChange={value => setPreference('notifyPush', value)} />
-        <PreferenceRow title="Email notifications" description="Allow updates to your inbox" value={preferenceValue('notifyEmail')}
-          disabled={busy} onChange={value => setPreference('notifyEmail', value)} />
-        <PreferenceRow title="Public profile" description="Let other members view your profile" value={preferenceValue('privacyPublicProfile')}
-          disabled={busy} onChange={value => setPreference('privacyPublicProfile', value)} />
+        <PreferenceRow title="Notifications" description="Allow updates from TradingGurukul" value={notificationsEnabled}
+          disabled={busy || !preferences.data} onChange={setNotifications} />
+        {preferences.isError ? <Text style={styles.helper}>Could not load your preferences.</Text> : null}
         {preferenceMutation.isPending ? <Text style={styles.helper} accessibilityLiveRegion="polite">Saving preference…</Text> : null}
         <Status feedback={preferenceFeedback} />
       </View>
@@ -150,7 +157,7 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
         accessibilityState={{ disabled: busy, busy: logoutMutation.isPending }}
         onPress={() => { if (!busy) logoutMutation.mutate(); }}
         style={({ pressed }) => [styles.logout, busy && styles.disabled, pressed && styles.pressed]}>
-        {logoutMutation.isPending ? <ActivityIndicator color="#9d394c" /> : <GlassIcon name="send" rotation={180} size={23} />}
+        {logoutMutation.isPending ? <ActivityIndicator color="#E11D48" /> : <GlassIcon name="send" rotation={180} size={23} tone="purple" />}
         <Text style={styles.logoutText}>{logoutMutation.isPending ? 'Logging out…' : 'Log out'}</Text>
       </GlassPressable>
       <Status feedback={logoutMutation.isError ? { error: true, message: logoutMutation.error.message || 'Could not log out. Please try again.' } : null} />
@@ -159,15 +166,15 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
 }
 
 function CardHeading({ icon, title, subtitle }: { icon: ComponentProps<typeof GlassIcon>['name']; title: string; subtitle: string }) {
-  return <View style={styles.heading}><View style={styles.iconTile}><GlassIcon name={icon} size={28} /></View>
+  return <View style={styles.heading}><View style={styles.iconTile}><GlassIcon name={icon} size={28} tone="purple" /></View>
     <View style={styles.flex}><Text accessibilityRole="header" style={styles.headingTitle}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>
   </View>;
 }
 
 function Field({ label, ...props }: ComponentProps<typeof TextInput> & { label: string }) {
   return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput {...props}
-    accessibilityLabel={label} placeholderTextColor="#64748b" autoCapitalize={props.secureTextEntry ? 'none' : 'sentences'}
-    autoCorrect={!props.secureTextEntry} style={[styles.input, props.multiline && styles.bio, !props.editable && styles.disabled]} /></View>;
+    accessibilityLabel={label} placeholderTextColor={Palette.textMuted} autoCapitalize={props.autoCapitalize ?? (props.secureTextEntry ? 'none' : 'sentences')}
+    autoCorrect={props.autoCorrect ?? !props.secureTextEntry} style={[styles.input, props.multiline && styles.bio, !props.editable && styles.disabled]} /></View>;
 }
 
 function PreferenceRow({ title, description, value, disabled, onChange }: {
@@ -176,7 +183,7 @@ function PreferenceRow({ title, description, value, disabled, onChange }: {
   return <View style={styles.preferenceRow}><View style={styles.flex}><Text style={styles.preferenceTitle}>{title}</Text>
     <Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={title}
     accessibilityHint={description} disabled={disabled} value={value} onValueChange={onChange}
-    trackColor={{ false: '#E2E8F0', true: '#0066FF' }} thumbColor="#ffffff" ios_backgroundColor="#E2E8F0" /></View>;
+    trackColor={{ false: Palette.border, true: Palette.accent }} thumbColor="#ffffff" ios_backgroundColor={Palette.border} /></View>;
 }
 
 function Status({ feedback }: { feedback: Feedback }) {
@@ -197,34 +204,34 @@ function ActionButton({ title, pendingTitle, pending, disabled, secondary, onPre
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20, gap: 16 },
-  card: { padding: 18, borderRadius: 22, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
+  card: { padding: 18, borderRadius: 22, backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#F3EEFF', alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
-  headingTitle: { color: '#1E293B', fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
-  subtitle: { color: '#64748B', fontSize: 12, marginTop: 4, lineHeight: 17 },
-  accountDetails: { padding: 14, backgroundColor: '#FAF8FE', borderRadius: 14, marginBottom: 10 },
-  detailLabel: { fontSize: 10, letterSpacing: 1.4, fontWeight: '600', color: '#64748B' },
-  detailValue: { color: '#475569', fontSize: 13, marginTop: 5, lineHeight: 19 },
+  headingTitle: { color: Palette.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
+  subtitle: { color: Palette.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 17 },
+  accountDetails: { padding: 14, backgroundColor: Palette.bg, borderRadius: 14, marginBottom: 10 },
+  detailLabel: { fontSize: 10, letterSpacing: 1.4, fontWeight: '600', color: Palette.textSecondary },
+  detailValue: { color: Palette.text, fontSize: 13, marginTop: 5, lineHeight: 19 },
   emailLabel: { marginTop: 14 },
   field: { marginTop: 12 },
-  label: { fontSize: 12, color: '#475569', fontWeight: '500', marginBottom: 7 },
-  input: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#DBE7FF', backgroundColor: '#FCFBFE', color: '#1E293B', fontSize: 14 },
+  label: { fontSize: 12, color: Palette.textSecondary, fontWeight: '500', marginBottom: 7 },
+  input: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.bg, color: Palette.text, fontSize: 14 },
   bio: { minHeight: 96, textAlignVertical: 'top', lineHeight: 20 },
-  counter: { color: '#94A3B8', textAlign: 'right', fontSize: 10, marginTop: 7 },
-  helper: { color: '#64748B', fontSize: 11, marginTop: 8, lineHeight: 16 },
-  preferenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0' },
-  preferenceTitle: { fontSize: 14, fontWeight: '500', color: '#475569' },
-  preferenceDescription: { fontSize: 11, color: '#64748B', lineHeight: 16, marginTop: 4 },
-  button: { minHeight: 48, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 13, backgroundColor: '#0066FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  counter: { color: Palette.textMuted, textAlign: 'right', fontSize: 10, marginTop: 7 },
+  helper: { color: Palette.textSecondary, fontSize: 11, marginTop: 8, lineHeight: 16 },
+  preferenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Palette.border },
+  preferenceTitle: { fontSize: 14, fontWeight: '500', color: Palette.text },
+  preferenceDescription: { fontSize: 11, color: Palette.textSecondary, lineHeight: 16, marginTop: 4 },
+  button: { minHeight: 48, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 13, backgroundColor: Palette.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   buttonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
-  secondaryButton: { backgroundColor: '#F6F2FC', borderWidth: 1, borderColor: '#BCD3FF' },
-  secondaryText: { color: '#0066FF' },
+  secondaryButton: { backgroundColor: Palette.accentMuted, borderWidth: 1, borderColor: '#0066FF' },
+  secondaryText: { color: '#0052D6' },
   feedback: { fontSize: 12, lineHeight: 18, marginTop: 10 },
-  error: { color: '#a02f45' },
-  success: { color: '#23704d' },
-  logout: { minHeight: 52, backgroundColor: '#fff4f5', borderWidth: 1, borderColor: '#f0dce1', borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  logoutText: { color: '#9d394c', fontSize: 13, fontWeight: '600' },
+  error: { color: '#E11D48' },
+  success: { color: '#059669' },
+  logout: { minHeight: 52, backgroundColor: 'rgba(244,63,94,0.12)', borderWidth: 1, borderColor: 'rgba(244,63,94,0.35)', borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  logoutText: { color: '#E11D48', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.75 },
 });

@@ -1,102 +1,96 @@
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 import { create } from 'zustand';
+import { authClient, authHeaders } from '../lib/authClient';
+import { API_URL } from '../lib/config';
 import { DEMO_MODE } from '../lib/demoMode';
 import { demoApi } from '../lib/demoData';
+
+/** Account lifecycle on the backend: sign-up → phone OTP → ACTIVE. */
+export type AccountStatus = 'PENDING_PHONE_VERIFICATION' | 'ACTIVE' | 'SUSPENDED' | 'DELETED';
 
 export type User = {
   id: string;
   email: string;
-  username: string;
   displayName: string | null;
-  bio: string | null;
+  username: string | null;
   avatarUrl: string | null;
-  theme: string;
-  notifyPush: boolean;
-  notifyEmail: boolean;
-  privacyPublicProfile: boolean;
+  status: AccountStatus;
+  phoneNumber: string | null;
+  timezone: string | null;
   createdAt: string;
 };
 
+type SessionUser = {
+  id: string; email: string; name?: string | null; image?: string | null; status?: AccountStatus | null;
+  phoneNumber?: string | null; createdAt: string | Date;
+};
+type Profile = { name: string | null; username: string | null; image: string | null; phoneNumber: string | null; timezone: string | null };
+
 type AuthState = {
   user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   hydrated: boolean;
-  setSession: (data: { user: User; accessToken: string; refreshToken: string }) => Promise<void>;
-  clearSession: () => Promise<void>;
+  /** Re-reads the session (and, for active users, the profile) from the backend. */
+  refresh: () => Promise<User | null>;
   hydrate: () => Promise<void>;
+  signOut: () => Promise<void>;
   updateUser: (user: User) => void;
+  /** Demo preview only. */
+  setSession: (data: { user: User }) => Promise<void>;
+  clearSession: () => Promise<void>;
 };
 
-const memoryStore = new Map<string, string>();
-
-async function setItem(key: string, value: string) {
-  if (Platform.OS === 'web') {
-    memoryStore.set(key, value);
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      // ignore
-    }
-    return;
-  }
-  await SecureStore.setItemAsync(key, value);
+/** Display name for greetings and avatars; never invents a handle. */
+export function displayNameOf(user: Pick<User, 'displayName' | 'username' | 'email'>) {
+  return user.displayName?.trim() || user.username || user.email.split('@')[0];
 }
 
-async function getItem(key: string) {
-  if (Platform.OS === 'web') {
-    try {
-      return localStorage.getItem(key) ?? memoryStore.get(key) ?? null;
-    } catch {
-      return memoryStore.get(key) ?? null;
-    }
-  }
-  return SecureStore.getItemAsync(key);
+function fromSession(u: SessionUser): User {
+  return {
+    id: u.id, email: u.email, displayName: u.name?.trim() || null, username: null, avatarUrl: u.image ?? null,
+    status: u.status ?? 'PENDING_PHONE_VERIFICATION', phoneNumber: u.phoneNumber ?? null, timezone: null,
+    createdAt: new Date(u.createdAt).toISOString(),
+  };
 }
 
-async function deleteItem(key: string) {
-  if (Platform.OS === 'web') {
-    memoryStore.delete(key);
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // ignore
-    }
-    return;
-  }
-  await SecureStore.deleteItemAsync(key);
+async function loadProfile(): Promise<Profile | null> {
+  const { headers, credentials } = await authHeaders();
+  const res = await fetch(`${API_URL}/api/v1/me/profile`, { headers, credentials });
+  return res.ok ? (await res.json()) as Profile : null;
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   user: null,
-  accessToken: null,
-  refreshToken: null,
   hydrated: false,
-  setSession: async ({ user, accessToken, refreshToken }) => {
-    if (DEMO_MODE) { set({ user, accessToken, refreshToken }); return; }
-    await setItem('accessToken', accessToken);
-    await setItem('refreshToken', refreshToken);
-    await setItem('user', JSON.stringify(user));
-    set({ user, accessToken, refreshToken });
-  },
-  clearSession: async () => {
-    if (DEMO_MODE) { set({ user: null, accessToken: null, refreshToken: null }); return; }
-    await deleteItem('accessToken');
-    await deleteItem('refreshToken');
-    await deleteItem('user');
-    set({ user: null, accessToken: null, refreshToken: null });
+  refresh: async () => {
+    if (DEMO_MODE) return get().user;
+    const { data, error } = await authClient.getSession();
+    if (error || !data) {
+      set({ user: null });
+      return null;
+    }
+    let user = fromSession(data.user as unknown as SessionUser);
+    if (user.status === 'ACTIVE') {
+      const profile = await loadProfile().catch(() => null);
+      if (profile) user = { ...user, displayName: profile.name?.trim() || user.displayName, username: profile.username,
+        avatarUrl: profile.image ?? user.avatarUrl, phoneNumber: profile.phoneNumber, timezone: profile.timezone };
+    }
+    set({ user });
+    return user;
   },
   hydrate: async () => {
-    if (DEMO_MODE) { set({ ...demoApi.session(), hydrated: true }); return; }
-    const accessToken = await getItem('accessToken');
-    const refreshToken = await getItem('refreshToken');
-    const rawUser = await getItem('user');
-    const user = rawUser ? (JSON.parse(rawUser) as User) : null;
-    set({ accessToken, refreshToken, user, hydrated: true });
+    if (DEMO_MODE) { set({ user: demoApi.session().user as unknown as User, hydrated: true }); return; }
+    try {
+      await get().refresh();
+    } catch {
+      set({ user: null });
+    } finally {
+      set({ hydrated: true });
+    }
   },
-  updateUser: (user) => {
-    if (!DEMO_MODE) void setItem('user', JSON.stringify(user));
-    set({ user });
+  signOut: async () => {
+    if (!DEMO_MODE) await authClient.signOut().catch(() => undefined);
+    set({ user: null });
   },
+  updateUser: (user) => set({ user }),
+  setSession: async ({ user }) => { set({ user }); },
+  clearSession: async () => { set({ user: null }); },
 }));

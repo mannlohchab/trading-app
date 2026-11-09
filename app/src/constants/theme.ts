@@ -2,35 +2,35 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
-/** Light fintech palette inspired by the BullFin home reference */
+/** Light fintech surfaces. Accent stays the brand blue. */
 export const Palette = {
   bg: '#F4F5FB',
   bgElevated: '#FFFFFF',
   card: '#FFFFFF',
   cardHover: '#F7F7FC',
-  border: '#ECEEF6',
-  borderSubtle: '#F0F1F7',
+  border: '#E3E6F0',
+  borderSubtle: '#ECEEF6',
   text: '#16181D',
-  textSecondary: '#8E93A6',
-  textMuted: '#B0B4C3',
-  green: '#1DB954',
-  red: '#F43F5E',
+  textSecondary: '#6B7185',
+  textMuted: '#9A9FB0',
+  green: '#16A34A',
+  red: '#E11D48',
   accent: '#0066FF',
   accentMuted: '#EEF4FF',
-  yellow: '#F0B90B',
-  orange: '#FF9800',
+  yellow: '#C98A00',
+  orange: '#E68A00',
   overlay: 'rgba(17,18,28,0.4)',
-  pill: '#F3F4F8',
+  pill: '#F0F1F7',
 } as const;
 
-/** Shared warm, monochrome theme for Insights and Community. */
+/** Warm light theme for Insights and Community. `onSolid` labels sit on `text` fills. */
 export const InsightPalette = {
   bg: '#F7F7F5',
   bgElevated: '#FFFFFF',
   card: '#FFFFFF',
   soft: '#EDEDEA',
   border: '#E6E6E2',
-  borderSubtle: '#E6E6E2',
+  borderSubtle: '#EDEDEA',
   text: '#1F1F1E',
   body: '#3D3D3A',
   textSecondary: '#6B6B67',
@@ -39,33 +39,26 @@ export const InsightPalette = {
   accentMuted: '#EDEDEA',
   red: '#DC2626',
   yellow: '#1F1F1E',
+  onSolid: '#FFFFFF',
 } as const;
 
+const lightColors = {
+  text: Palette.text,
+  background: Palette.bg,
+  backgroundElement: Palette.card,
+  backgroundSelected: Palette.cardHover,
+  textSecondary: Palette.textSecondary,
+  border: Palette.border,
+  green: Palette.green,
+  red: Palette.red,
+  accent: Palette.accent,
+  card: Palette.card,
+} as const;
+
+// The app ships a single light theme regardless of the device setting.
 export const Colors = {
-  light: {
-    text: '#0B0E11',
-    background: '#F5F7FA',
-    backgroundElement: '#FFFFFF',
-    backgroundSelected: '#E8ECF1',
-    textSecondary: '#5E6673',
-    border: '#DCE1E8',
-    green: Palette.green,
-    red: Palette.red,
-    accent: Palette.accent,
-    card: '#FFFFFF',
-  },
-  dark: {
-    text: Palette.text,
-    background: Palette.bg,
-    backgroundElement: Palette.card,
-    backgroundSelected: Palette.cardHover,
-    textSecondary: Palette.textSecondary,
-    border: Palette.border,
-    green: Palette.green,
-    red: Palette.red,
-    accent: Palette.accent,
-    card: Palette.card,
-  },
+  light: lightColors,
+  dark: lightColors,
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;

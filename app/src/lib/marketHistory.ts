@@ -18,12 +18,11 @@ export function buildHistoryChart(history?: HistoryResponse, allowDemo = false) 
   }
   const sorted = [...unique].sort(([a], [b]) => a - b);
   if (!sorted.length) return null;
-  const source = history.source ?? history.candles[0]?.source;
-  // Crypto trades 24/7: use a rolling day. Forex uses the latest UTC session date.
-  const rolling = source === 'binance' || history.assetClass === 'crypto';
   const end = sorted[sorted.length - 1][0];
-  const sessionDate = rolling ? '24h' : utcDate(end);
-  const samples = sorted.filter(([time]) => rolling ? time > end - 86400 : utcDate(time) === sessionDate);
+  const sessionDate = utcDate(end);
+  // Anchor to the latest observation so closed markets retain their final hour.
+  // Twelve five-minute observations keep compact charts inexpensive to render.
+  const samples = sorted.filter(([time]) => time > end - 3600);
   if (samples.length < 2) return null;
   const high = Math.max(...samples.map(([, price]) => price));
   const low = Math.min(...samples.map(([, price]) => price));
@@ -46,25 +45,12 @@ export function buildHistoryChart(history?: HistoryResponse, allowDemo = false) 
 }
 
 type MiniPoint = { x: number; y: number; value: number };
-type QuoteSeries = { sparkline?: number[]; source?: 'demo' | 'binance' | 'twelvedata' };
-
-/** Quotes can already contain a real price series, even if the history request fails. */
-export function buildWatchlistChart(history: HistoryResponse | undefined, quote: QuoteSeries, allowDemo = false) {
+/** Timestamped history is required to guarantee the mini chart's one-hour range. */
+export function buildWatchlistChart(history: HistoryResponse | undefined, allowDemo = false) {
   const dated = buildHistoryChart(history, allowDemo);
   if (dated) return { points: dated.points, peak: dated.peak, positive: dated.positive,
-    caption: `${history?.isDemo ? 'Demo · ' : ''}${dated.sessionDate} · 5m` };
-  if (quote.source !== 'binance' && quote.source !== 'twelvedata' && !(allowDemo && quote.source === 'demo')) return null;
-  const values = quote.sparkline;
-  if (!values || values.length < 2 || values.some(value => !Number.isFinite(value) || value <= 0)) return null;
-  const high = Math.max(...values), low = Math.min(...values);
-  // This series has no timestamps: preserve observation order without inventing a session date.
-  const points = values.map((value, i) => ({
-    x: 3 + i / (values.length - 1) * 154,
-    y: high === low ? 59 : 85 - (value - low) / (high - low) * 52,
-    value,
-  }));
-  return { points, peak: points.find(point => point.value === high)!, positive: values[values.length - 1] >= values[0],
-    caption: quote.source === 'demo' ? 'Demo prices' : 'Recent prices' };
+    caption: `${history?.isDemo ? 'Demo · ' : ''}1H · ${dated.sessionDate} · 5m` };
+  return null;
 }
 
 /** Place each native line around its midpoint, so rotation joins adjacent points exactly. */

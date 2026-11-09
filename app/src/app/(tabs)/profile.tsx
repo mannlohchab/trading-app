@@ -1,119 +1,117 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InstrumentRowSkeleton } from '@/components/ui/Skeleton';
-import { PortfolioDonut } from '@/components/charts/PortfolioDonut';
+import { PaperOrders } from '@/components/trading/PaperOrders';
+import { fetchActivity, fetchPortfolio, type PaperActivity } from '@/lib/paperTrading';
+import { PortfolioAllocationBar } from '@/components/charts/PortfolioAllocationBar';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
-import { Palette } from '@/constants/theme';
-import { api } from '@/lib/api';
+import { InsightPalette as P } from '@/constants/theme';
+import { ApiError } from '@/lib/api';
 import { formatMarketPrice, formatUsd, formatPct } from '@/lib/format';
-import { useAuth, type User } from '@/store/auth';
+import { displayNameOf, useAuth, type User } from '@/store/auth';
 
 const TABS = ['Overview', 'Portfolio', 'Settings'] as const;
-const TAB_ICONS: Record<(typeof TABS)[number], GlassIconName> = { Overview: 'analytics', Portfolio: 'wallet', Settings: 'profile' };
+type Tab = (typeof TABS)[number];
+/** Same green/red as the Market list and chart. */
+const UP = '#089981';
+const DOWN = '#F23645';
 
-type Overview = {
-  user: User;
-  portfolio: {
-    equity: number;
-    cashBalance: number;
-    invested: number;
-    unrealizedPnl: number;
-    realizedPnl: number;
-    totalPnl: number;
-    totalPnlPercent: number;
-    startingBalance: number;
-    positions: {
-      id: string;
-      symbol: string;
-      name: string;
-      exchange: string;
-      quantity: number;
-      avgPrice: number;
-      ltp: number;
-      marketValue: number;
-      unrealizedPnl: number;
-      unrealizedPnlPercent: number;
-    }[];
-  };
-  community: { posts: number; followers: number; following: number };
-};
+type PaperTransaction = PaperActivity;
+
+const money = (value: number | null, digits = 2) => value === null ? '—' : formatUsd(value, digits);
+const percent = (value: number | null) => value === null ? '—' : formatPct(value);
+const tone = (value: number | null | undefined) => value == null || value === 0 ? P.textSecondary : value > 0 ? UP : DOWN;
+
+function parseTimestamp(value: string) {
+  const trimmed = value.trim();
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed) ? `${trimmed.replace(' ', 'T')}Z` : trimmed;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+function formatMemberSince(value: string) {
+  const date = parseTimestamp(value);
+  return date ? date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : value;
+}
+function formatStamp(value: string) {
+  const date = parseTimestamp(value);
+  return date ? date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : value;
+}
+function overviewErrorMessage(error: unknown, hasData: boolean) {
+  if (hasData) return 'Could not refresh your portfolio. Showing the last loaded values.';
+  if (error instanceof ApiError && error.message) return error.message;
+  if (error instanceof TypeError || (error instanceof Error && /network|fetch|failed/i.test(error.message))) {
+    return 'Could not reach the trading server. Your saved profile stays on this device; cash, positions, and activity appear when the API responds.';
+  }
+  return 'Your portfolio is temporarily unavailable.';
+}
 
 export default function ProfileScreen() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Overview');
+  const [tab, setTab] = useState<Tab>('Overview');
+  // Other screens can open a specific tab, e.g. the top bar's bell opens Settings. `at` makes each request distinct.
+  const params = useLocalSearchParams<{ tab?: string; at?: string }>();
+  const tabRequest = params.tab && (TABS as readonly string[]).includes(params.tab) ? `${params.tab}:${params.at ?? ''}` : undefined;
+  const [handledTabRequest, setHandledTabRequest] = useState<string>();
+  if (tabRequest && tabRequest !== handledTabRequest) {
+    setHandledTabRequest(tabRequest);
+    setTab(params.tab as Tab);
+  }
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const clearSession = useAuth((s) => s.clearSession);
+  const signOut = useAuth((s) => s.signOut);
   const updateUser = useAuth((s) => s.updateUser);
   const sessionUser = useAuth((s) => s.user);
   const qc = useQueryClient();
 
+  // Shares the order ticket's cache, so a fill shows up here straight away.
   const overviewQuery = useQuery({
-    queryKey: ['profile-overview', sessionUser?.id],
-    queryFn: ({ signal }) => api<Overview>('/api/users/me/overview', { signal }),
+    queryKey: ['paper-portfolio', sessionUser?.id],
+    queryFn: ({ signal }) => fetchPortfolio(sessionUser!.id, signal),
     enabled: Boolean(sessionUser),
     refetchInterval: 15_000,
   });
 
   const txQuery = useQuery({
     queryKey: ['transactions', sessionUser?.id],
-    enabled: tab === 'Portfolio' && Boolean(sessionUser),
-    refetchInterval: tab === 'Portfolio' ? 15_000 : false,
-    queryFn: ({ signal }) =>
-      api<{
-        transactions: {
-          id: string;
-          type: string;
-          symbol: string | null;
-          quantity: number | null;
-          price: number | null;
-          amount: number;
-          realizedPnl: number | null;
-          createdAt: string;
-        }[];
-      }>('/api/trading/transactions', { signal }),
+    enabled: Boolean(sessionUser) && (tab === 'Overview' || tab === 'Portfolio'),
+    refetchInterval: tab === 'Overview' || tab === 'Portfolio' ? 15_000 : false,
+    queryFn: ({ signal }) => fetchActivity(sessionUser!.id, signal),
   });
 
   const data = overviewQuery.data;
-  const profileUser = data?.user ?? sessionUser;
-  const pnlColor = (data?.portfolio.totalPnl ?? 0) >= 0 ? Palette.green : Palette.red;
+  const profileUser = sessionUser;
+  const portfolio = data;
+  const valuationNote = portfolio?.valuationStatus && portfolio.valuationStatus !== 'current' ? portfolio.valuationStatus : null;
 
-  function selectTab(next: (typeof TABS)[number]) {
+  function selectTab(next: Tab) {
     setTab(next);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }
 
   function onUserSaved(user: User) {
     updateUser(user);
-    void qc.cancelQueries({ queryKey: ['profile-overview', user.id] }).then(() => {
-      qc.setQueryData<Overview>(['profile-overview', user.id], current => current ? { ...current, user } : current);
-    });
   }
 
   async function refresh() {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      await Promise.all([overviewQuery.refetch(), ...(tab === 'Portfolio' ? [txQuery.refetch()] : [])]);
+      await Promise.all([overviewQuery.refetch(), ...(tab === 'Overview' || tab === 'Portfolio' ? [txQuery.refetch()] : [])]);
     } finally { setRefreshing(false); }
   }
 
   async function logout() {
-    try {
-      await api('/api/auth/logout', { method: 'POST', body: { refreshToken: useAuth.getState().refreshToken ?? undefined } });
-    } catch {
-      // ignore
-    }
     await qc.cancelQueries();
-    await clearSession();
+    await signOut();
     qc.clear();
     router.replace('/(auth)/login');
   }
@@ -121,154 +119,141 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.headerBrand}><GlassIcon name="profile" size={30} tone="purple" /><Text style={styles.title}>My profile</Text></View>
-        <GlassPressable accessibilityRole="button" accessibilityLabel="Refresh profile and portfolio" accessibilityState={{ disabled: refreshing }} disabled={refreshing} style={({ pressed }) => [styles.refreshButton, pressed && { opacity: 0.6 }]} onPress={() => void refresh()}>
-          {refreshing ? <ActivityIndicator color="#0066FF" size="small" /> : <GlassIcon name="analytics" size={21} tone="purple" />}
-          <Text style={styles.refreshText}>Refresh</Text>
-        </GlassPressable>
+        <Text accessibilityRole="header" style={styles.title}>Profile</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Refresh profile and portfolio" accessibilityState={{ disabled: refreshing }} disabled={refreshing}
+          onPress={() => void refresh()} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+          {refreshing ? <ActivityIndicator color={P.text} size="small" />
+            : <SymbolView name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }} size={20} tintColor={P.text} accessible={false} />}
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS !== 'web'}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor="#0066FF" colors={['#0066FF']} />}>
-        {overviewQuery.isError ? <ErrorBanner message={data ? 'Could not refresh your portfolio. Showing the last loaded values.' : 'Your portfolio is temporarily unavailable.'} onRetry={() => void overviewQuery.refetch()} /> : null}
-        {tab === 'Overview' && profileUser ? (
-          <View style={styles.profileSummary}>
-            <Image source={require('@/assets/images/profile-blue-glow.svg')} style={styles.profileGlow} contentFit="fill" accessible={false} pointerEvents="none" />
-            <View style={styles.summaryTop}>
-              <Text style={styles.eyebrow}>YOUR PROFILE</Text>
-              <GlassPressable accessibilityRole="button" accessibilityLabel="Edit profile" style={styles.editButton} onPress={() => selectTab('Settings')}><Text style={styles.editText}>Edit profile</Text><GlassIcon name="profile" size={18} tone="blue" /></GlassPressable>
-            </View>
-            <View style={styles.profileCard}>
-              <View style={styles.avatar}>
-                {profileUser.avatarUrl ? <Image source={{ uri: profileUser.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <GlassIcon name="profile" size={44} tone="blue" />}
-              </View>
-              <View style={styles.profileIdentity}>
-                <Text style={styles.name}>{profileUser.displayName ?? profileUser.username}</Text>
-                <Text style={styles.profileMeta}>@{profileUser.username}</Text>
-              </View>
-            </View>
-            {profileUser.bio ? <Text style={styles.bio}>{profileUser.bio}</Text> : null}
-            {data ? <View style={styles.statsRow}>
-              <Stat icon="send" tone="orange" label="Posts" value={String(data.community.posts)} />
-              <Stat icon="community" tone="blue" label="Followers" value={String(data.community.followers)} />
-              <Stat icon="profile" tone="blue" label="Following" value={String(data.community.following)} />
-            </View> : null}
-            <Text style={styles.joined}>Member since {new Date(profileUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
-          </View>
-        ) : tab !== 'Overview' ? <View style={styles.pageHeading}><Text style={styles.pageTitle}>{tab === 'Portfolio' ? 'Your holdings' : 'Account settings'}</Text><Text style={styles.pageSubtitle}>{tab === 'Portfolio' ? 'Positions, balances and activity' : 'Your profile, preferences and security'}</Text></View> : null}
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={P.text} colors={[P.text]} />}>
+        {overviewQuery.isError ? <ErrorBanner message={overviewErrorMessage(overviewQuery.error, Boolean(data))} onRetry={() => void overviewQuery.refetch()} /> : null}
 
-        <View style={styles.tabs} accessibilityRole="tablist">
-          {TABS.map(item => <GlassPressable key={item} accessibilityRole="tab" accessibilityState={{ selected: tab === item }} onPress={() => selectTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}><GlassIcon name={TAB_ICONS[item]} size={20} tone={tab === item ? 'purple' : undefined} /><Text style={[styles.tabText, tab === item && styles.tabTextSelected]}>{item}</Text></GlassPressable>)}
+        {profileUser ? (
+          <View style={styles.identity}>
+            <View style={styles.identityRow}>
+              <View style={styles.avatar}>
+                {profileUser.avatarUrl
+                  ? <Image source={{ uri: profileUser.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel={`${displayNameOf(profileUser)} avatar`} />
+                  : <Text style={styles.initial}>{displayNameOf(profileUser).charAt(0).toUpperCase()}</Text>}
+              </View>
+              <View style={styles.identityText}>
+                <Text style={styles.name} numberOfLines={1}>{displayNameOf(profileUser)}</Text>
+                <Text style={styles.handle} numberOfLines={1}>{profileUser.username ? `@${profileUser.username}` : profileUser.email}</Text>
+              </View>
+              {tab !== 'Settings' && (
+                <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => selectTab('Settings')} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.tabs}>
+          <SegmentedTabs tabs={[...TABS]} value={tab} onChange={value => selectTab(value as Tab)} variant="insight" />
         </View>
 
-        {overviewQuery.isLoading && tab === 'Portfolio' && <View style={{ padding: 16 }}><InstrumentRowSkeleton /></View>}
-
         {tab === 'Overview' ? (
-          <View style={styles.hero}>
-            <View style={styles.heroHeading}>
-              <Text style={styles.heroTitle}>Portfolio overview</Text>
-              <View style={styles.paperTag}><View style={styles.paperDot} /><Text style={styles.paperText}>Paper trading</Text></View>
-            </View>
-            <Text style={styles.heroSubtitle}>Your virtual investments, at a glance.</Text>
-            <PortfolioDonut portfolio={data?.portfolio} loading={overviewQuery.isLoading} />
-            <View style={styles.returnCard}>
-              <View style={styles.returnLeft}>
-                <View style={styles.inline}><GlassIcon name="coin" size={19} /><Text style={styles.returnLabel}>Total profit / loss</Text></View>
-                <Text style={[styles.returnValue, data ? { color: pnlColor } : null]}>{data ? formatUsd(data.portfolio.totalPnl) : '—'}</Text>
-              </View>
-              <View style={styles.returnRight}>
-                <Text style={styles.returnLabel}>All-time return</Text>
-                <Text style={[styles.returnPercent, data ? { color: pnlColor } : null]}>{data ? formatPct(data.portfolio.totalPnlPercent) : '—'}</Text>
-              </View>
-            </View>
-          </View>
-        ) : null}
-        {tab === 'Overview' ? (
-          <View style={styles.block}>
-            <Text style={styles.quickHeading}>Quick access</Text>
-            <View style={styles.quickActions}>
-              <GlassPressable accessibilityRole="button" style={styles.quickAction} onPress={() => selectTab('Portfolio')}><GlassIcon name="wallet" size={32} tone="purple" /><Text style={styles.quickTitle}>My holdings</Text><Text style={styles.quickCaption}>Positions & activity</Text></GlassPressable>
-              <GlassPressable accessibilityRole="button" style={styles.quickAction} onPress={() => router.push('/(tabs)/community')}><GlassIcon name="community" size={32} tone="purple" /><Text style={styles.quickTitle}>Community</Text><Text style={styles.quickCaption}>Ideas & discussions</Text></GlassPressable>
-            </View>
-          </View>
-        ) : null}
-
-        {tab === 'Portfolio' && data && (
-          <View style={styles.block}>
-            <View style={styles.card}>
-              <View style={styles.inline}><GlassIcon name="wallet" size={25} /><Text style={styles.cardLabel}>Virtual portfolio</Text></View>
-              <Text style={styles.equity}>{formatUsd(data.portfolio.equity)}</Text>
-              <Text style={[styles.pnl, { color: pnlColor }]}>
-                {formatUsd(data.portfolio.totalPnl)} ({formatPct(data.portfolio.totalPnlPercent)})
+          <View style={styles.section}>
+            <Text style={styles.kicker}>{portfolio && portfolio.equity === null ? 'Available cash · USDT' : 'Paper portfolio · USDT'}</Text>
+            <Text style={styles.equity} numberOfLines={1} adjustsFontSizeToFit>
+              {portfolio ? (portfolio.equity === null ? money(portfolio.availableCash ?? portfolio.cashBalance) : money(portfolio.equity)) : overviewQuery.isLoading ? ' ' : '—'}
+            </Text>
+            {portfolio && portfolio.totalPnl !== null ? (
+              <Text style={[styles.equityChange, { color: tone(portfolio.totalPnl) }]}>
+                {money(portfolio.totalPnl)}  {percent(portfolio.totalPnlPercent)} <Text style={styles.muted}>all time</Text>
               </Text>
-              <View style={styles.grid}>
-                <Mini icon="wallet" label="Cash" value={formatUsd(data.portfolio.cashBalance, 0)} />
-                <Mini icon="chart" label="Invested" value={formatUsd(data.portfolio.invested, 0)} />
-                <Mini icon="analytics" label="Unrealized" value={formatUsd(data.portfolio.unrealizedPnl, 0)} />
-                <Mini icon="coin" label="Realized" value={formatUsd(data.portfolio.realizedPnl, 0)} />
+            ) : null}
+            {valuationNote ? <Text style={styles.note}>Some market prices are {valuationNote}. Cash, cost, and quantities below are from your paper account. Totals appear only when every position has a price.</Text> : null}
+            <View style={styles.allocation}><PortfolioAllocationBar portfolio={portfolio} loading={overviewQuery.isLoading} /></View>
+            {portfolio ? (
+              <View style={styles.list}>
+                <Line icon="cash" label="Available cash" value={money(portfolio.availableCash ?? portfolio.cashBalance)} />
+                <Line icon="btc" label="In positions" value={money(portfolio.invested)} />
+                <Line label="Open positions" value={String(portfolio.positions.length)} onPress={() => selectTab('Portfolio')} last />
               </View>
+            ) : null}
+            {txQuery.data && txQuery.data.transactions.length > 0 ? (
+              <>
+                <SectionTitle title="Recent activity" />
+                {txQuery.data.transactions.slice(0, 5).map((t, index, all) => (
+                  <ActivityRow key={t.id} tx={t} last={index === all.length - 1} />
+                ))}
+              </>
+            ) : null}
+            {profileUser ? <Text style={styles.footer}>Member since {formatMemberSince(profileUser.createdAt)}</Text> : null}
+          </View>
+        ) : null}
+
+        {tab === 'Portfolio' && overviewQuery.isLoading && !portfolio ? <View style={styles.section}><InstrumentRowSkeleton /></View> : null}
+
+        {tab === 'Portfolio' && !portfolio && !overviewQuery.isLoading ? (
+          <View style={styles.section}>
+            <Text style={styles.emptyTitle}>Portfolio figures are unavailable</Text>
+            <Text style={styles.emptyText}>Your paper cash, positions, and orders load from the trading server. Pull to refresh once it responds. Nothing here is estimated.</Text>
+            <View style={styles.orders}><PaperOrders /></View>
+            <SectionTitle title="Recent activity" />
+            <ActivityList query={txQuery} />
+          </View>
+        ) : null}
+
+        {tab === 'Portfolio' && portfolio ? (
+          <View style={styles.section}>
+            <Text style={styles.kicker}>Total value</Text>
+            <Text style={styles.equity} numberOfLines={1} adjustsFontSizeToFit>{money(portfolio.equity)}</Text>
+            {portfolio.totalPnl !== null ? (
+              <Text style={[styles.equityChange, { color: tone(portfolio.totalPnl) }]}>{money(portfolio.totalPnl)}  {percent(portfolio.totalPnlPercent)}</Text>
+            ) : null}
+            {valuationNote ? <Text style={styles.note}>Valuation {valuationNote}. Cash and quantities are current.</Text> : null}
+            <View style={styles.list}>
+              <Line icon="cash" label="Available cash" value={money(portfolio.availableCash ?? portfolio.cashBalance)} />
+              <Line icon="cash" label="Reserved cash" value={money(portfolio.reservedCash ?? 0)} />
+              <Line icon="btc" label="In positions" value={money(portfolio.invested)} />
+              {portfolio.totalFees !== undefined ? <Line label="Fees paid" value={money(portfolio.totalFees)} /> : null}
+              <Line label="Unrealized P&L" value={money(portfolio.unrealizedPnl)} color={tone(portfolio.unrealizedPnl)} />
+              <Line label="Realized P&L" value={money(portfolio.realizedPnl)} color={tone(portfolio.realizedPnl)} last />
             </View>
 
-            <SectionHeading icon="chart" title="Open positions" detail={String(data.portfolio.positions.length)} />
-            {data.portfolio.positions.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <GlassIcon name="chart" size={42} /><Text style={styles.emptyTitle}>Your first investment starts here</Text>
-                <Text style={styles.empty}>Explore a stock and place a paper trade to build your portfolio.</Text>
-                <GlassPressable accessibilityRole="button" style={styles.exploreButton} onPress={() => router.push('/(tabs)/markets')}><Text style={styles.exploreText}>Explore markets</Text><GlassIcon name="up" size={22} rotation={90} /></GlassPressable>
+            <SectionTitle title="Positions" count={portfolio.positions.length} />
+            {portfolio.positions.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No positions yet</Text>
+                <Text style={styles.emptyText}>Open a crypto chart and place a paper trade to build your portfolio.</Text>
+                <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/market')} style={({ pressed }) => [styles.emptyButton, pressed && styles.pressed]}>
+                  <Text style={styles.emptyButtonText}>Browse markets</Text>
+                </Pressable>
               </View>
-            ) : (
-              data.portfolio.positions.map((p) => (
-                <GlassPressable
-                  key={p.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open ${p.name}, market value ${formatUsd(p.marketValue)}`}
-                  style={styles.pos}
-                  onPress={() =>
-                    router.push({ pathname: '/instrument/[symbol]', params: { symbol: p.symbol, exchange: p.exchange, name: p.name } })
-                  }>
-                  <SymbolIcon symbol={p.symbol} exchange={p.exchange} size={36} />
-                  <View style={styles.positionName}>
-                    <Text style={styles.symbol}>{p.symbol}</Text>
-                    <Text style={styles.meta}>
-                      {p.quantity} @ {formatMarketPrice(p.avgPrice, p, false)} · LTP {formatMarketPrice(p.ltp, p, false)}
-                    </Text>
-                  </View>
-                  <View style={styles.positionValue}>
-                    <Text style={styles.symbol} numberOfLines={1} adjustsFontSizeToFit>{formatUsd(p.marketValue, 0)}</Text>
-                    <Text style={[styles.positionPnl, { color: p.unrealizedPnl >= 0 ? Palette.green : Palette.red }]}>
-                      {formatUsd(p.unrealizedPnl)}
-                    </Text>
-                    <Text style={[styles.positionPnl, { color: p.unrealizedPnl >= 0 ? Palette.green : Palette.red }]}>
-                      {formatPct(p.unrealizedPnlPercent)}
-                    </Text>
-                  </View>
-                </GlassPressable>
-              ))
-            )}
-
-          </View>
-        )}
-
-        {tab === 'Portfolio' && (
-          <View style={styles.block}>
-            <SectionHeading icon="card" title="Recent activity" />
-            {txQuery.isLoading ? <InstrumentRowSkeleton /> : null}
-            {txQuery.isError ? <ErrorBanner message="Could not refresh your transactions." onRetry={() => void txQuery.refetch()} /> : null}
-            {txQuery.isSuccess && txQuery.data.transactions.length === 0 ? <View style={styles.emptyCard}><GlassIcon name="card" size={38} /><Text style={styles.emptyTitle}>No transactions yet</Text><Text style={styles.empty}>Your paper trades will appear here.</Text></View> : null}
-            {(txQuery.data?.transactions ?? []).slice(0, 20).map((t) => (
-              <View key={t.id} style={styles.pos}>
-                <View style={styles.activityIcon}><GlassIcon name={t.type === 'BUY' ? 'down' : t.type === 'SELL' ? 'up' : 'coin'} size={28} /></View>
-                <View style={styles.positionName}>
-                  <Text style={styles.symbol}>
-                    {t.type} {t.symbol ?? ''}
+            ) : portfolio.positions.map((p, index) => (
+              <Pressable
+                key={p.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${p.name}, market value ${money(p.marketValue)}`}
+                onPress={() => router.push({ pathname: '/instrument/[symbol]', params: { symbol: p.symbol, exchange: p.exchange, name: p.name } })}
+                style={({ pressed }) => [styles.row, index === portfolio.positions.length - 1 && styles.rowLast, pressed && styles.pressed]}>
+                <SymbolIcon symbol={p.symbol} exchange={p.exchange} size={40} />
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{p.symbol}</Text>
+                  <Text style={styles.rowMeta} numberOfLines={2}>
+                    {p.quantity}{p.availableQuantity != null && p.availableQuantity !== p.quantity ? ` (${p.availableQuantity} available)` : ''} @ {formatMarketPrice(p.avgPrice, p, false)} · Last {p.ltp === null ? '—' : formatMarketPrice(p.ltp, p, false)}
                   </Text>
-                  <Text style={styles.meta}>{t.createdAt.slice(0, 19).replace('T', ' ')}</Text>
                 </View>
-                <Text style={[styles.symbol, styles.activityAmount]} numberOfLines={1} adjustsFontSizeToFit>{formatUsd(t.amount, 0)}</Text>
-              </View>
+                <View style={styles.rowRight}>
+                  <Text style={styles.rowValue} numberOfLines={1}>{money(p.marketValue)}</Text>
+                  <Text style={[styles.rowChange, { color: tone(p.unrealizedPnl) }]} numberOfLines={1}>{money(p.unrealizedPnl)}  {percent(p.unrealizedPnlPercent)}</Text>
+                </View>
+              </Pressable>
             ))}
+
+            <View style={styles.orders}><PaperOrders /></View>
+
+            <SectionTitle title="Recent activity" />
+            <ActivityList query={txQuery} />
           </View>
-        )}
+        ) : null}
 
         {tab === 'Settings' && profileUser && (
           <ProfileSettings key={profileUser.id} user={profileUser} onUserSaved={onUserSaved} onLogout={logout} />
@@ -279,105 +264,121 @@ export default function ProfileScreen() {
   );
 }
 
-function SectionHeading({ icon, title, detail }: { icon: GlassIconName; title: string; detail?: string }) {
-  return <View style={styles.sectionHeading}><GlassIcon name={icon} size={24} /><Text style={styles.sectionTitle}>{title}</Text>{detail ? <Text style={styles.sectionDetail}>{detail}</Text> : null}</View>;
-}
-
-function Stat({ icon, tone, label, value }: { icon: GlassIconName; tone: 'orange' | 'blue'; label: string; value: string }) {
+function ActivityRow({ tx, last }: { tx: PaperTransaction; last?: boolean }) {
   return (
-    <View style={styles.stat}>
-      <GlassIcon name={icon} size={20} tone={tone} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.profileStatLabel}>{label}</Text>
+    <View style={[styles.row, last && styles.rowLast]}>
+      <View style={[styles.side, { backgroundColor: tx.type === 'BUY' ? 'rgba(8,153,129,0.16)' : tx.type === 'SELL' ? 'rgba(242,54,69,0.16)' : P.soft }]}>
+        <Text style={[styles.sideText, { color: tx.type === 'BUY' ? UP : tx.type === 'SELL' ? DOWN : P.body }]}>{tx.type}</Text>
+      </View>
+      <View style={styles.rowMain}>
+        <Text style={styles.rowTitle} numberOfLines={1}>{tx.symbol ?? 'Account'}</Text>
+        <Text style={styles.rowMeta}>{formatStamp(tx.createdAt)}</Text>
+      </View>
+      <Text style={styles.rowValue} numberOfLines={1}>{money(tx.amount)}</Text>
     </View>
   );
 }
 
-function Mini({ icon, label, value }: { icon: GlassIconName; label: string; value: string }) {
+function ActivityList({ query }: { query: { isLoading: boolean; isError: boolean; isSuccess: boolean; data?: { transactions: PaperTransaction[] }; refetch: () => unknown } }) {
   return (
-    <View style={styles.mini}>
-      <View style={styles.inline}><GlassIcon name={icon} size={22} /><Text style={styles.statLabel}>{label}</Text></View>
-      <Text style={styles.miniValue}>{value}</Text>
+    <>
+      {query.isLoading ? <InstrumentRowSkeleton /> : null}
+      {query.isError ? <ErrorBanner message="Could not load your transactions." onRetry={() => void query.refetch()} /> : null}
+      {query.isSuccess && query.data?.transactions.length === 0 ? <Text style={styles.emptyText}>Your paper trades will appear here.</Text> : null}
+      {(query.data?.transactions ?? []).slice(0, 20).map((tx, index, all) => (
+        <ActivityRow key={tx.id} tx={tx} last={index === all.length - 1} />
+      ))}
+    </>
+  );
+}
+
+const LINE_ICONS = {
+  cash: require('@/assets/images/cash-stack.png'),
+  btc: require('@/assets/images/btc-coin.png'),
+};
+
+function Line({ label, value, color, last, onPress, icon }: { label: string; value: string; color?: string; last?: boolean; onPress?: () => void; icon?: keyof typeof LINE_ICONS }) {
+  const content = <>
+    <View style={styles.lineStart}>
+      {icon ? <Image source={LINE_ICONS[icon]} style={styles.lineIcon} contentFit="contain" accessible={false} /> : null}
+      <Text style={styles.lineLabel}>{label}</Text>
+    </View>
+    <Text style={[styles.lineValue, color ? { color } : null]} numberOfLines={1}>{value}{onPress ? '  ›' : ''}</Text>
+  </>;
+  return onPress
+    ? <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.line, last && styles.lineLast, pressed && styles.pressed]}>{content}</Pressable>
+    : <View style={[styles.line, last && styles.lineLast]}>{content}</View>;
+}
+
+function SectionTitle({ title, count }: { title: string; count?: number }) {
+  return (
+    <View style={styles.sectionTitleRow}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {count !== undefined ? <Text style={styles.sectionCount}>{count}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  inline: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  safe: { flex: 1, backgroundColor: '#F8F9FD' },
-  header: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  headerBrand: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  title: { color: '#0F172A', fontSize: 22, fontWeight: '600', letterSpacing: -0.5 },
-  refreshButton: { minHeight: 44, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  refreshText: { color: '#0052D6', fontSize: 12, fontWeight: '500' },
-  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingBottom: 32 },
-  profileSummary: { marginHorizontal: 20, marginBottom: 22, padding: 20, borderRadius: 24, backgroundColor: '#F6FAFF', borderWidth: 1, borderColor: '#DBE7FF', overflow: 'hidden', boxShadow: '0 5px 20px rgba(0,82,214,0.06)' },
-  profileGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: 170, opacity: 0.28 },
-  summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 16 },
-  eyebrow: { color: '#64748B', fontSize: 10, letterSpacing: 1.8, fontWeight: '600' },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  profileIdentity: { flex: 1, minWidth: 0 },
-  avatar: { width: 72, height: 72, borderRadius: 24, backgroundColor: '#F1F5F9', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  name: { color: '#334155', fontSize: 24, fontWeight: '600', letterSpacing: -0.6 },
-  profileMeta: { color: '#64748B', fontSize: 13, marginTop: 5 },
-  editButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, minHeight: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.85)', borderWidth: 1, borderColor: '#BCD3FF' },
-  editText: { color: '#0066FF', fontSize: 12, fontWeight: '500' },
-  bio: { color: '#64748B', fontSize: 14, lineHeight: 22, marginTop: 18 },
-  joined: { color: '#94A3B8', fontSize: 11, marginTop: 18, textAlign: 'center' },
-  statsRow: { flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: '#DBE7FF', marginTop: 20, paddingTop: 16 },
-  stat: { flex: 1, alignItems: 'center', gap: 5 },
-  statLabel: { color: '#64748B', fontSize: 12, fontWeight: '400' },
-  profileStatLabel: { color: '#64748B', fontSize: 12, fontWeight: '400' },
-  statValue: { color: '#475569', fontSize: 21, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  tabs: { marginHorizontal: 20, marginBottom: 20, flexDirection: 'row', padding: 4, backgroundColor: '#F0EDF6', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16 },
-  tab: { flex: 1, flexDirection: 'row', gap: 5, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 12 },
-  tabSelected: { backgroundColor: '#fff', boxShadow: '0 2px 8px rgba(0,66,173,0.08)' },
-  tabText: { color: '#64748B', fontSize: 12, fontWeight: '500' },
-  tabTextSelected: { color: '#0052D6', fontWeight: '600' },
-  hero: { marginHorizontal: 20, padding: 18, paddingBottom: 18, backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderColor: '#E2E8F0' },
-  heroHeading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  heroTitle: { color: '#1E293B', fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
-  heroSubtitle: { color: '#64748B', fontSize: 12, lineHeight: 18, marginTop: 8 },
-  paperTag: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, backgroundColor: '#F6F2FC' },
-  paperDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#94A3B8' },
-  paperText: { color: '#64748B', fontSize: 10 },
-  returnCard: { backgroundColor: '#FAF8FE', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', padding: 14, gap: 14, marginTop: 16 },
-  returnLeft: { flexGrow: 1, minWidth: 130 },
-  returnLabel: { color: '#64748B', fontSize: 11 },
-  returnValue: { color: '#1E293B', fontSize: 23, fontWeight: '600', marginTop: 7, letterSpacing: -0.5 },
-  returnRight: { alignItems: 'flex-start', justifyContent: 'center', minWidth: 100 },
-  returnPercent: { color: '#1E293B', fontSize: 19, fontWeight: '600', marginTop: 7 },
-  pageHeading: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 24 },
-  pageTitle: { color: '#1E293B', fontSize: 28, fontWeight: '600', letterSpacing: -0.8 },
-  pageSubtitle: { color: '#64748B', fontSize: 13, marginTop: 7 },
-  block: { paddingHorizontal: 20 },
-  quickHeading: { color: '#475569', fontSize: 16, fontWeight: '600', marginTop: 24, marginBottom: 12 },
-  quickActions: { flexDirection: 'row', gap: 12 },
-  quickAction: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 18, padding: 16, gap: 8 },
-  quickTitle: { color: '#1E293B', fontSize: 14, fontWeight: '600', marginTop: 4 },
-  quickCaption: { color: '#64748B', fontSize: 12, lineHeight: 18 },
-  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 12 },
-  sectionTitle: { color: '#475569', fontSize: 16, fontWeight: '600', flex: 1 },
-  sectionDetail: { color: '#0066FF', fontSize: 12, backgroundColor: '#F1F5F9', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
-  meta: { color: '#64748B', fontSize: 11, lineHeight: 17, marginTop: 4 },
-  card: { backgroundColor: '#fff', borderRadius: 22, padding: 20, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 4 },
-  cardLabel: { color: '#64748B', fontSize: 13 },
-  equity: { color: '#1E293B', fontSize: 32, fontWeight: '600', marginTop: 14, letterSpacing: -0.7 },
-  pnl: { fontWeight: '500', fontSize: 14, marginTop: 6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 },
-  mini: { flexBasis: '46%', flexGrow: 1, backgroundColor: '#FAF8FE', borderRadius: 14, padding: 12 },
-  miniValue: { color: '#1E293B', fontSize: 16, fontWeight: '600', marginTop: 8 },
-  emptyCard: { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', padding: 24, alignItems: 'center', gap: 12 },
-  emptyTitle: { color: '#475569', fontSize: 16, fontWeight: '600', textAlign: 'center' },
-  empty: { color: '#64748B', fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  exploreButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#BCD3FF', borderRadius: 12, paddingHorizontal: 16, minHeight: 44, marginTop: 4 },
-  exploreText: { color: '#0066FF', fontSize: 13, fontWeight: '600' },
-  pos: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, marginBottom: 10 },
-  positionName: { flex: 1, minWidth: 0 },
-  positionValue: { alignItems: 'flex-end', maxWidth: '40%' },
-  positionPnl: { fontSize: 11, marginTop: 4, fontWeight: '500' },
-  activityIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F6F2FC', alignItems: 'center', justifyContent: 'center' },
-  activityAmount: { maxWidth: '35%' },
-  symbol: { color: '#1E293B', fontSize: 14, fontWeight: '600' },
+  pressed: { opacity: 0.55 },
+  safe: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: '#FFFFFF' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  title: { color: P.text, fontSize: 26, lineHeight: 34, letterSpacing: -0.3 },
+  iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: P.soft, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { paddingBottom: 40 },
+
+  identity: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 18 },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: P.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  initial: { color: P.text, fontSize: 24, fontWeight: '600' },
+  identityText: { flex: 1, minWidth: 0 },
+  name: { color: P.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.2 },
+  handle: { color: P.textSecondary, fontSize: 14, marginTop: 3 },
+  editButton: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: P.border, backgroundColor: P.card, justifyContent: 'center' },
+  editText: { color: P.text, fontSize: 13, fontWeight: '500' },
+  bio: { color: P.body, fontSize: 14, lineHeight: 21, marginTop: 14 },
+  community: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: P.border },
+  communityStat: { flex: 1, alignItems: 'center' },
+  communityValue: { color: P.text, fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  communityLabel: { color: P.textSecondary, fontSize: 12, marginTop: 2 },
+  communityDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: P.border },
+
+  tabs: { paddingHorizontal: 16, paddingBottom: 16 },
+  section: { paddingHorizontal: 16 },
+  kicker: { color: P.textMuted, fontSize: 12, letterSpacing: 0.3 },
+  equity: { color: P.text, fontSize: 36, fontWeight: '600', letterSpacing: -0.8, marginTop: 4, fontVariant: ['tabular-nums'] },
+  equityChange: { fontSize: 15, fontWeight: '500', marginTop: 4, fontVariant: ['tabular-nums'] },
+  muted: { color: P.textMuted, fontWeight: '400' },
+  note: { color: P.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  allocation: { marginTop: 16 },
+  list: { marginTop: 12, borderRadius: 14, backgroundColor: P.card, borderWidth: StyleSheet.hairlineWidth, borderColor: P.border, paddingHorizontal: 14 },
+  line: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: P.border },
+  lineLast: { borderBottomWidth: 0 },
+  lineStart: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  lineIcon: { width: 30, height: 30 },
+  lineLabel: { color: P.textSecondary, fontSize: 14 },
+  lineValue: { color: P.text, fontSize: 15, fontWeight: '500', fontVariant: ['tabular-nums'], flexShrink: 1 },
+  footer: { color: P.textMuted, fontSize: 12, textAlign: 'center', marginTop: 24 },
+
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 28, marginBottom: 6 },
+  sectionTitle: { color: P.text, fontSize: 17, fontWeight: '600' },
+  sectionCount: { color: P.textMuted, fontSize: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: P.border },
+  rowLast: { borderBottomWidth: 0 },
+  rowMain: { flex: 1, minWidth: 0 },
+  rowTitle: { color: P.text, fontSize: 15, fontWeight: '600' },
+  rowMeta: { color: P.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  rowRight: { alignItems: 'flex-end', maxWidth: '45%' },
+  rowValue: { color: P.text, fontSize: 15, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  rowChange: { fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] },
+  side: { minWidth: 44, height: 26, borderRadius: 13, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  sideText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  orders: { marginTop: 20 },
+
+  empty: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+  emptyTitle: { color: P.text, fontSize: 16, fontWeight: '600' },
+  emptyText: { color: P.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 300 },
+  emptyButton: { marginTop: 6, minHeight: 40, paddingHorizontal: 16, borderRadius: 20, backgroundColor: P.text, justifyContent: 'center' },
+  emptyButtonText: { color: P.onSolid, fontSize: 13, fontWeight: '600' },
 });

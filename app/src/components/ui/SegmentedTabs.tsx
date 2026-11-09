@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
   warmSelected: { color: InsightPalette.text, fontWeight: '600' },
   row: {
     flexDirection: 'row',
-    backgroundColor: '#EEF0F6',
+    backgroundColor: Palette.pill,
     borderRadius: 14,
     padding: 4,
   },
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   tabSelected: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Palette.cardHover,
   },
   label: {
     color: Palette.textSecondary,

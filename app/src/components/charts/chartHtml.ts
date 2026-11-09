@@ -26,7 +26,11 @@ export function buildChartHtml(
   drawingKey = symbol,
   pricePrecision = 2,
   currency = 'USD',
+  options: { exchange?: string; timeframe?: string } = {},
 ) {
+  const timeframe = options.timeframe ?? '';
+  const timeframeSeconds = ({ '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 } as Record<string, number>)[timeframe] ?? 0;
+  const legendTitle = [symbol, timeframe, options.exchange].filter(Boolean).join(' · ');
   const data = JSON.stringify(candles);
   pricePrecision = Math.max(0, Math.min(12, pricePrecision));
   const inds = JSON.stringify(indicators);
@@ -37,17 +41,18 @@ export function buildChartHtml(
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <style>
-  html,body,#wrap{margin:0;padding:0;height:100%;background:#fff;overflow:hidden;font-family:Georgia,"Times New Roman",serif;}
+  html,body,#wrap{margin:0;padding:0;height:100%;background:#FFFFFF;overflow:hidden;font-family:Georgia,"Times New Roman",serif;}
   #chart{height:${showVolume ? '78%' : '100%'};}
   #vol{height:${showVolume ? '22%' : '0'};display:${showVolume ? 'block' : 'none'};}
-  #tip{
-    position:absolute;display:none;pointer-events:none;z-index:5;
-    background:#fff;color:#1E293B;border:1px solid #BCD3FF;border-radius:10px;padding:8px 12px;
-    font-size:12px;line-height:1.25;min-width:72px;text-align:left;
-    box-shadow:0 2px 8px rgba(0,66,173,.12);
-  }
-  #tip b{font-weight:700;}
-  #tip.down{border-color:#F2CCD6;}
+  #legend{position:absolute;left:12px;top:8px;z-index:6;pointer-events:none;line-height:1.35;}
+  #legend .title{font-size:13px;color:#16181D;letter-spacing:.1px;}
+  #legend .quote{font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums;}
+  #legend .quote span{margin-right:8px;}
+  #legend .time{font-size:11px;color:#9A9FB0;}
+  #vol-label{position:absolute;left:12px;z-index:6;font-size:12px;color:#6B7185;pointer-events:none;}
+  /* The app toolbar's pen button opens the drawing menu; keep the in-chart toggle for keyboard/tests only. */
+  #tools-toggle{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;overflow:hidden;opacity:0;pointer-events:none;}
+  #drawing-ui{top:58px!important;}
 ${drawingToolsCss}
 </style>
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
@@ -56,7 +61,8 @@ ${drawingToolsCss}
 <div id="wrap">
   <div id="chart"></div>
   <div id="vol"></div>
-  <div id="tip"></div>
+  <div id="legend" aria-live="off"><div class="title"></div><div class="quote"></div></div>
+  <div id="vol-label">Volume</div>
   ${drawingToolsHtml}
 </div>
 <script>
@@ -72,17 +78,22 @@ ${drawingToolsCss}
   const showVolume = ${showVolume ? 'true' : 'false'};
   const initialDrawings = ${JSON.stringify(initialDrawings)};
   const drawingKey = ${JSON.stringify(drawingKey).replace(/</g, '\\u003c')};
-  const grid = '#F0EDF6';
+  const grid = '#F0F1F7';
+  const UP = '#089981', DOWN = '#F23645';
+  const UP_VOL = 'rgba(8,153,129,0.45)', DOWN_VOL = 'rgba(242,54,69,0.45)';
+  const legendTitle = ${JSON.stringify(legendTitle).replace(/</g, '\\u003c')};
+  const timeframeSeconds = ${timeframeSeconds};
   const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-    layout: { background: { color: '#FFFFFF' }, textColor: '#64748b', fontFamily: 'Georgia, Times New Roman, serif', fontSize: 12 },
+    layout: { background: { color: '#FFFFFF' }, textColor: '#6B7185', fontFamily: 'Georgia, Times New Roman, serif', fontSize: 12 },
     grid: { vertLines: { color: grid }, horzLines: { color: grid } },
-    rightPriceScale: { borderColor: '#E2E8F0', scaleMargins: { top: 0.08, bottom: 0.08 } },
-    timeScale: { borderColor: '#E2E8F0', timeVisible: true, secondsVisible: false },
+    rightPriceScale: { borderColor: '#E3E6F0', scaleMargins: { top: 0.16, bottom: 0.06 } },
+    timeScale: { borderColor: '#E3E6F0', timeVisible: true, secondsVisible: false, rightOffset: 4 },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#94A3B8', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#0066FF' },
-      horzLine: { color: '#94A3B8', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#0066FF' },
+      vertLine: { color: '#9A9FB0', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#F7F7FC' },
+      horzLine: { color: '#9A9FB0', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#F7F7FC' },
     },
+    localization: { priceFormatter: p => Number(p).toLocaleString('en-US', { minimumFractionDigits: pricePrecision, maximumFractionDigits: pricePrecision }) },
     handleScroll: true,
     handleScale: true,
   });
@@ -90,10 +101,11 @@ ${drawingToolsCss}
   let volChart = null;
   if (showVolume) {
     volChart = LightweightCharts.createChart(document.getElementById('vol'), {
-      layout: { background: { color: '#FFFFFF' }, textColor: '#64748b', fontFamily: 'Georgia, Times New Roman, serif' },
-      grid: { vertLines: { visible: false }, horzLines: { color: grid } },
-      rightPriceScale: { borderColor: '#E2E8F0' },
+      grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+      rightPriceScale: { borderColor: '#E3E6F0', scaleMargins: { top: 0.2, bottom: 0 } },
       timeScale: { visible: false },
+      // The main pane keeps the TradingView attribution; one logo is enough.
+      layout: { background: { color: '#FFFFFF' }, textColor: '#6B7185', fontFamily: 'Georgia, Times New Roman, serif', fontSize: 12, attributionLogo: false },
     });
   }
 
@@ -109,22 +121,23 @@ ${drawingToolsCss}
     series.setData(candles.map(c => ({ time: c.time, value: c.close })));
   } else {
     series = chart.addCandlestickSeries({
-      upColor: '#0EA57A', downColor: '#E45D80',
-      borderUpColor: '#0EA57A', borderDownColor: '#E45D80',
-      wickUpColor: '#0EA57A', wickDownColor: '#E45D80',
+      upColor: UP, downColor: DOWN,
+      borderUpColor: UP, borderDownColor: DOWN,
+      wickUpColor: UP, wickDownColor: DOWN,
       priceLineVisible: false,
     });
     series.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
   }
 
-  series.applyOptions({priceFormat});
+  // The dashed price line carries the last-price label (and countdown); avoid a duplicate series label.
+  series.applyOptions({priceFormat, lastValueVisible: false});
   let priceLine = null;
   const last = candles[candles.length - 1];
   if (last) {
     const up = last.close >= last.open;
     priceLine = series.createPriceLine({
       price: last.close,
-      color: up ? '#0EA57A' : '#E45D80',
+      color: up ? UP : DOWN,
       lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dashed,
       axisLabelVisible: true,
@@ -133,11 +146,10 @@ ${drawingToolsCss}
   }
 
   if (volChart) {
-    const vol = volumeSeries = volChart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
-    vol.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0 } });
+    const vol = volumeSeries = volChart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceLineVisible: false });
     vol.setData(candles.map(c => ({
       time: c.time, value: c.volume,
-      color: c.close >= c.open ? 'rgba(14,165,122,0.28)' : 'rgba(228,93,128,0.28)',
+      color: c.close >= c.open ? UP_VOL : DOWN_VOL,
     })));
   }
 
@@ -207,31 +219,63 @@ ${drawingToolsCss}
     openedOnMovingCandle = true;
   }
 
-  const tip = document.getElementById('tip');
-  chart.subscribeCrosshairMove(param => {
-    if (!param.point || !param.time || !param.seriesData) {
-      tip.style.display = 'none';
-      return;
+  // TradingView-style legend: latest bar by default, hovered bar while the crosshair is active.
+  const legend = document.getElementById('legend');
+  legend.querySelector('.title').textContent = legendTitle;
+  const fmt = n => Number(n).toLocaleString('en-US', { minimumFractionDigits: pricePrecision, maximumFractionDigits: pricePrecision });
+  function renderLegend(index, hovered) {
+    const bar = candles[index]; if (!bar) return;
+    const previous = candles[index - 1];
+    const base = previous ? previous.close : bar.open;
+    const change = bar.close - base, pct = base ? change / base * 100 : 0;
+    const quote = legend.querySelector('.quote');
+    quote.style.color = change >= 0 ? UP : DOWN;
+    quote.innerHTML = '';
+    for (const text of [fmt(bar.close), (change >= 0 ? '+' : '') + fmt(change), '(' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)']) {
+      const span = document.createElement('span'); span.textContent = text; quote.appendChild(span);
     }
-    const bar = param.seriesData.get(series);
-    const price = bar && (bar.close ?? bar.value);
-    if (price == null) { tip.style.display = 'none'; return; }
-    const d = new Date(Number(param.time) * 1000);
-    const hh = String(d.getHours()).padStart(2,'0');
-    const mm = String(d.getMinutes()).padStart(2,'0');
-    const down = bar.open != null && bar.close < bar.open;
-    tip.className = down ? 'down' : '';
-    tip.textContent = symbol + ' ' + Number(price).toFixed(pricePrecision) + ' ' + currency + ' · ' + hh + ':' + mm;
-    tip.style.display = 'block';
-    tip.style.top = Math.max(8, param.point.y - 18) + 'px';
-    tip.style.left = Math.min(window.innerWidth - 120, Math.max(8, param.point.x + 12)) + 'px';
+    if (hovered) {
+      const d = new Date(bar.time * 1000), time = document.createElement('span');
+      time.className = 'time'; time.textContent = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+      quote.appendChild(time);
+    }
+  }
+  window.renderLatestLegend = () => renderLegend(candles.length - 1, false);
+  window.renderLatestLegend();
+  chart.subscribeCrosshairMove(param => {
+    const index = param.time ? candles.findIndex(c => c.time === param.time) : -1;
+    if (!param.point || index < 0) { window.renderLatestLegend(); return; }
+    renderLegend(index, true);
   });
+
+  // Countdown to the next candle on the last-price label (intraday timeframes only).
+  function updateCountdown() {
+    const latest = candles[candles.length - 1];
+    if (!priceLine || !latest || !timeframeSeconds) return;
+    const left = Math.max(0, Math.floor(latest.time + timeframeSeconds - Date.now() / 1000));
+    const h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), sec = left % 60;
+    const pad = n => String(n).padStart(2, '0');
+    priceLine.applyOptions({ title: left > 0 ? (h ? h + ':' + pad(m) + ':' + pad(sec) : pad(m) + ':' + pad(sec)) : '' });
+  }
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+
+  // The native toolbar's pen button opens the in-chart drawing menu.
+  function receiveCommand(event) {
+    try { const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      if (data && data.type === 'open-drawing-tools') document.getElementById('tools-toggle').click();
+    } catch (_) {}
+  }
+  window.addEventListener('message', receiveCommand);
+  document.addEventListener('message', receiveCommand);
 
   function resize() {
     const h = window.innerHeight;
     const w = window.innerWidth;
     chart.applyOptions({ width: w, height: showVolume ? h * 0.78 : h });
     if (volChart) volChart.applyOptions({ width: w, height: h * 0.22 });
+    document.getElementById('vol-label').style.display = showVolume ? 'block' : 'none';
+    document.getElementById('vol-label').style.top = (h * 0.78 + 6) + 'px';
     if (!openedOnMovingCandle) zoomToMovingCandle();
   }
   new ResizeObserver(resize).observe(document.body);

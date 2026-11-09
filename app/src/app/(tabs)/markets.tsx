@@ -1,250 +1,101 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppTopBar } from '@/components/navigation/AppTopBar';
 
 import { InstrumentRow, type QuoteLike } from '@/components/markets/InstrumentRow';
 import { HomeQuoteCard } from '@/components/markets/HomeQuoteCard';
+import { WelcomeGift } from '@/components/markets/WelcomeGift';
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
-import { WatchlistSection } from '@/components/markets/WatchlistSection';
+import SpecularButton from '@/components/ui/SpecularButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { InstrumentRowSkeleton } from '@/components/ui/Skeleton';
 import { Palette, Spacing } from '@/constants/theme';
-import { api } from '@/lib/api';
 import { formatPct } from '@/lib/format';
 import { marketAssets } from '@/lib/marketAssets';
-import { groupQuotes } from '@/lib/marketGroups';
+import { fetchTickerList, searchPairs } from '@/lib/marketData';
 import { useLiveMarket } from '@/hooks/use-live-market';
-import { useAuth } from '@/store/auth';
 
-type Watchlist = { id: string; name: string; isDefault: boolean };
-type WatchlistItem = { id: string; symbol: string; exchange: string; name: string; quote: QuoteLike | null };
+const HERO_COINS: Record<string, number> = {
+  BTC: require('@/assets/images/hero-btc.png'),
+  ETH: require('@/assets/images/hero-eth.png'),
+  BNB: require('@/assets/images/hero-bnb.png'),
+  SOL: require('@/assets/images/hero-sol.png'),
+  USDT: require('@/assets/images/hero-usdt.png'),
+};
 
-const TABS = ['Watchlist', 'Explore', 'Overview'] as const;
+// Watchlists have no backend yet, so Home shows live discovery lists from Binance instead.
+const TABS = ['Most active', 'Gainers', 'Losers'] as const;
+const SORT = { 'Most active': 'volume', Gainers: 'gainers', Losers: 'losers' } as const;
+
+function openQuote(q: { symbol: string; exchange: string; name: string }) {
+  router.push({
+    pathname: '/stock/[symbol]',
+    params: { symbol: q.symbol, exchange: q.exchange, name: q.name },
+  });
+}
 
 export default function MarketsScreen() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Watchlist');
+  const [tab, setTab] = useState<(typeof TABS)[number]>('Most active');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState({ crypto: true, forex: true });
   const [directory, setDirectory] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(true);
   const [pageWidth, setPageWidth] = useState(390);
-  const qc = useQueryClient();
-  const user = useAuth((s) => s.user);
-
-  const listsQuery = useQuery({
-    queryKey: ['watchlists'],
-    queryFn: () => api<{ watchlists: Watchlist[] }>('/api/watchlists'),
-  });
-  const activeListId = listsQuery.data?.watchlists[0]?.id;
-  const activeListName = listsQuery.data?.watchlists[0]?.name ?? 'Watchlist';
-
-  const itemsQuery = useQuery({
-    queryKey: ['watchlist-items', activeListId],
-    enabled: Boolean(activeListId),
-    queryFn: () =>
-      api<{ items: WatchlistItem[]; isDemo: boolean }>(`/api/watchlists/${activeListId}/items`),
-    refetchInterval: 60_000,
-  });
 
   const exploreQuery = useQuery({
-    queryKey: ['explore'],
-    enabled: true,
-    queryFn: () =>
-      api<{
-        constituents: QuoteLike[];
-        crypto?: QuoteLike[];
-        forex?: QuoteLike[];
-        availability?: { crypto: string; forex: string };
-        gainers: QuoteLike[];
-        losers: QuoteLike[];
-        active: QuoteLike[];
-        isDemo: boolean;
-        marketSessions?: {crypto:string;forex:string};
-        statusLabel: string;
-      }>('/api/market/explore'),
+    queryKey: ['explore', 'volume'],
+    queryFn: ({ signal }) => fetchTickerList('volume', 30, signal),
     refetchInterval: 60_000,
   });
-
-  const overviewQuery = useQuery({
-    queryKey: ['overview'],
-    enabled: tab === 'Overview',
-    queryFn: () =>
-      api<{
-        marketSessions?: {crypto:string;forex:string};
-        statusLabel: string;
-        availability?: {crypto:string;forex:string};
-        crypto?: QuoteLike[];
-        forex?: QuoteLike[];
-        sentiment: string;
-        volatilityLabel: string;
-        news: { id: string; title: string; source: string }[];
-        events: { id: string; title: string; date: string }[];
-        isDemo: boolean;
-      }>('/api/market/overview'),
+  const listQuery = useQuery({
+    queryKey: ['explore', SORT[tab]],
+    enabled: directory,
+    queryFn: ({ signal }) => fetchTickerList(SORT[tab], 30, signal),
     refetchInterval: 60_000,
   });
-
   const searchQuery = useQuery({
     queryKey: ['search', query],
-    enabled: searchOpen && query.length >= 1,
-    queryFn: () =>
-      api<{ results: { symbol: string; exchange: string; name: string; token?: string }[] }>(
-        `/api/market/search?q=${encodeURIComponent(query)}`,
-      ),
+    enabled: searchOpen && query.trim().length >= 1,
+    queryFn: ({ signal }) => searchPairs(query, signal),
   });
 
-  const addMutation = useMutation({
-    mutationFn: (item: { symbol: string; exchange: string; name: string; token?: string }) =>
-      api(`/api/watchlists/${activeListId}/items`, { method: 'POST', body: item }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['watchlist-items'] });
-      setSearchOpen(false);
-      setQuery('');
-    },
-  });
+  const discovery = exploreQuery.data?.crypto ?? [];
+  const listed = directory ? listQuery.data?.crypto ?? [] : [];
+  const feedStatus = useLiveMarket([...discovery, ...listed].map(q => `${q.exchange}:${q.symbol}`));
 
-  const createListMutation = useMutation({
-    mutationFn: (name: string) => api('/api/watchlists', { method: 'POST', body: { name } }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['watchlists'] }),
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: (itemId: string) =>
-      api(`/api/watchlists/${activeListId}/items/${itemId}`, { method: 'DELETE' }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['watchlist-items'] }),
-  });
-
-  const watchlistQuotes = useMemo(
-    () =>
-      (itemsQuery.data?.items ?? [])
-        .map((i) => i.quote)
-        .filter((q): q is QuoteLike => Boolean(q)),
-    [itemsQuery.data],
-  );
-
-  const grouped = useMemo(() => groupQuotes(watchlistQuotes), [watchlistQuotes]);
-
-  const itemIdBySymbol = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of itemsQuery.data?.items ?? []) {
-      map.set(`${item.exchange}:${item.symbol}`.toUpperCase(), item.id);
-    }
-    return map;
-  }, [itemsQuery.data]);
-
-  const discovery = [...(exploreQuery.data?.crypto ?? []), ...(exploreQuery.data?.forex ?? [])];
-  const feedStatus = useLiveMarket([...(itemsQuery.data?.items ?? []), ...discovery].map(q => `${q.exchange}:${q.symbol}`));
-
-
-  function promptAddList() {
-    if (Platform.OS === 'web') {
-      const name = window.prompt('New watchlist name', 'My list');
-      if (name?.trim()) createListMutation.mutate(name.trim());
-      return;
-    }
-    if (Platform.OS === 'ios') {
-      // Alert.prompt is iOS-only
-      (Alert as typeof Alert & { prompt: Function }).prompt(
-        'New watchlist',
-        'Enter a name for this list',
-        (name: string) => {
-          if (name?.trim()) createListMutation.mutate(name.trim());
-        },
-        'plain-text',
-        'My list',
-      );
-      return;
-    }
-    const n = (listsQuery.data?.watchlists.length ?? 0) + 1;
-    createListMutation.mutate(`List ${n}`);
-  }
-
-  function removeBySymbol(symbol: string) {
-    const id = itemIdBySymbol.get(symbol.toUpperCase());
-    if (!id) return;
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Remove ${symbol} from watchlist?`)) removeMutation.mutate(id);
-      return;
-    }
-    Alert.alert('Remove', `Remove ${symbol} from watchlist?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeMutation.mutate(id) },
-    ]);
-  }
-
-  const avgChange =
-    watchlistQuotes.reduce((sum, q) => sum + q.changePercent, 0) / (watchlistQuotes.length || 1);
+  const avgChange = discovery.slice(0, 10).reduce((sum, q) => sum + q.changePercent, 0) / (Math.min(discovery.length, 10) || 1);
   const marketsUp = avgChange >= 0;
-  const chips = (watchlistQuotes.length ? watchlistQuotes : discovery).slice(0, 4);
-  const cardQuotes = [
-    ...grouped.crypto,
-    ...grouped.forex,
-    ...(watchlistQuotes.length ? [] : discovery),
-  ].slice(0, 6);
+  const chips = discovery.slice(0, 3);
+  const cardQuotes = discovery.slice(0, 6);
   const cardWidth = Math.min(214, Math.max(156, (pageWidth - 20) / 2));
-  const marketHeadline = watchlistQuotes.length
-    ? marketsUp ? 'Markets are\nup today' : 'Markets are\ndown today'
-    : 'Forex & crypto,\nat a glance';
-  const pillLabel = (q: QuoteLike) => q.exchange === 'FOREX' ? q.symbol : marketAssets(q.symbol, q.exchange)?.[0] ?? q.symbol;
-  const shortcuts: { label: string; icon: GlassIconName; onPress: () => void }[] = [
-    { label: 'Add pair', icon: 'add', onPress: () => setSearchOpen(true) },
-    { label: 'Markets', icon: 'chart', onPress: () => router.push('/(tabs)/market') },
-    { label: 'Portfolio', icon: 'wallet', onPress: () => router.push('/(tabs)/profile') },
-    { label: 'AI Insight', icon: 'analytics', onPress: () => router.push('/(tabs)/ai') },
-    { label: 'Community', icon: 'community', onPress: () => router.push('/(tabs)/community') },
-    { label: 'Share idea', icon: 'send', onPress: () => router.push('/community/compose') },
+  const marketHeadline = discovery.length
+    ? marketsUp ? 'Crypto is\nup today' : 'Crypto is\ndown today'
+    : 'Crypto,\nat a glance';
+  const pillLabel = (q: QuoteLike) => marketAssets(q.symbol, q.exchange)?.[0] ?? q.symbol;
+  const shortcuts: { label: string; icon?: GlassIconName; art?: number; onPress: () => void }[] = [
+    { label: 'Search', icon: 'add', onPress: () => setSearchOpen(true) },
+    { label: 'Markets', art: require('@/assets/images/home-markets.png'), onPress: () => router.push('/(tabs)/market') },
+    { label: 'Portfolio', art: require('@/assets/images/home-portfolio.png'), onPress: () => router.push('/(tabs)/profile') },
+    { label: 'AI Insight', art: require('@/assets/images/home-ai.png'), onPress: () => router.push('/(tabs)/ai') },
   ];
-
-  function openQuote(q: QuoteLike) {
-    router.push({
-      pathname: '/stock/[symbol]',
-      params: { symbol: q.symbol, exchange: q.exchange, name: q.name },
-    });
-  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']} onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}>
-      <View style={styles.header}>
-        <View style={styles.brand}>
-          <Image
-            source={{ uri: 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837cb6f4498b.jpg' }}
-            style={styles.logo}
-            contentFit="cover"
-            accessibilityLabel="Gurukul icon"
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Gurukul home"
-            accessibilityHint="Return to the homepage"
-            style={({ pressed }) => [styles.brandHome, pressed && { opacity: 0.65 }]}
-            onPress={() => setDirectory(false)}>
-            <Text style={styles.brandName}>Gurukul</Text>
-          </Pressable>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Open portfolio" style={styles.portfolioPill} onPress={() => router.push('/(tabs)/profile')}>
-            <Text style={styles.portfolioText}>Portfolio</Text>
-          </Pressable>
-          <GlassPressable accessibilityRole="button" accessibilityLabel="Open profile" style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}>
-            {user?.avatarUrl ? <Image source={{ uri: user.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <GlassIcon name="profile" size={28} />}
-          </GlassPressable>
-        </View>
-      </View>
+      <AppTopBar onBrandPress={() => setDirectory(false)} />
 
       <Text style={[styles.cardSymbol, {paddingHorizontal: 18, paddingBottom: 8}]}>{feedStatus}</Text>
-      {exploreQuery.data?.availability?.forex && !exploreQuery.data?.forex?.length ? <Text style={[styles.cardSymbol, {paddingHorizontal: 18, paddingBottom: 8}]}>{exploreQuery.data.availability.forex}</Text> : null}
-      {(itemsQuery.isError || exploreQuery.isError || overviewQuery.isError) && (
+      {(exploreQuery.isError || listQuery.isError) && (
         <ErrorBanner
           message="Could not load market data. Is the API running?"
           onRetry={() => {
-            void itemsQuery.refetch();
             void exploreQuery.refetch();
-            void overviewQuery.refetch();
+            if (directory) void listQuery.refetch();
           }}
         />
       )}
@@ -252,69 +103,105 @@ export default function MarketsScreen() {
       {!directory ? (
         <ScrollView contentContainerStyle={styles.homePad} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <Text style={styles.heroTitle} accessibilityRole="header">{marketHeadline}</Text>
-            <Text style={styles.heroSubtitle}>
-              {'✦ '}
-              {watchlistQuotes.length ? (
-                <>Your watchlist is <Text style={[styles.heroHighlight, { color: marketsUp ? Palette.green : Palette.red }]}>{formatPct(avgChange)}</Text> today</>
-              ) : (
-                <>Live prices for <Text style={styles.heroHighlight}>crypto &amp; forex</Text></>
-              )}
-              {' ✦'}
-            </Text>
+            <View style={styles.heroTop}>
+              <View style={styles.heroCopy}>
+                <Text style={styles.heroTitle} accessibilityRole="header">{marketHeadline}</Text>
+                <Text style={styles.heroSubtitle}>
+                  {discovery.length ? (
+                    <>The 10 most active pairs average <Text style={[styles.heroHighlight, { color: marketsUp ? Palette.green : Palette.red }]}>{formatPct(avgChange)}</Text></>
+                  ) : (
+                    <>Live prices for <Text style={styles.heroHighlight}>crypto</Text></>
+                  )}
+                </Text>
+              </View>
+              <Image
+                source={require('@/assets/images/home-insight.png')}
+                style={styles.heroArt}
+                contentFit="contain"
+                accessible={false}
+                pointerEvents="none"
+              />
+            </View>
             <View style={styles.heroPills}>
-              {itemsQuery.isLoading
+              {exploreQuery.isLoading
                 ? Array.from({ length: 3 }).map((_, i) => <View key={i} style={styles.pillSkeleton} />)
-                : chips.slice(0, 3).map((q) => (
+                : chips.map((q) => {
+                    const label = pillLabel(q);
+                    const coin = HERO_COINS[label];
+                    return (
                     <Pressable
                       key={`${q.exchange}:${q.symbol}`}
                       accessibilityRole="button"
                       accessibilityLabel={`Open ${q.name}, ${formatPct(q.changePercent)}`}
                       style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
                       onPress={() => openQuote(q)}>
-                      <Text style={styles.pillSymbol}>{pillLabel(q)}</Text>
-                      <Text style={[styles.pillChange, { color: q.changePercent >= 0 ? Palette.green : Palette.red }]}>
+                      {coin ? (
+                        <Image source={coin} style={styles.pillCoin} contentFit="contain" accessible={false} />
+                      ) : null}
+                      <Text style={styles.pillSymbol} numberOfLines={1}>{label}</Text>
+                      <Text style={[styles.pillChange, { color: q.changePercent >= 0 ? Palette.green : Palette.red }]} numberOfLines={1}>
                         {formatPct(q.changePercent)}
                       </Text>
                     </Pressable>
-                  ))}
+                    );
+                  })}
             </View>
-            <Pressable
+            <SpecularButton
+              size="lg"
+              radius={28}
+              tint="#0066FF"
+              tintOpacity={0.06}
+              textColor="#16181D"
+              lineColor="#0066FF"
+              baseColor="#C9CEDB"
+              intensity={1}
+              idleIntensity={0.35}
+              shineSize={10}
+              shineFade={34}
+              thickness={1.2}
+              glow={1}
+              followMouse
+              proximity={250}
               accessibilityRole="button"
-              style={({ pressed }) => [styles.heroCta, pressed && styles.heroCtaPressed]}
-              onPress={() => {
-                if (!watchlistQuotes.length) { setSearchOpen(true); return; }
-                router.push('/(tabs)/market');
-              }}>
-              <Text style={styles.heroCtaText}>{watchlistQuotes.length ? 'Explore markets' : 'Add your first pair'}</Text>
-            </Pressable>
+              accessibilityLabel="Explore markets"
+              onClick={() => router.push('/(tabs)/market')}
+              onPress={() => router.push('/(tabs)/market')}
+              style={styles.heroCta}>
+              Explore markets
+            </SpecularButton>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.shortcutScroll} contentContainerStyle={styles.shortcuts}>
             {shortcuts.map(item => (
               <GlassPressable key={item.label} accessibilityRole="button" accessibilityLabel={item.label} style={styles.shortcut} onPress={item.onPress}>
-                <GlassIcon name={item.icon} size={28} />
+                <View style={styles.shortcutArt}>
+                  {item.art ? (
+                    <Image source={item.art} style={styles.shortcutImage} contentFit="contain" accessible={false} />
+                  ) : item.icon ? (
+                    <GlassIcon name={item.icon} size={32} />
+                  ) : null}
+                </View>
                 <Text style={styles.shortcutLabel} numberOfLines={2}>{item.label}</Text>
               </GlassPressable>
             ))}
           </ScrollView>
 
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>{watchlistQuotes.length ? 'Your watchlist' : 'Discover markets'}</Text>
-            <GlassPressable accessibilityRole="button" accessibilityLabel="See all watchlist instruments" style={styles.seeAllButton} onPress={() => setDirectory(true)}>
+            <Text style={styles.sectionTitle}>Discover markets</Text>
+            <GlassPressable accessibilityRole="button" accessibilityLabel="See all markets" style={styles.seeAllButton} onPress={() => setDirectory(true)}>
               <Text style={styles.seeAll}>See all</Text>
               <GlassIcon name="add" size={18} />
             </GlassPressable>
           </View>
 
-          {itemsQuery.isLoading ? (
+          {exploreQuery.isLoading ? (
             <InstrumentRowSkeleton />
           ) : cardQuotes.length === 0 ? (
-            <EmptyState title="Watchlist is empty" subtitle="Search BTCUSDT, ETHUSDT or EUR/USD to start your watchlist." />
+            <EmptyState title="No prices yet" subtitle="Market data appears once the server reaches Binance." />
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardScroll} contentContainerStyle={styles.cardRow}>
               {cardQuotes.map((q) => (
-                  <HomeQuoteCard key={`${q.exchange}-${q.symbol}`} quote={q} width={cardWidth} onPress={() => openQuote(q)} onRemove={() => removeBySymbol(`${q.exchange}:${q.symbol}`)} />
+                <HomeQuoteCard key={`${q.exchange}-${q.symbol}`} quote={q} width={cardWidth} onPress={openQuote} />
               ))}
             </ScrollView>
           )}
@@ -322,7 +209,7 @@ export default function MarketsScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.homePad}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>{activeListName}</Text>
+            <Text style={styles.sectionTitle}>Markets</Text>
             <Pressable onPress={() => setDirectory(false)}>
               <Text style={styles.seeAll}>Home</Text>
             </Pressable>
@@ -335,87 +222,49 @@ export default function MarketsScreen() {
               </Pressable>
             ))}
             <GlassPressable style={styles.dirTab} onPress={() => setSearchOpen(true)}>
-              <GlassIcon name="add" size={18} /><Text style={styles.dirTabText}>Add</Text>
+              <GlassIcon name="add" size={18} /><Text style={styles.dirTabText}>Search</Text>
             </GlassPressable>
-            <Pressable style={styles.dirTab} onPress={promptAddList}>
-              <Text style={styles.dirTabText}>New list</Text>
-            </Pressable>
           </ScrollView>
-          {tab === 'Watchlist' && (
-            <>
-              {(itemsQuery.data?.items ?? []).filter(i => !i.quote).map(i => <Pressable key={i.id} onLongPress={() => removeBySymbol(`${i.exchange}:${i.symbol}`)} onPress={() => router.push({pathname:'/stock/[symbol]',params:{symbol:i.symbol,exchange:i.exchange,name:i.name}})} style={{padding:16}}><Text>{i.symbol} · Quote unavailable</Text></Pressable>)}
-              <WatchlistSection title="Crypto" quotes={grouped.crypto} expanded={expanded.crypto} onToggle={() => setExpanded(e => ({...e, crypto: !e.crypto}))} onRemove={removeBySymbol} />
-              <WatchlistSection title="Forex" quotes={grouped.forex} expanded={expanded.forex} onToggle={() => setExpanded(e => ({...e, forex: !e.forex}))} onRemove={removeBySymbol} />
-            </>
-          )}
-          {tab === 'Explore' &&
-            (exploreQuery.isLoading ? (
-              <InstrumentRowSkeleton />
-            ) : (
-              <>
-                <Text style={styles.sectionTitle}>Crypto</Text>
-                <Text style={styles.cardSymbol}>{exploreQuery.data?.availability?.crypto}</Text>
-                {(exploreQuery.data?.crypto ?? []).map(q => <InstrumentRow key={`${q.exchange}:${q.symbol}`} quote={q} />)}
-                <Text style={styles.sectionTitle}>Forex</Text>
-                <Text style={styles.cardSymbol}>{exploreQuery.data?.marketSessions?.forex}</Text>
-                <Text style={styles.cardSymbol}>{exploreQuery.data?.availability?.forex}</Text>
-                {(exploreQuery.data?.forex ?? []).map(q => <InstrumentRow key={`${q.exchange}:${q.symbol}`} quote={q} />)}
-              </>
-            ))}
-          {tab === 'Overview' && overviewQuery.data && (
-            <View style={styles.overviewCard}>
-              <Text style={styles.cardName}>{overviewQuery.data.statusLabel}</Text>
-              <Text style={styles.cardSymbol}>{overviewQuery.data.marketSessions?.forex}</Text>
-              <Text style={styles.cardSymbol}>{overviewQuery.data.availability?.crypto} · {overviewQuery.data.availability?.forex}</Text>
-              {[...(overviewQuery.data.crypto ?? []), ...(overviewQuery.data.forex ?? [])].map(q => <InstrumentRow key={`${q.exchange}:${q.symbol}`} quote={q} />)}
-              <Text style={styles.cardSymbol}>
-                {overviewQuery.data.sentiment} · {overviewQuery.data.volatilityLabel}
-              </Text>
-              {(overviewQuery.data.news ?? []).map((n) => (
-                <Text key={n.id} style={styles.news}>
-                  {n.title}
-                </Text>
-              ))}
-            </View>
-          )}
+          {listQuery.isLoading ? <InstrumentRowSkeleton /> : listed.map(q => <InstrumentRow key={`${q.exchange}:${q.symbol}`} quote={q} />)}
         </ScrollView>
       )}
+
+      <WelcomeGift visible={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
 
       <Modal visible={searchOpen} animationType="slide" onRequestClose={() => setSearchOpen(false)}>
         <SafeAreaView style={styles.safe}>
           <View style={styles.searchHeader}>
             <TextInput
               autoFocus
+              accessibilityLabel="Search crypto pairs"
               style={styles.searchInput}
-              placeholder="Search crypto / forex pairs"
+              placeholder="Search crypto pairs"
               placeholderTextColor={Palette.textMuted}
               value={query}
               onChangeText={setQuery}
               autoCapitalize="characters"
+              autoCorrect={false}
             />
             <Pressable onPress={() => setSearchOpen(false)}>
               <Text style={styles.cancel}>Close</Text>
             </Pressable>
           </View>
           <FlatList
-            data={searchQuery.data?.results ?? []}
+            data={searchQuery.data ?? []}
             keyExtractor={(item) => `${item.exchange}-${item.symbol}`}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <Pressable
+                accessibilityRole="button"
                 style={styles.searchRow}
-                onPress={() =>
-                  addMutation.mutate({
-                    symbol: item.symbol,
-                    exchange: item.exchange,
-                    name: item.name,
-                    token: item.token,
-                  })
-                }>
+                onPress={() => { setSearchOpen(false); setQuery(''); openQuote(item); }}>
                 <Text style={styles.cardName}>{item.symbol}</Text>
                 <Text style={styles.cardSymbol}>{item.name}</Text>
               </Pressable>
             )}
-            ListEmptyComponent={<EmptyState title="Search symbols" subtitle="Try BTCUSDT, ETHUSDT, EUR/USD" />}
+            ListEmptyComponent={searchQuery.isError
+              ? <EmptyState title="Search failed" subtitle="Check your connection and try again." />
+              : <EmptyState title="Search symbols" subtitle="Try BTC, ETH or SOL" />}
           />
         </SafeAreaView>
       </Modal>
@@ -424,64 +273,50 @@ export default function MarketsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#ffffff', width: '100%', maxWidth: 480, alignSelf: 'center' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingTop: 16, paddingBottom: 24,
-  },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  logo: { width: 36, height: 36, borderRadius: 9, backgroundColor: '#fff' },
-  brandName: { color: '#0F172A', fontSize: 17, fontWeight: '600', letterSpacing: -0.5 },
-  brandHome: { minHeight: 44, justifyContent: 'center' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  portfolioPill: {
-    borderWidth: 1, borderColor: '#4d8dff', backgroundColor: '#fff',
-    borderRadius: 20, paddingHorizontal: 16, minHeight: 36, justifyContent: 'center',
-  },
-  portfolioText: { color: '#0f172a', fontWeight: '500', fontSize: 11 },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18, overflow: 'hidden',
-    backgroundColor: '#dbe7ff', alignItems: 'center', justifyContent: 'center',
-  },
+  safe: { flex: 1, backgroundColor: Palette.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
   homePad: { paddingHorizontal: 18, paddingBottom: 28 },
-  hero: { alignItems: 'center', paddingTop: 28, paddingBottom: 8 },
-  heroTitle: { color: '#0f172a', fontSize: 38, fontWeight: '700', lineHeight: 44, letterSpacing: -1.2, textAlign: 'center' },
-  heroSubtitle: { color: '#0f172a', fontSize: 16, lineHeight: 22, textAlign: 'center', marginTop: 18 },
+  hero: { paddingTop: 4, paddingBottom: 8 },
+  heroTop: { minHeight: 168, justifyContent: 'center' },
+  heroCopy: { maxWidth: 196 },
+  heroArt: { position: 'absolute', width: 196, height: 196, right: -28, top: -12 },
+  heroTitle: { color: Palette.text, fontSize: 40, fontWeight: '700', lineHeight: 44, letterSpacing: -1.4, textAlign: 'left' },
+  heroSubtitle: { color: Palette.text, fontSize: 16, lineHeight: 22, textAlign: 'left', marginTop: 14 },
   heroHighlight: { color: Palette.accent, fontWeight: '700' },
-  heroPills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 16 },
-  pill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, backgroundColor: '#f1f5f9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  pillSkeleton: { width: 96, height: 32, borderRadius: 8, backgroundColor: '#f1f5f9' },
-  pillSymbol: { color: '#0f172a', fontSize: 14, fontWeight: '600' },
-  pillChange: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  heroPills: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20 },
+  pill: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Palette.pill, borderRadius: 8, paddingLeft: 4, paddingRight: 8, paddingVertical: 2 },
+  pillCoin: { width: 26, height: 26 },
+  pillSkeleton: { flex: 1, height: 32, borderRadius: 8, backgroundColor: Palette.pill },
+  pillSymbol: { flexShrink: 1, color: Palette.text, fontSize: 13, fontWeight: '600' },
+  pillChange: { flexShrink: 0, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   pressed: { opacity: 0.6 },
-  heroCta: { alignSelf: 'stretch', marginTop: 28, height: 56, borderRadius: 28, backgroundColor: Palette.accent, alignItems: 'center', justifyContent: 'center' },
-  heroCtaPressed: { backgroundColor: '#0052D6' },
-  heroCtaText: { color: '#ffffff', fontSize: 18, fontWeight: '600', letterSpacing: -0.2 },
+  heroCta: { alignSelf: 'stretch', width: '100%', marginTop: 28, height: 56 },
   shortcutScroll: { marginTop: 26, marginHorizontal: -18 },
   shortcuts: { paddingHorizontal: 10, gap: 2 },
-  shortcut: { width: 76, alignItems: 'center', gap: 8, paddingVertical: 6 },
-  shortcutLabel: { color: '#334155', fontSize: 13, textAlign: 'center', lineHeight: 17 },
+  shortcut: { width: 96, alignItems: 'center', gap: 2, paddingVertical: 4 },
+  shortcutArt: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+  shortcutImage: { width: 84, height: 84 },
+  shortcutLabel: { color: Palette.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 17 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 16 },
-  sectionTitle: { color: '#0F172A', fontSize: 20, fontWeight: '600', letterSpacing: -0.7 },
-  seeAllButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: '#dfe2e9', borderRadius: 7, paddingHorizontal: 10, minHeight: 30 },
-  seeAll: { color: '#1e293b', fontSize: 11, fontWeight: '400' },
+  sectionTitle: { color: Palette.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.7 },
+  seeAllButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: Palette.border, borderRadius: 7, paddingHorizontal: 10, minHeight: 30 },
+  seeAll: { color: Palette.text, fontSize: 11, fontWeight: '400' },
   cardScroll: { marginHorizontal: -18 },
   cardRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 18, paddingBottom: 10 },
   cardName: { color: Palette.text, fontWeight: '600', fontSize: 16 },
-  cardSymbol: { color: '#777d87', fontSize: 12, marginTop: 2 },
+  cardSymbol: { color: Palette.textSecondary, fontSize: 12, marginTop: 2 },
   dirTab: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#fff',
-    borderWidth: 1, borderColor: '#EEEFF4', overflow: 'hidden', minHeight: 42,
+    backgroundColor: Palette.card,
+    borderWidth: 1, borderColor: Palette.border, overflow: 'hidden', minHeight: 42,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  dirTabOn: { backgroundColor: '#fff', borderColor: '#BCD3FF', boxShadow: '0 3px 9px rgba(0,82,214,0.10)' },
-  dirTabText: { color: '#7e8794', fontSize: 13, fontWeight: '500' },
+  dirTabOn: { backgroundColor: Palette.accentMuted, borderColor: '#0066FF' },
+  dirTabText: { color: Palette.textSecondary, fontSize: 13, fontWeight: '500' },
   dirTabTextOn: { color: '#0052D6', fontWeight: '600' },
   overviewCard: {
-    backgroundColor: '#fff',
+    backgroundColor: Palette.card,
     borderRadius: 20,
     padding: 16,
     gap: 8,
@@ -495,7 +330,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Palette.card,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
