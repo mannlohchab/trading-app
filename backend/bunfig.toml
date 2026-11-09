@@ -1,0 +1,3 @@
+[test]
+# The main suite. poc/ directories hold standalone experiments with their own tests (cd poc/<name> && bun test).
+root = "tests"

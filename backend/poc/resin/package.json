@@ -1,0 +1,13 @@
+{
+  "name": "resin-backtest-poc",
+  "description": "Proof of concept: Pine Script backtests with @nullarch/resin on our Postgres Binance candles. Not wired into the app.",
+  "private": true,
+  "scripts": {
+    "demo": "bun demo.ts",
+    "test": "bun test"
+  },
+  "type": "module",
+  "dependencies": {
+    "@nullarch/resin": "github:nullarch/resin#fa683a0ce81bf54832805f3e386c504c144d451a"
+  }
+}

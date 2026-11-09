@@ -1,0 +1,36 @@
+{
+  "name": "trading-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "market:sync": "bun src/scripts/sync-market.ts",
+    "jobs": "bun src/jobs-worker.ts",
+    "db:seed-test-user": "bun src/db/seed-test-user.ts",
+    "dev:setup": "bun run db:up && bun run db:migrate && bun run db:seed-test-user"
+  },
+  "dependencies": {
+    "@better-auth/expo": "^1.7.18",
+    "@nullarch/resin": "github:nullarch/resin#fa683a0ce81bf54832805f3e386c504c144d451a",
+    "better-auth": "^1.7.18",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.17",
+    "postgres": "^4.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@types/bun": "^1.4.4",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "^7.0.2"
+  }
+}
