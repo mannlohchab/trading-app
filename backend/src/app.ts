@@ -8,6 +8,7 @@ import type { AiModule } from './modules/ai';
 import type { BacktestingModule } from './modules/backtesting';
 import type { IdentityModule } from './modules/identity';
 import type { MarketModule } from './modules/market';
+import type { NewsModule } from './modules/news';
 import type { PaperTradingModule } from './modules/paper-trading';
 import type { ProfilesModule } from './modules/profiles';
 import type { StrategiesModule } from './modules/strategies';
@@ -23,10 +24,11 @@ export type AppDeps = {
   ai: AiModule;
   backtesting: BacktestingModule;
   paperTrading: PaperTradingModule;
+  news: NewsModule;
 };
 
 /** Builds the HTTP app from its modules. No I/O happens here; see ./index.ts for production wiring. */
-export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading }: AppDeps) {
+export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news }: AppDeps) {
   const app = new Hono();
 
   app.use(requestId());
@@ -55,6 +57,7 @@ export function createApp({ clientOrigin, pingDatabase, identity, profiles, mark
   app.route('/', ai.routes);
   app.route('/', backtesting.routes);
   app.route('/', paperTrading.routes);
+  app.route('/', news.routes);
 
   app.notFound(c => c.json({ error: 'Not found' }, 404));
   app.onError((err, c) => {

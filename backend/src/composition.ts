@@ -9,6 +9,7 @@ import { createBacktestingModule } from './modules/backtesting';
 import { verifySandboxIsolation } from './modules/backtesting/workers/backtest.worker-manager';
 import { ConsoleSmsSender, createIdentityModule, type SmsSender } from './modules/identity';
 import { binanceAdapters, createMarketModule } from './modules/market';
+import { createNewsModule, newsSourcesFromConfig } from './modules/news';
 import { createPaperTradingModule } from './modules/paper-trading';
 import { createProfilesModule } from './modules/profiles';
 import { createStrategiesModule } from './modules/strategies';
@@ -60,7 +61,14 @@ export function composeModules() {
     signals: backtesting.signals,
     queue: backtesting.queue,
   });
-  return { identity, profiles, market, strategies, ai, backtesting, paperTrading };
+  const news = createNewsModule({
+    db,
+    requireActiveUser: identity.requireActiveUser,
+    sources: newsSourcesFromConfig(config.news.sources),
+    retentionDays: config.news.retentionDays,
+    log: createLogger('news'),
+  });
+  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news };
 }
 
 /** Starts the job runner after proving the sandbox isolates. Returns a stop function. */
@@ -84,7 +92,7 @@ export async function startJobRunner(modules: ReturnType<typeof composeModules>,
   }
   const runner = new JobRunner({
     queue: backtesting.queue,
-    handlers: sandboxReady ? [backtesting.jobHandler, modules.paperTrading.jobHandler] : [modules.paperTrading.jobHandler],
+    handlers: [...(sandboxReady ? [backtesting.jobHandler] : []), modules.paperTrading.jobHandler, modules.news.jobHandler],
     workerId,
     concurrency: config.backtesting.jobConcurrency,
     leaseMs: backtesting.leaseMs,
@@ -92,7 +100,9 @@ export async function startJobRunner(modules: ReturnType<typeof composeModules>,
   });
   runner.start();
   if (config.paperTrading.engineEnabled) await modules.paperTrading.engine.start();
+  await modules.news.startScheduling();
   return async () => {
+    modules.news.stop();
     await modules.paperTrading.engine.stop();
     await runner.stop();
   };

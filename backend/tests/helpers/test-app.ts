@@ -7,6 +7,7 @@ import { createBacktestingModule } from '../../src/modules/backtesting';
 import type { CandleHistory } from '../../src/modules/backtesting/backtesting.market-history';
 import { silentLogger } from '../../src/logger';
 import { createMarketModule } from '../../src/modules/market';
+import { createNewsModule, type NewsSource } from '../../src/modules/news';
 import { createPaperTradingModule } from '../../src/modules/paper-trading';
 import { createProfilesModule } from '../../src/modules/profiles';
 import { createStrategiesModule } from '../../src/modules/strategies';
@@ -60,7 +61,7 @@ const authConfig = (overrides: Partial<AuthConfig> = {}): AuthConfig => ({
 });
 
 /** The real app (real Better Auth, real migrations) on an in-memory Postgres. */
-export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingDatabase?: () => Promise<boolean>; aiLimits?: { turnsPerDay: number; tokensPerDay: number }; aiConfigured?: boolean; backtestEngine?: import('../../src/modules/backtesting').BacktestEngine; signalEngine?: import('../../src/modules/backtesting').StrategySignalEngine } = {}) {
+export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingDatabase?: () => Promise<boolean>; aiLimits?: { turnsPerDay: number; tokensPerDay: number }; aiConfigured?: boolean; backtestEngine?: import('../../src/modules/backtesting').BacktestEngine; signalEngine?: import('../../src/modules/backtesting').StrategySignalEngine; newsSources?: NewsSource[] } = {}) {
   const database = await createTestDb();
   const sms = new FakeSms();
   const clock = new FakeClock();
@@ -90,8 +91,9 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
     db: database.appDb, requireActiveUser: identity.requireActiveUser, market: { service: market.service, hub: market.hub },
     signals: options.signalEngine ?? backtesting.signals, queue: backtesting.queue, clock, log: silentLogger,
   });
-  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading });
-  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, history, model, provider, feed, sms, clock, ...database };
+  const news = createNewsModule({ db: database.appDb, requireActiveUser: identity.requireActiveUser, sources: options.newsSources ?? [], clock });
+  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news });
+  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, history, model, provider, feed, sms, clock, ...database };
 }
 
 let clientCount = 0;

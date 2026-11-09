@@ -68,6 +68,23 @@ export const config = {
       jobConcurrency: Number(env.BACKGROUND_JOBS_CONCURRENCY ?? 1),
     };
   })(),
+  news: {
+    /** Delete stored articles older than this. */
+    retentionDays: Number(env.NEWS_RETENTION_DAYS ?? 30),
+    sources: {
+      rss: { enabled: (env.NEWS_RSS_ENABLED ?? 'true') === 'true', intervalMinutes: Number(env.NEWS_RSS_INTERVAL_MINUTES ?? 10) },
+      // Free Crypto News API: key-less, 120 requests/hour. Each poll makes 2 requests plus one per topic.
+      cryptocurrencyCv: {
+        enabled: (env.NEWS_CRYPTOCURRENCY_CV_ENABLED ?? 'true') === 'true',
+        intervalMinutes: Number(env.NEWS_CRYPTOCURRENCY_CV_INTERVAL_MINUTES ?? 10),
+        topics: list(env.NEWS_CRYPTOCURRENCY_CV_TOPICS ?? 'bitcoin,ethereum,solana,xrp'),
+      },
+      // CryptoPanic needs an API key; without one it is not polled.
+      cryptoPanic: env.CRYPTOPANIC_API_KEY?.trim()
+        ? { apiKey: env.CRYPTOPANIC_API_KEY.trim(), intervalMinutes: Number(env.NEWS_CRYPTOPANIC_INTERVAL_MINUTES ?? 60), baseUrl: env.CRYPTOPANIC_API_URL?.trim() || undefined }
+        : undefined,
+    },
+  },
   paperTrading: {
     /** Run the live paper engine (market subscriptions, fills, strategy scheduling) in this process. */
     engineEnabled: (env.PAPER_ENGINE_ENABLED ?? 'true') === 'true',

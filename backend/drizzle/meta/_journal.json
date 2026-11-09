@@ -64,6 +64,13 @@
       "when": 1794220412088,
       "tag": "0008_paper_ledger_sequence",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794251464218,
+      "tag": "0009_news",
+      "breakpoints": true
     }
   ]
 }

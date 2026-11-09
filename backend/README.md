@@ -110,6 +110,34 @@ All endpoints require an ACTIVE user. `exchange` defaults to `BINANCE`. Prices a
 - **Shared ticker fetch:** REST tickers come from one cached all-symbols call (5 s TTL).
 - **Rate-limit backoff:** on HTTP 429/418 calls stop until Binance's `Retry-After` passes.
 
+## Crypto news (`modules/news`)
+
+News from several free sources, stored in Postgres and served from there. User requests never reach a source, so app traffic never spends the sources' rate limits.
+
+| Source | Kind | Key | Default poll | Notes |
+|---|---|---|---|---|
+| [Free Crypto News API](https://cryptocurrency.cv) | aggregator (300+ outlets) | none | 10 min | Free tier: 120 req/h; `/api/news` returns 3 items, `/api/breaking` and `/api/search` 10 each. One poll is breaking + latest + one search per topic (default 4 topics, so 36 req/h). Breaking items are flagged. |
+| CoinDesk, Cointelegraph, The Block, Decrypt, CryptoSlate | RSS | none | 10 min | Publishers' own feeds (`DEFAULT_RSS_FEEDS` in `modules/news/index.ts`). |
+| [CryptoPanic](https://cryptopanic.com/developers/api/) | aggregator, coin-tagged | `CRYPTOPANIC_API_KEY` | 60 min | Only polled when a key is set. Free plans are small, so check yours and set the interval to match. |
+
+All endpoints require an ACTIVE user.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/v1/news?limit=20&cursor=&asset=BTC&publisher=coindesk&q=etf` | Newest first. Filters combine. `q` is Postgres full-text search (web-search syntax). `nextCursor` pages stably while new articles arrive. |
+| GET | `/api/v1/news/breaking?limit=10` | Stories flagged as breaking in the last 24 h. |
+| GET | `/api/v1/news/sources` | Each source's status (`ok`/`failing`/`pending`), last success and next poll. Error details stay in the server log. |
+
+An article looks like this: `{ id, title, summary, url, imageUrl, author, publisher: { key, name }, publishedAt, assets: ["BTC"], categories, breaking, sources: ["coindesk", "cryptocurrency-cv"] }`.
+
+**How it works.**
+- **Scheduling in Postgres.** Each source has one queued `news.poll` job, and each poll queues the next. The schedule lives in `news_sources.next_run_at`, and only the job whose time matches may record a poll. Any number of API and worker processes therefore share one schedule. Duplicate jobs are skipped, and a broken chain is repaired every 5 minutes.
+- **Back-off.** On failure the poll interval doubles, up to 8×, and a source's `Retry-After` is honoured.
+- **One row per story.** Articles are de-duplicated by canonical URL (no `www.`, tracking parameters, fragment or trailing slash). The same story from an aggregator and from the publisher's feed is one row: the first source keeps its title, and later ones add missing fields, coin tags and the breaking flag.
+- **Coin tags.** `assets` holds coin codes detected from names and capitalised tickers, conservatively: "optimism" is not OP, and "BTCUSDT" is not BTC. Filter an instrument page by its base asset.
+- **Hygiene.** The aggregator's data rows (gas price, hashrate) and its non-crypto mainstream stories are dropped. HTML is stripped from text. Only http(s) links are stored. Feeds are parsed without DTDs or entity expansion, with a 5 MB response cap and a 15 s timeout.
+- **Retention.** Articles older than `NEWS_RETENTION_DAYS` (30) are deleted.
+
 ## AI assistant (`modules/ai`)
 
 A tool-using assistant on Cloudflare Workers AI. It answers market questions from live data, analyses charts with server-computed indicators, and drafts trading strategies the user can save.
@@ -292,3 +320,9 @@ Simulated trading with virtual funds on **live Binance market data**. It never c
 | `DATABASE_POOL_MAX` | `10` | Max pooled connections. |
 | `DATABASE_SSL` | `disable` (`require` in production) | Use `require` for managed Postgres. |
 | `PAPER_ENGINE_ENABLED` | `true` | Run the paper-trading engine (live fills, strategy scheduling) in this process. Enable it in exactly one process. Evaluation jobs run wherever the job runner runs. |
+| `NEWS_RSS_ENABLED` / `NEWS_RSS_INTERVAL_MINUTES` | `true` / `10` | Publisher RSS feeds. |
+| `NEWS_CRYPTOCURRENCY_CV_ENABLED` / `NEWS_CRYPTOCURRENCY_CV_INTERVAL_MINUTES` | `true` / `10` | Free Crypto News API (120 req/h free). |
+| `NEWS_CRYPTOCURRENCY_CV_TOPICS` | `bitcoin,ethereum,solana,xrp` | One search request per topic per poll. |
+| `CRYPTOPANIC_API_KEY` | unset | Enables CryptoPanic. Secret: it is never logged. |
+| `NEWS_CRYPTOPANIC_INTERVAL_MINUTES` / `CRYPTOPANIC_API_URL` | `60` / `https://cryptopanic.com/api/developer/v2` | |
+| `NEWS_RETENTION_DAYS` | `30` | |
