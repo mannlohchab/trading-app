@@ -220,6 +220,22 @@ export function createDemoApi() {
         if (method !== 'GET') throw new Error('Orders are disabled in demo preview. Switch to live mode to place paper trades.');
         return { orders: [] };
       }
+      // Fictional headlines with no links: the demo preview never opens outside sites.
+      if (url.pathname === '/api/v1/news') {
+        const samples = [
+          ['Sample: Bitcoin holds steady as traders wait for inflation data', 'BTC', 1],
+          ['Sample: How spot ETF flows can move crypto prices', 'BTC', 3],
+          ['Sample: Ethereum fees stay low after the latest network upgrade', 'ETH', 5],
+          ['Sample: What stablecoins are and why traders use them', 'USDT', 8],
+          ['Sample: Solana developers ship a new validator release', 'SOL', 12],
+        ] as const;
+        const articles = samples.map(([title, asset, hoursAgo], i) => ({
+          id: `demo-news-${i + 1}`, title, summary: 'A fictional story for the demo preview.', url: null, imageUrl: null, author: null,
+          publisher: { key: 'demodesk', name: 'Demo Market Desk' }, publishedAt: ago(hoursAgo), assets: [asset], breaking: i === 0,
+        }));
+        const asset = url.searchParams.get('asset')?.toUpperCase();
+        return { articles: asset ? articles.filter(a => (a.assets as readonly string[]).includes(asset)) : articles, nextCursor: null };
+      }
       if (parts[1] === 'market') {
         if (parts[2] === 'quote') return { quote: quoteFor(parts[3]), isDemo: true };
         if (parts[2] === 'candles') return history(parts[3], url.searchParams.get('timeframe') ?? '5m');

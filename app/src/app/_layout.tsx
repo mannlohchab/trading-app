@@ -69,6 +69,7 @@ export default function RootLayout() {
           options={{ presentation: 'modal', headerShown: true, title: 'New post' }}
         />
         <Stack.Screen name="community/post/[id]" options={{ headerShown: true, title: 'Post' }} />
+        <Stack.Screen name="news" options={{ headerShown: true, title: 'Crypto news' }} />
       </Stack>
       {DEMO_MODE && <View style={{ backgroundColor: Palette.card, paddingVertical: 6, paddingHorizontal: 12 }}>
         <Text style={{ color: '#0052D6', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>

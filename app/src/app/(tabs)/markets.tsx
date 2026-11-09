@@ -9,6 +9,7 @@ import { AppTopBar } from '@/components/navigation/AppTopBar';
 
 import { InstrumentRow, type QuoteLike } from '@/components/markets/InstrumentRow';
 import { HomeQuoteCard } from '@/components/markets/HomeQuoteCard';
+import { HomeNews } from '@/components/markets/HomeNews';
 import { WelcomeGift } from '@/components/markets/WelcomeGift';
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
 import SpecularButton from '@/components/ui/SpecularButton';
@@ -185,6 +186,8 @@ export default function MarketsScreen() {
               </GlassPressable>
             ))}
           </ScrollView>
+
+          <HomeNews />
 
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>Discover markets</Text>
