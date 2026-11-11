@@ -59,19 +59,20 @@ test('local edits round trip without mutating other demo instances or response s
 
 test('community has posts and comments and supports local interaction', async () => {
   const demo = createDemoApi();
-  const { posts } = await request(demo, '/api/community/feed?tab=foryou');
+  const { posts } = await request(demo, '/api/v1/community/feed?tab=foryou');
   const post = posts[0];
-  await request(demo, `/api/community/posts/${post.id}/like`, 'POST');
-  const detail = await request(demo, `/api/community/posts/${post.id}`);
+  await request(demo, `/api/v1/community/posts/${post.id}/like`, 'PUT');
+  await request(demo, `/api/v1/community/posts/${post.id}/like`, 'PUT');
+  const detail = await request(demo, `/api/v1/community/posts/${post.id}`);
   assert.equal(detail.post.likeCount, post.likeCount + 1);
   assert.ok(detail.comments.length);
-  await request(demo, `/api/community/posts/${post.id}/comments`, 'POST', { content: 'A preview comment' });
-  assert.equal((await request(demo, `/api/community/posts/${post.id}`)).comments.at(-1).content, 'A preview comment');
-  await request(demo, '/api/community/posts', 'POST', { content: 'My preview post', symbol: 'eurusd' });
-  const [mine] = (await request(demo, '/api/community/feed?tab=foryou')).posts;
+  await request(demo, `/api/v1/community/posts/${post.id}/comments`, 'POST', { content: 'A preview comment' });
+  assert.equal((await request(demo, `/api/v1/community/posts/${post.id}`)).comments.at(-1).content, 'A preview comment');
+  await request(demo, '/api/v1/community/posts', 'POST', { content: 'My preview post', symbol: 'eurusd' });
+  const [mine] = (await request(demo, '/api/v1/community/feed?tab=foryou')).posts;
   assert.equal(mine.content, 'My preview post');
   assert.deepEqual([mine.symbol, mine.exchange], ['EUR/USD', 'FOREX']);
-  await assert.rejects(request(demo, '/api/community/posts', 'POST', { content: 'x', symbol: 'TCS' }), /not included/);
+  await assert.rejects(request(demo, '/api/v1/community/posts', 'POST', { content: 'x', symbol: 'TCS' }), /not included/);
 });
 
 test('sample AI streams labeled answers into conversation history and handles aborts', async () => {

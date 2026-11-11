@@ -138,6 +138,34 @@ An article looks like this: `{ id, title, summary, url, imageUrl, author, publis
 - **Hygiene.** The aggregator's data rows (gas price, hashrate) and its non-crypto mainstream stories are dropped. HTML is stripped from text. Only http(s) links are stored. Feeds are parsed without DTDs or entity expansion, with a 5 MB response cap and a 15 s timeout.
 - **Retention.** Articles older than `NEWS_RETENTION_DAYS` (30) are deleted.
 
+## Community (`modules/community`)
+
+Traders post market findings, optionally tagged with an instrument and an image. Others can like, save, comment, reply, report and follow. All endpoints except images require an ACTIVE user. Base path: `/api/v1/community`.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/feed?tab=foryou\|editors\|following\|saved&limit=20&cursor=&author=<userId>&symbol=BTCUSDT&exchange=` | Newest first (`saved` is ordered by when the post was saved). `author` and `symbol` narrow any tab. Returns `{ posts, nextCursor }`. |
+| POST | `/posts` | `{ content, symbol?, exchange?, image? }` → 201 `{ post }`. `symbol` accepts `btc/usdt`, `BTC-USDT` and similar spellings, and must be an active instrument. If `exchange` is left out, every exchange is searched. `image` is a base64 data URL (JPEG/PNG/WebP/GIF, up to 1.5 MB). |
+| GET | `/posts/:id` | `{ post, comments, nextCommentCursor }`, with comments oldest first. |
+| GET | `/posts/:id/comments?cursor=&limit=100` | More comments. |
+| PATCH / DELETE | `/posts/:id` | Edit `{ content }` (sets `editedAt`) or delete. Author only. |
+| PUT / DELETE | `/posts/:id/like`, `/posts/:id/bookmark` | Like or save, and undo. Idempotent. Like returns `{ liked, likeCount }`. |
+| POST | `/posts/:id/comments` | `{ content, parentId? }` → 201 `{ comment }`. A reply's parent must be on the same post. |
+| DELETE | `/comments/:id` | The comment's author or the post's author. Replies are deleted with it. |
+| POST | `/posts/:id/report` | `{ reason, details? }`. `reason` is `SPAM`/`HARASSMENT`/`MISLEADING`/`INAPPROPRIATE`/`OTHER` or the app's label. Reporting again only updates the reason. |
+| GET | `/users/:id` | `{ user, postCount, followerCount, followingCount, following }` |
+| PUT / DELETE | `/users/:id/follow` | Follow or unfollow. Idempotent. |
+| GET | `/api/v1/community-images/:id` | A post's image. No session is needed, because the app's image component can't send one; ids are random UUIDs. |
+
+A post looks like this: `{ id, content, imageUrl, symbol, exchange, likeCount, commentCount, createdAt, editedAt, liked, bookmarked, following, isEditorsPick, isOwn, hidden, author: { id, username, displayName, avatarUrl } }`.
+
+**Rules.**
+- **Counts are kept by Postgres triggers** on likes and comments, so they stay correct after cascades (deleted user, deleted parent comment).
+- **Moderation.** A post reported by `AUTO_HIDE_REPORTS` (5) different users is hidden. Only its author still sees it, with `hidden: true`, and its image stops being served. Unresolved reports sit in `community_reports` (`resolved_at IS NULL`). There is no moderator API yet. Editors' picks are set directly in the database (`community_posts.is_editors_pick`).
+- **Rate limits.** 10 posts and 60 comments per user per hour, counted in Postgres (`RATE_LIMITS`) → 429 `RATE_LIMITED`.
+- **Hygiene.** Text is stored as plain text, with control and bidi-override characters removed. Image formats are detected from the file's bytes, not the declared type, and SVG is refused. Avatars are only returned if they are http(s). Request bodies are capped at 2.5 MB for new posts and 32 KB for everything else.
+- **Deleted or suspended accounts** disappear from feeds, posts, comments and follower counts at once. Their rows are removed by the account purge (foreign keys cascade).
+
 ## AI assistant (`modules/ai`)
 
 A tool-using assistant on Cloudflare Workers AI. It answers market questions from live data, analyses charts with server-computed indicators, and drafts trading strategies the user can save.

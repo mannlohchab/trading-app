@@ -8,7 +8,7 @@ import { PostCard } from '@/components/community/PostCard';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { InsightPalette as P } from '@/constants/theme';
 import { api } from '@/lib/api';
-import { refreshCommunity, type CommunityDetail, type CommunityComment } from '@/lib/community';
+import { COMMUNITY_API, refreshCommunity, type CommunityDetail, type CommunityComment } from '@/lib/community';
 import { timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 
@@ -20,10 +20,10 @@ export default function PostDetailScreen() {
   const client = useQueryClient();
   const detail = useQuery({
     queryKey: ['post', userId, id],
-    queryFn: ({ signal }) => api<CommunityDetail>(`/api/community/posts/${id}`, { signal }),
+    queryFn: ({ signal }) => api<CommunityDetail>(`${COMMUNITY_API}/posts/${id}`, { signal }),
   });
   const mutation = useMutation({
-    mutationFn: () => api(`/api/community/posts/${id}/comments`, {
+    mutationFn: () => api(`${COMMUNITY_API}/posts/${id}/comments`, {
       method: 'POST', body: { content: comment.trim(), parentId: replyTo?.id },
     }),
     onSuccess: async () => {
@@ -51,8 +51,8 @@ export default function PostDetailScreen() {
         renderItem={({ item }) => {
           const parent = item.parentId ? comments.find(c => c.id === item.parentId) : undefined;
           return <View style={[styles.comment, item.parentId && styles.reply]}>
-            {parent && <Text style={styles.meta}>Replying to @{parent.author.username}: {parent.content.slice(0, 80)}{parent.content.length > 80 ? '…' : ''}</Text>}
-            <Text style={styles.author}>{item.author.displayName || item.author.username || 'Trader'}</Text>
+            {parent && <Text style={styles.meta}>Replying to {parent.author.displayName}: {parent.content.slice(0, 80)}{parent.content.length > 80 ? '…' : ''}</Text>}
+            <Text style={styles.author}>{item.author.displayName}</Text>
             <Text style={styles.meta}>{timeAgo(item.createdAt)}</Text>
             <Text style={styles.content}>{item.content}</Text>
             <Pressable accessibilityRole="button" disabled={mutation.isPending} onPress={() => setReplyTo(item)} style={styles.replyButton}><Text style={styles.replyText}>Reply</Text></Pressable>
@@ -62,7 +62,7 @@ export default function PostDetailScreen() {
       {detail.data && <View style={styles.composer}>
         {mutation.error && <ErrorBanner message={mutation.error.message || 'Could not send your comment.'} />}
         {replyTo && <View style={styles.replyBanner}>
-          <Text style={styles.meta}>Replying to @{replyTo.author.username || 'trader'}</Text>
+          <Text style={styles.meta}>Replying to {replyTo.author.displayName}</Text>
           <Pressable accessibilityRole="button" disabled={mutation.isPending} onPress={() => setReplyTo(undefined)} style={styles.replyButton}><Text style={styles.replyText}>Cancel reply</Text></Pressable>
         </View>}
         <View style={styles.row}>

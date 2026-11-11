@@ -71,6 +71,13 @@
       "when": 1794251464218,
       "tag": "0009_news",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794291138922,
+      "tag": "0010_community",
+      "breakpoints": true
     }
   ]
 }

@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InsightPalette as Palette, Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
-import { refreshCommunity } from '@/lib/community';
+import { COMMUNITY_API, refreshCommunity } from '@/lib/community';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 
 export default function ComposeScreen() {
@@ -20,13 +20,14 @@ export default function ComposeScreen() {
 
   const mutation = useMutation({
     mutationFn: () =>
-      api('/api/community/posts', {
+      api(`${COMMUNITY_API}/posts`, {
         method: 'POST',
         body: {
           content: content.trim(),
           // The server resolves pair aliases (BTC/USDT, EURUSD) to their canonical exchange.
           symbol: symbol.trim() || undefined,
-          imageUrl,
+          // Base64 data URL; the server checks the real format and size.
+          image: imageUrl,
         },
       }),
     onSuccess: async () => {

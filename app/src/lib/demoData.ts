@@ -295,49 +295,62 @@ export function createDemoApi() {
         if (parts[2] === 'news') return { ...metadata, items: [{ id: 'sample-news', title: 'Sample: investors watch the next inflation release',
           publisher: 'Demo preview', date: fetchedAt, country: 'Sample economy', url: 'https://www.gdeltproject.org' }] };
       }
-      if (parts[1] === 'community') {
-        if (parts[2] === 'feed') {
+      if (parts[1] === 'v1' && parts[2] === 'community') {
+        const [, , , section, itemId, action] = parts;
+        if (section === 'feed') {
           const tab = url.searchParams.get('tab');
-          const offset = Number(url.searchParams.get('offset') ?? 0);
+          const offset = Number(url.searchParams.get('cursor') ?? 0);
           const limit = Number(url.searchParams.get('limit') ?? 20);
           if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('Invalid pagination');
           const filtered = posts.filter(p => tab === 'editors' ? p.isEditorsPick : tab === 'following' ? following.has(p.author.id) : tab === 'saved' ? p.bookmarked : true);
           const page = filtered.slice(offset, offset + limit);
-          return { posts: page.map(enrichPost), nextOffset: offset + page.length, hasMore: offset + page.length < filtered.length };
+          return { posts: page.map(enrichPost), nextCursor: offset + page.length < filtered.length ? String(offset + page.length) : null };
         }
-        if (parts[2] === 'users' && parts[4] === 'follow' && method === 'POST') {
-          if (parts[3] === user.id || !authors.some(a => a.id === parts[3])) throw new Error('Cannot follow this user');
-          if (following.has(parts[3])) following.delete(parts[3]); else following.add(parts[3]);
-          return { following: following.has(parts[3]) };
+        if (section === 'users' && action === 'follow' && (method === 'PUT' || method === 'DELETE')) {
+          if (itemId === user.id || !authors.some(a => a.id === itemId)) throw new Error('Cannot follow this user');
+          if (method === 'PUT') following.add(itemId); else following.delete(itemId);
+          return { following: following.has(itemId) };
         }
-        if (parts[2] === 'posts') {
-          if (parts.length === 3 && method === 'POST') {
+        if (section === 'comments' && method === 'DELETE') {
+          for (const [postId, list] of Object.entries(comments)) {
+            const kept = list.filter(c => c.id !== itemId && c.parentId !== itemId);
+            if (kept.length !== list.length) { comments[postId] = kept; const post = posts.find(p => p.id === postId); if (post) post.commentCount = kept.length; }
+          }
+          return null;
+        }
+        if (section === 'posts') {
+          if (!itemId && method === 'POST') {
             const content = text('content').trim();
             if (!content || content.length > 5000) throw new Error('Post must contain 1–5000 characters');
             const tagged = text('symbol') ? quoteFor(text('symbol').replace(/^([A-Z]{3})([A-Z]{3})$/i, '$1/$2')) : undefined;
-            const post = { id: id('post'), content, imageUrl: text('imageUrl') || undefined, symbol: tagged?.symbol ?? '', exchange: tagged?.exchange ?? '', likeCount: 0,
+            const post = { id: id('post'), content, imageUrl: text('image') || undefined, symbol: tagged?.symbol ?? '', exchange: tagged?.exchange ?? '', likeCount: 0,
               commentCount: 0, createdAt: new Date().toISOString(), liked: false, bookmarked: false, isEditorsPick: false, author: user };
             posts.unshift(post); comments[post.id] = []; return { post: enrichPost(post) };
           }
-          const post = posts.find(p => p.id === parts[3]);
+          const post = posts.find(p => p.id === itemId);
           if (!post) throw new Error('Demo post not found.');
-          if (method === 'POST') {
-            if (parts[4] === 'like') { post.liked = !post.liked; post.likeCount += post.liked ? 1 : -1; return { liked: post.liked }; }
-            else if (parts[4] === 'bookmark') { post.bookmarked = !post.bookmarked; return { bookmarked: post.bookmarked }; }
-            else if (parts[4] === 'comments') {
-              const content = text('content').trim();
-              const parentId = text('parentId') || null;
-              if (!content || content.length > 2000) throw new Error('Comment must contain 1–2000 characters');
-              if (parentId && !comments[post.id].some(c => c.id === parentId)) throw new Error('Reply must belong to this post');
-              comments[post.id].push({ id: id('comment'), content, parentId, createdAt: new Date().toISOString(), author: user });
-              post.commentCount = comments[post.id].length;
-              return { comment: comments[post.id].at(-1) };
-            } else if (parts[4] === 'report') {
-              if (text('reason').trim().length < 3) throw new Error('Please enter a report reason');
-              return { ok: true, message: 'Report submitted for moderation review' };
-            } else if (parts[4] !== 'report') throw new Error('This action is not available in demo preview.');
+          if (!action && method === 'DELETE') { posts.splice(posts.indexOf(post), 1); return null; }
+          if (action === 'like' && (method === 'PUT' || method === 'DELETE')) {
+            const liked = method === 'PUT';
+            if (liked !== post.liked) { post.liked = liked; post.likeCount += liked ? 1 : -1; }
+            return { liked: post.liked, likeCount: post.likeCount };
           }
-          return { post: enrichPost(post), comments: comments[post.id] };
+          if (action === 'bookmark' && (method === 'PUT' || method === 'DELETE')) { post.bookmarked = method === 'PUT'; return { bookmarked: post.bookmarked }; }
+          if (action === 'comments' && method === 'POST') {
+            const content = text('content').trim();
+            const parentId = text('parentId') || null;
+            if (!content || content.length > 2000) throw new Error('Comment must contain 1–2000 characters');
+            if (parentId && !comments[post.id].some(c => c.id === parentId)) throw new Error('Reply must belong to this post');
+            comments[post.id].push({ id: id('comment'), content, parentId, createdAt: new Date().toISOString(), author: user });
+            post.commentCount = comments[post.id].length;
+            return { comment: comments[post.id].at(-1) };
+          }
+          if (action === 'report' && method === 'POST') {
+            if (text('reason').trim().length < 3) throw new Error('Please enter a report reason');
+            return { ok: true, message: 'Report submitted for moderation review.' };
+          }
+          if (action || method !== 'GET') throw new Error('This action is not available in demo preview.');
+          return { post: enrichPost(post), comments: comments[post.id], nextCommentCursor: null };
         }
       }
       if (url.pathname === '/api/ai/suggestions') return { suggestions: ['How do I size a paper trade?', 'How do forex pips work?', 'Help me build a trading journal.'] };

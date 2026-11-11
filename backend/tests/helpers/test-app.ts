@@ -7,6 +7,7 @@ import { createBacktestingModule } from '../../src/modules/backtesting';
 import type { CandleHistory } from '../../src/modules/backtesting/backtesting.market-history';
 import { silentLogger } from '../../src/logger';
 import { createMarketModule } from '../../src/modules/market';
+import { createCommunityModule, marketInstrumentResolver } from '../../src/modules/community';
 import { createNewsModule, type NewsSource } from '../../src/modules/news';
 import { createPaperTradingModule } from '../../src/modules/paper-trading';
 import { createProfilesModule } from '../../src/modules/profiles';
@@ -92,8 +93,11 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
     signals: options.signalEngine ?? backtesting.signals, queue: backtesting.queue, clock, log: silentLogger,
   });
   const news = createNewsModule({ db: database.appDb, requireActiveUser: identity.requireActiveUser, sources: options.newsSources ?? [], clock });
-  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news });
-  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, history, model, provider, feed, sms, clock, ...database };
+  const community = createCommunityModule({
+    db: database.appDb, requireActiveUser: identity.requireActiveUser, instruments: marketInstrumentResolver(market.service), publicBaseUrl: TEST_ORIGIN, clock,
+  });
+  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community });
+  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, history, model, provider, feed, sms, clock, ...database };
 }
 
 let clientCount = 0;
@@ -126,6 +130,7 @@ export function client(app: { request: (path: string, init?: RequestInit) => Res
     get: (path: string) => call('GET', path),
     post: (path: string, body: unknown = {}) => call('POST', path, body),
     patch: (path: string, body: unknown = {}) => call('PATCH', path, body),
+    put: (path: string, body?: unknown) => call('PUT', path, body),
     delete: (path: string) => call('DELETE', path),
     get cookie() { return cookie; },
   };

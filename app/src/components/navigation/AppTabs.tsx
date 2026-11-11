@@ -41,9 +41,7 @@ export default function AppTabs() {
         sceneStyle: { backgroundColor: '#FFFFFF' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="chart" tone={focused ? 'purple' : 'neutral'} />,
       }} />
-      {/* Community has no backend yet, so the tab is hidden (the screens are kept). */}
       <Tabs.Screen name="community" options={{
-        href: null,
         title: 'Community',
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="community" tone={focused ? 'purple' : 'neutral'} />,
       }} />

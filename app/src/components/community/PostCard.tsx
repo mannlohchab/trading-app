@@ -6,7 +6,7 @@ import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { InsightPalette as P } from '@/constants/theme';
 import { api } from '@/lib/api';
-import { refreshCommunity, type CommunityPost } from '@/lib/community';
+import { COMMUNITY_API, refreshCommunity, type CommunityPost } from '@/lib/community';
 import { timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 
@@ -21,11 +21,13 @@ export function PostCard({ post, onOpen }: { post: CommunityPost; onOpen?: () =>
   const [notice, setNotice] = useState('');
   const [shareError, setShareError] = useState('');
   const mutation = useMutation({
-    mutationFn: (action: Action) => api(action === 'follow'
-      ? `/api/community/users/${post.author.id}/follow`
-      : `/api/community/posts/${post.id}/${action}`, {
-      method: 'POST', ...(action === 'report' ? { body: { reason } } : {}),
-    }),
+    // Like, save and follow are set (PUT) or cleared (DELETE) explicitly, so a retried tap can't flip them back.
+    mutationFn: (action: Action) => {
+      if (action === 'report') return api(`${COMMUNITY_API}/posts/${post.id}/report`, { method: 'POST', body: { reason } });
+      const on = action === 'like' ? !post.liked : action === 'bookmark' ? !post.bookmarked : !post.following;
+      const path = action === 'follow' ? `${COMMUNITY_API}/users/${post.author.id}/follow` : `${COMMUNITY_API}/posts/${post.id}/${action}`;
+      return api(path, { method: on ? 'PUT' : 'DELETE' });
+    },
     onMutate: () => { setNotice(''); setShareError(''); },
     onSuccess: async (_, action) => {
       if (action === 'report') { setReporting(false); setNotice('Report submitted for review.'); }
@@ -37,7 +39,7 @@ export function PostCard({ post, onOpen }: { post: CommunityPost; onOpen?: () =>
   const error = mutation.error?.message || shareError;
   async function share() {
     setShareError(''); setNotice('');
-    const message = `${post.author.displayName || post.author.username}: ${post.content}`;
+    const message = `${post.author.displayName}: ${post.content}`;
     try {
       if (Platform.OS === 'web' && !navigator.share && navigator.clipboard) {
         await navigator.clipboard.writeText(message);
@@ -56,16 +58,16 @@ export function PostCard({ post, onOpen }: { post: CommunityPost; onOpen?: () =>
     <View style={styles.header}>
       {post.author.avatarUrl
         ? <Image source={{ uri: post.author.avatarUrl }} style={styles.avatar} />
-        : <View style={styles.avatar}><Text style={styles.initial}>{(post.author.displayName || post.author.username).slice(0, 1).toUpperCase()}</Text></View>}
+        : <View style={styles.avatar}><Text style={styles.initial}>{post.author.displayName.slice(0, 1).toUpperCase()}</Text></View>}
       <View style={styles.authorBlock}>
-        <Text style={styles.author}>{post.author.displayName || post.author.username}</Text>
-        <Text style={styles.meta}>@{post.author.username} · {timeAgo(post.createdAt)}{post.isEditorsPick ? ' · Editors’ Pick' : ''}</Text>
+        <Text style={styles.author}>{post.author.displayName}</Text>
+        <Text style={styles.meta}>{post.author.username ? `@${post.author.username} · ` : ''}{timeAgo(post.createdAt)}{post.editedAt ? ' · edited' : ''}{post.isEditorsPick ? ' · Editors’ Pick' : ''}</Text>
       </View>
-      {post.author.id !== viewerId && <Pressable accessibilityRole="button" accessibilityLabel={post.following ? `Unfollow ${post.author.username}` : `Follow ${post.author.username}`} disabled={busy} onPress={() => action('follow')} style={styles.follow}>
+      {post.author.id !== viewerId && <Pressable accessibilityRole="button" accessibilityLabel={post.following ? `Unfollow ${post.author.displayName}` : `Follow ${post.author.displayName}`} disabled={busy} onPress={() => action('follow')} style={styles.follow}>
         <Text style={styles.buttonText}>{busy && mutation.variables === 'follow' ? 'Updating…' : post.following ? 'Following' : 'Follow'}</Text>
       </Pressable>}
     </View>
-    {onOpen ? <Pressable accessibilityRole="button" accessibilityLabel={`Open post by ${post.author.username}`} onPress={onOpen}>{content}</Pressable> : content}
+    {onOpen ? <Pressable accessibilityRole="button" accessibilityLabel={`Open post by ${post.author.displayName}`} onPress={onOpen}>{content}</Pressable> : content}
     {post.symbol && <Pressable style={styles.chip} accessibilityRole="button" accessibilityLabel={`View ${post.symbol}`} onPress={() => router.push({ pathname: '/instrument/[symbol]', params: { symbol: post.symbol!, ...(post.exchange ? { exchange: post.exchange } : {}) } })}>
       <Text style={styles.buttonText}>{post.symbol}</Text>
     </Pressable>}

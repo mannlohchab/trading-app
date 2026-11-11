@@ -9,6 +9,7 @@ import { createBacktestingModule } from './modules/backtesting';
 import { verifySandboxIsolation } from './modules/backtesting/workers/backtest.worker-manager';
 import { ConsoleSmsSender, createIdentityModule, type SmsSender } from './modules/identity';
 import { binanceAdapters, createMarketModule } from './modules/market';
+import { createCommunityModule, marketInstrumentResolver } from './modules/community';
 import { createNewsModule, newsSourcesFromConfig } from './modules/news';
 import { createPaperTradingModule } from './modules/paper-trading';
 import { createProfilesModule } from './modules/profiles';
@@ -68,7 +69,13 @@ export function composeModules() {
     retentionDays: config.news.retentionDays,
     log: createLogger('news'),
   });
-  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news };
+  const community = createCommunityModule({
+    db,
+    requireActiveUser: identity.requireActiveUser,
+    instruments: marketInstrumentResolver(market.service),
+    publicBaseUrl: config.auth.baseUrl,
+  });
+  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community };
 }
 
 /** Starts the job runner after proving the sandbox isolates. Returns a stop function. */

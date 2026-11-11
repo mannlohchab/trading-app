@@ -9,4 +9,5 @@ export * from './strategies';
 export * from './backtesting';
 export * from './paper-trading';
 export * from './news';
+export * from './community';
 export * from './system';

@@ -6,6 +6,7 @@ import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
 import type { AiModule } from './modules/ai';
 import type { BacktestingModule } from './modules/backtesting';
+import type { CommunityModule } from './modules/community';
 import type { IdentityModule } from './modules/identity';
 import type { MarketModule } from './modules/market';
 import type { NewsModule } from './modules/news';
@@ -25,10 +26,11 @@ export type AppDeps = {
   backtesting: BacktestingModule;
   paperTrading: PaperTradingModule;
   news: NewsModule;
+  community: CommunityModule;
 };
 
 /** Builds the HTTP app from its modules. No I/O happens here; see ./index.ts for production wiring. */
-export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news }: AppDeps) {
+export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community }: AppDeps) {
   const app = new Hono();
 
   app.use(requestId());
@@ -58,6 +60,7 @@ export function createApp({ clientOrigin, pingDatabase, identity, profiles, mark
   app.route('/', backtesting.routes);
   app.route('/', paperTrading.routes);
   app.route('/', news.routes);
+  app.route('/', community.routes);
 
   app.notFound(c => c.json({ error: 'Not found' }, 404));
   app.onError((err, c) => {

@@ -12,7 +12,7 @@ import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { InsightPalette as P } from '@/constants/theme';
 import { api } from '@/lib/api';
-import type { CommunityPage } from '@/lib/community';
+import { COMMUNITY_API, type CommunityPage } from '@/lib/community';
 import { useAuth } from '@/store/auth';
 
 const TABS = ['For You', "Editors' Picks", 'Following', 'Saved'] as const;
@@ -23,9 +23,9 @@ export default function CommunityScreen() {
   const userId = useAuth(s => s.user?.id);
   const feed = useInfiniteQuery({
     queryKey: ['feed', userId, TAB_MAP[tab]],
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) => api<CommunityPage>(`/api/community/feed?tab=${TAB_MAP[tab]}&offset=${pageParam}&limit=20`, { signal }),
-    getNextPageParam: last => last.hasMore ? last.nextOffset : undefined,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) => api<CommunityPage>(`${COMMUNITY_API}/feed?tab=${TAB_MAP[tab]}&limit=20${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`, { signal }),
+    getNextPageParam: last => last.nextCursor ?? undefined,
   });
   const posts = [...new Map(feed.data?.pages.flatMap(page => page.posts).map(post => [post.id, post])).values()];
   return <SafeAreaView style={styles.safe} edges={['top']}>
