@@ -91,7 +91,7 @@ describe('assistant turns', () => {
     expect(blocks[1].data).toMatchObject({ exchange: 'BINANCE', symbol: 'BTCUSDT', lastPrice: '73886.01' });
     expect(res.body.assistantMessage.metadata.toolCalls).toEqual([{ name: 'get_tickers', arguments: { symbols: ['btcusdt'] }, ok: true, durationMs: expect.any(Number) }]);
     expect(res.body.assistantMessage.tokenUsage).toMatchObject({ inputTokens: 350, outputTokens: 22 });
-    expect(t.model.requests[0]!.tools!.map(x => x.name)).toEqual(['search_symbols', 'get_tickers', 'get_top_movers', 'analyze_market', 'draft_strategy']);
+    expect(t.model.requests[0]!.tools!.map(x => x.name)).toEqual(['search_symbols', 'get_tickers', 'get_top_movers', 'analyze_market', 'show_chart', 'draft_strategy']);
   });
 
   test('market analysis uses server-computed indicators', async () => {
@@ -102,6 +102,66 @@ describe('assistant turns', () => {
     const blocks = (await ask(id, 'Analyze ETH')).body.assistantMessage.metadata.blocks;
     const card = blocks.find((b: any) => b.type === 'market_analysis');
     expect(card.data).toMatchObject({ symbol: 'ETHUSDT', timeframe: '1h', trend: 'UP', rsiState: 'OVERBOUGHT', lastClose: 179, source: 'exchange' });
+  });
+
+  test('charts are drawn from real candles with server-computed lines and levels', async () => {
+    const now = t.clock.now().getTime();
+    t.provider.candles = Array.from({ length: 120 }, (_, i) => candle(now - (120 - i) * 3_600_000, String(100 + i), true, 60));
+    const id = await newConversation();
+    t.model.script(
+      [call('show_chart', { symbol: 'ethusdt', timeframe: '1h', candles: 40, overlays: ['SMA20', 'SUPPORT_RESISTANCE'] }), done()],
+      req => {
+        const result = JSON.parse((req.messages.at(-1) as any).content);
+        expect(result).toMatchObject({ shownToUser: true, symbol: 'ETHUSDT', candles: 40, lastClose: 219 });
+        expect(result.candles).toBe(40);
+        return [text('ETH has climbed steadily; see the chart below.'), done()];
+      },
+    );
+    const blocks = (await ask(id, 'Show me ETH on a chart')).body.assistantMessage.metadata.blocks;
+    expect(blocks.map((b: any) => b.type)).toEqual(['markdown', 'chart', 'disclaimer']);
+    const chart = blocks[1].data;
+    expect(chart).toMatchObject({ exchange: 'BINANCE', symbol: 'ETHUSDT', timeframe: '1h', chartType: 'candle', lastClose: 219 });
+    expect(chart.candles).toHaveLength(40);
+    expect(chart.candles.at(-1)[4]).toBe(219);
+    // Warm-up history means the moving average is defined from the first visible candle.
+    expect(chart.lines[0].id).toBe('SMA20');
+    expect(chart.lines[0].values.every((v: number | null) => v !== null)).toBe(true);
+    expect(chart.lines[0].values.at(-1)).toBe(209.5);
+    expect(chart.levels.map((l: any) => l.kind)).toEqual(['resistance', 'support']);
+  });
+
+  test('a turn draws at most two charts', async () => {
+    const now = t.clock.now().getTime();
+    t.provider.candles = Array.from({ length: 80 }, (_, i) => candle(now - (80 - i) * 3_600_000, String(100 + i), true, 60));
+    const id = await newConversation();
+    const chart = { symbol: 'BTCUSDT', timeframe: '1h' };
+    t.model.script(
+      [call('show_chart', chart, 'a'), call('show_chart', chart, 'b'), call('show_chart', chart, 'c'), done()],
+      req => {
+        expect(JSON.parse((req.messages.at(-1) as any).content).error).toContain('At most 2 charts');
+        return [text('Here are the charts.'), done()];
+      },
+    );
+    const blocks = (await ask(id, 'Chart BTC three times')).body.assistantMessage.metadata.blocks;
+    expect(blocks.filter((b: any) => b.type === 'chart')).toHaveLength(2);
+  });
+
+  test('raw strategy definitions and code never reach the user', async () => {
+    const id = await newConversation();
+    t.model.script([text('## BTC Intraday\n\nBuy dips above the 20-candle average.\n\n``'), text('`json\n{"name": "BTC Intraday", "definition": {}}\n```'), text('\n\nThe stop loss limits each loss to 2%.'), done()]);
+    const res = await ask(id, 'Make an intraday strategy for BTC');
+    const message = res.body.assistantMessage;
+    expect(message.content).toBe('## BTC Intraday\n\nBuy dips above the 20-candle average.\n\n\n\nThe stop loss limits each loss to 2%.');
+    expect(message.metadata.blocks[0].text).not.toContain('definition');
+    expect(message.metadata.codeRemoved).toBe(true);
+  });
+
+  test('a reply that was only code is replaced with a plain-language offer', async () => {
+    const id = await newConversation();
+    t.model.script([text('```pine\n//@version=5\nstrategy("x")\n```'), done()]);
+    const message = (await ask(id, 'Give me Pine Script for a BTC strategy')).body.assistantMessage;
+    expect(message.content).toContain('plain words');
+    expect(message.content).not.toContain('@version');
   });
 
   test('tool errors go back to the model, which can correct itself', async () => {

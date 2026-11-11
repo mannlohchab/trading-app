@@ -1,4 +1,6 @@
-import { expect, test } from 'bun:test';
+import { buildChart } from '../../src/modules/ai/domain/chart';
+import { createCodeFilter } from '../../src/modules/ai/domain/code-filter';
+import { describe, expect, test } from 'bun:test';
 import { assembleBlocks } from '../../src/modules/ai/domain/blocks';
 import { CONVERSATION_LIMITS, selectHistory, titleFromMessage } from '../../src/modules/ai/domain/conversation';
 import { buildSystemPrompt } from '../../src/modules/ai/domain/prompt';
@@ -44,4 +46,52 @@ test('blocks: text first, data cards, drafts, disclaimer last', () => {
   ]);
   expect(blocks.map(b => b.type)).toEqual(['markdown', 'ticker', 'strategy_draft', 'disclaimer']);
   expect(assembleBlocks('', []).map(b => b.type)).toEqual(['disclaimer']);
+});
+
+describe('chart cards', () => {
+  const bar = (i: number, close: string, isClosed = true) => ({ openTime: i * 60_000, open: close, high: close, low: close, close, isClosed });
+  const base = { exchange: 'BINANCE', symbol: 'XRPUSDT', timeframe: '1m', chartType: 'line' as const, source: 'exchange' };
+
+  test('shows the newest candles and skips the unfinished one', () => {
+    const candles = [...Array.from({ length: 10 }, (_, i) => bar(i, String(1 + i / 100))), bar(10, '9', false)];
+    const chart = buildChart({ ...base, candles, visible: 5, overlays: [] })!;
+    expect(chart.candles.map(c => c[0])).toEqual([5, 6, 7, 8, 9].map(i => i * 60_000));
+    expect(chart).toMatchObject({ lastClose: 1.09, lines: [], levels: [], pricePrecision: 2 });
+  });
+
+  test('moving averages without enough history are left out; levels come from the visible candles', () => {
+    const candles = Array.from({ length: 12 }, (_, i) => bar(i, (0.5 + i * 0.0001).toFixed(4)));
+    const chart = buildChart({ ...base, candles, visible: 12, overlays: ['SMA50', 'SMA20', 'SUPPORT_RESISTANCE'] })!;
+    expect(chart.lines).toEqual([]);
+    expect(chart.pricePrecision).toBe(4);
+    expect(chart.levels).toEqual([
+      { kind: 'resistance', label: 'Resistance (12-candle high)', price: 0.5011 },
+      { kind: 'support', label: 'Support (12-candle low)', price: 0.5 },
+    ]);
+  });
+
+  test('needs at least two candles', () => {
+    expect(buildChart({ ...base, candles: [bar(0, '1')], visible: 60, overlays: [] })).toBeNull();
+  });
+});
+
+describe('code filter', () => {
+  const run = (chunks: string[]) => {
+    const f = createCodeFilter();
+    const out = chunks.map(c => f.push(c)).join('') + f.flush();
+    return { out, removed: f.removed };
+  };
+
+  test('removes fenced blocks, keeping the prose around them', () => {
+    expect(run(['Idea first.\n\n```json\n{"name":"BTC"}\n```\n\nRisks next.'])).toEqual({ out: 'Idea first.\n\n\n\nRisks next.', removed: true });
+  });
+
+  test('fences split across chunks are still caught', () => {
+    expect(run(['Rules:\n`', '``pine\n//@version=5\nstrategy("x")\n`', '`', '`\nDone.']).out).toBe('Rules:\n\nDone.');
+  });
+
+  test('an unclosed block is dropped; inline code and plain text pass through', () => {
+    expect(run(['Before ```json\n{"a":', '1']).out).toBe('Before ');
+    expect(run(['Use the `RSI` line', ' here.'])).toEqual({ out: 'Use the `RSI` line here.', removed: false });
+  });
 });

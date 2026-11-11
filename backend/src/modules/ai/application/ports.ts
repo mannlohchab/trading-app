@@ -31,6 +31,8 @@ export type ChatRequest = {
   tools?: ToolSpec[];
   maxOutputTokens: number;
   temperature?: number;
+  /** For reasoning models: how much hidden thinking to do before answering. */
+  reasoningEffort?: 'low' | 'medium' | 'high';
   signal?: AbortSignal;
 };
 
@@ -50,7 +52,9 @@ export type ModelProfile = {
   label: string;
   supportsTools: boolean;
   contextWindow: number;
+  /** For reasoning models this budget also covers their hidden thinking. */
   maxOutputTokens: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
 };
 
 // ---------------------------------------------------------------------------
@@ -66,6 +70,8 @@ export type MessageMetadata = {
   finishReason?: string;
   rounds?: number;
   interrupted?: boolean;
+  /** The model wrote code or a raw definition, which was removed before the user saw it. */
+  codeRemoved?: boolean;
   modelId?: string;
 };
 export type StoredMessage = {

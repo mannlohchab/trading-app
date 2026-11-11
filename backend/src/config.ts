@@ -46,8 +46,8 @@ export const config = {
   sms: { provider: smsProvider },
   ai: {
     cloudflare: pair({ accountId: env.CF_ACCOUNT_ID?.trim(), apiToken: env.CF_API_TOKEN?.trim() }),
-    defaultModel: env.AI_DEFAULT_MODEL?.trim() || 'llama-4-scout',
-    fallbackModels: list(env.AI_FALLBACK_MODELS ?? 'mistral-small-3.1'),
+    defaultModel: env.AI_DEFAULT_MODEL?.trim() || 'gpt-oss-120b',
+    fallbackModels: list(env.AI_FALLBACK_MODELS ?? 'llama-4-scout,mistral-small-3.1'),
     limits: {
       turnsPerDay: Number(env.AI_DAILY_TURN_LIMIT ?? 50),
       tokensPerDay: Number(env.AI_DAILY_TOKEN_LIMIT ?? 250_000),

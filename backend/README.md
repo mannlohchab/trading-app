@@ -162,11 +162,13 @@ A tool-using assistant on Cloudflare Workers AI. It answers market questions fro
 
 Cards are built from tool results, not model text, so they always show observed values.
 
-**Tools.** `search_symbols`, `get_tickers`, `get_top_movers`, `analyze_market` and `draft_strategy`. They call the market and strategies modules. Invalid arguments are returned to the model so it can correct them, and a turn has at most 4 tool rounds.
+**Tools.** `search_symbols`, `get_tickers`, `get_top_movers`, `analyze_market`, `show_chart` and `draft_strategy`. `show_chart` returns a `chart` block holding the candles it drew (up to 150), moving averages warmed up on 50 earlier candles, and support/resistance from the last 30 candles. A reply can have at most 2 charts, and a saved message re-renders exactly what the AI saw. The tools call the market and strategies modules. Invalid arguments are returned to the model so it can correct them, and a turn has at most 4 tool rounds.
+
+**No raw strategy code.** The assistant explains strategies in plain words with a chart. It never gives JSON, Pine Script or other code, even if asked. The prompt asks for this, and `domain/code-filter.ts` enforces it: fenced code blocks are removed from replies while they stream, and the message is marked `metadata.codeRemoved`. Smaller models sometimes copy a tool's argument format into their answer, which is why the filter is needed. `draft_strategy` still runs, so the definition is validated and kept for saving, but only as a card.
 
 **Providers.**
 - **Adding one:** implement `ChatModelProvider` (`application/ports.ts`) and add `ModelProfile`s, as `WorkersAiProvider` and `WORKERS_AI_MODELS` do.
-- **Workers AI:** uses the OpenAI-compatible endpoint. The default is `llama-4-scout`, falling back to `mistral-small-3.1` when the default fails before producing output. Both models were checked end to end on streaming, tool calls and answers from tool results.
+- **Workers AI:** uses the OpenAI-compatible endpoint. The default is `gpt-oss-120b`, with `reasoning_effort: low` and a 4096-token budget that covers its hidden reasoning. When the default fails before producing output, it falls back to `llama-4-scout`, then `mistral-small-3.1`. In a live comparison on 2026-11-12, gpt-oss-120b was the only Workers Free model that called every tool correctly and refused to write code. GLM-5.3 and DeepSeek V4.1 need the Workers Paid plan.
 - **Persona:** the user's AI preferences (style, explanation level, language) and timezone shape the system prompt.
 
 **Usage and cost.** Every model call is a row in `ai_usage_events` with tokens, Cloudflare neurons, latency, model and status. Daily per-user limits (`AI_DAILY_TURN_LIMIT`, `AI_DAILY_TOKEN_LIMIT`) are checked against it. Measured live: about 150 to 200 neurons per question, while the Workers AI free allowance is 10,000 neurons a day per account.

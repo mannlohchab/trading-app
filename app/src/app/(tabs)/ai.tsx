@@ -14,10 +14,12 @@ import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
 import { conversationMessages, createConversation, deleteConversation as removeConversation, listConversations, promptFor } from '@/lib/aiApi';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { useAuth } from '@/store/auth';
+import { AiChartCard } from '@/components/ai/AiChartCard';
 import { AiResponse } from '@/components/ai/AiResponse';
+import { chartsFromBlocks, parseChartBlock, type AiChart } from '@/lib/aiCharts';
 import { MovingMist } from '@/components/ai/MovingMist';
 
-type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error' };
+type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error'; charts?: AiChart[] };
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
 const ALL_MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
   { kind: 'chat', label: 'Chat', hint: 'Ask anything about markets', icon: 'community' },
@@ -210,10 +212,17 @@ export default function AiScreen() {
         await streamAiMessage(id, promptFor(kind, trimmed, symbol), (event) => {
           if (!gate.isCurrent(request)) return;
           if (event.type === 'delta' && event.text) append(event.text);
+          // Charts arrive as soon as the tool runs, before the answer text finishes.
+          if (event.type === 'block') {
+            const chart = parseChartBlock(event.block);
+            if (chart) setMessages((previous) => previous.map((message) => message.id === assistantId
+              ? { ...message, charts: [...(message.charts ?? []), chart] } : message));
+          }
           // The saved reply is authoritative (it also covers replies that arrived without deltas).
           if (event.type === 'assistant_message' && typeof event.message?.content === 'string') {
             const content: string = event.message.content;
-            setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, content } : message));
+            const charts = chartsFromBlocks(event.message.metadata?.blocks);
+            setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, content, charts } : message));
           }
         }, request.signal);
       }
@@ -322,8 +331,9 @@ export default function AiScreen() {
             ) : (
               <View style={styles.assistantMessage} accessibilityLabel="AI Insight response">
                 {!!item.content && <AiResponse content={item.content} />}
+                {item.charts?.map((chart, index) => <AiChartCard key={`${chart.symbol}-${chart.timeframe}-${index}`} chart={chart} />)}
                 {item.status === 'streaming' && !!item.content && <ActivityIndicator size="small" color={MUTED} style={styles.streamingDot} />}
-                {!item.content && <Text style={styles.muted}>{item.status === 'streaming' ? 'Looking into it…' : item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
+                {!item.content && !item.charts?.length && <Text style={styles.muted}>{item.status === 'streaming' ? 'Looking into it…' : item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
                 {item.status === 'stopped' && !!item.content && <Text style={styles.responseStatus}>Stopped · partial response</Text>}
                 {item.status === 'error' && !!item.content && <Text style={styles.responseStatus}>Incomplete response</Text>}
               </View>

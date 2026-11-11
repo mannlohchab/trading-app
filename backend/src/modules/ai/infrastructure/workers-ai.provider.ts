@@ -24,6 +24,7 @@ export class WorkersAiProvider implements ChatModelProvider {
           ...(request.tools?.length && { tools: request.tools.map(t => ({ type: 'function', function: t })) }),
           max_tokens: request.maxOutputTokens,
           ...(request.temperature !== undefined && { temperature: request.temperature }),
+          ...(request.reasoningEffort && { reasoning_effort: request.reasoningEffort }),
           stream: true,
           stream_options: { include_usage: true },
         }),

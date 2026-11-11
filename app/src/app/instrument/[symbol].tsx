@@ -55,11 +55,12 @@ function IconButton({ label, onPress, children, selected }: { label: string; onP
 }
 
 export default function InstrumentScreen() {
-  const params = useLocalSearchParams<{ symbol: string; exchange?: string; name?: string }>();
+  const params = useLocalSearchParams<{ symbol: string; exchange?: string; name?: string; timeframe?: string }>();
   const symbol = String(params.symbol ?? 'BTCUSDT').toUpperCase();
   const exchange = String(params.exchange ?? 'BINANCE').toUpperCase();
   const drawingStore = useRef<Record<string, ChartDrawing[]>>({});
-  const [timeframe, setTimeframe] = useState<Timeframe>('15m');
+  // Links (e.g. an AI chart card) may open the chart on a given timeframe.
+  const [timeframe, setTimeframe] = useState<Timeframe>(() => TIMEFRAMES.find(tf => tf === params.timeframe) ?? '15m');
   const [chartType, setChartType] = useState<ChartType>('candle');
   const [indicators, setIndicators] = useState<string[]>(['VOL']);
   const [chartHeight, setChartHeight] = useState(0);

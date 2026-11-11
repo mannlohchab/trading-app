@@ -5,6 +5,7 @@ import { TIMEFRAMES } from '../../market/domain/market-options';
 import type { MarketSummary } from '../../market/domain/analysis';
 import type { strategyDraftSchema } from '../../strategies';
 import type { ResponseBlock } from '../domain/blocks';
+import { buildChart, CHART_OVERLAYS, CHART_WARMUP, type ChartCandleInput } from '../domain/chart';
 import type { ToolSpec } from './ports';
 
 // ---- Gateways to other modules (implemented in ../infrastructure) --------------------------------
@@ -17,6 +18,7 @@ export interface MarketGateway {
   tickers(symbols: string[]): Promise<TickerView[]>;
   topMovers(quoteAsset: string, sort: 'volume' | 'gainers' | 'losers', limit: number): Promise<TickerView[]>;
   analyze(symbol: string, timeframe: (typeof TIMEFRAMES)[number], candles: number): Promise<{ summary: MarketSummary | null; source: 'exchange' | 'store' }>;
+  candles(symbol: string, timeframe: (typeof TIMEFRAMES)[number], limit: number): Promise<{ candles: ChartCandleInput[]; source: 'exchange' | 'store' }>;
 }
 
 export interface StrategyDraftChecker {
@@ -115,8 +117,12 @@ function normalizeDraft(draft: z.infer<typeof looseDraft>): unknown {
   };
 }
 
+/** Charts per reply: enough to compare two pairs, few enough to keep a phone screen readable. */
+const MAX_CHARTS_PER_TURN = 2;
+
 export function createTools(market: MarketGateway, strategies: StrategyDraftChecker): AssistantTool[] {
   let draftCount = 0;
+  let chartCount = 0;
   return [
     defineTool(
       'search_symbols',
@@ -167,6 +173,37 @@ export function createTools(market: MarketGateway, strategies: StrategyDraftChec
         if (!summary) throw new ToolInputError(`Not enough candle data for ${upper} on ${timeframe}.`);
         const data = { exchange: market.exchange, symbol: upper, timeframe, source, ...summary };
         return { result: data, blocks: [{ type: 'market_analysis' as const, data }] };
+      },
+    ),
+    defineTool(
+      'show_chart',
+      'Show the user a price chart of one pair drawn from real candles, optionally with moving averages and recent support/resistance lines. Use when the user asks to see a chart or graph, or when a picture makes a trend, level or crossover clearer. Returns the values drawn so you can describe them.',
+      z.strictObject({
+        symbol,
+        timeframe: z.enum(TIMEFRAMES).describe('Candle size'),
+        candles: z.number().int().min(20).max(150).default(60).describe('How many recent candles to show'),
+        chartType: z.enum(['candle', 'line']).default('candle'),
+        overlays: z.array(z.enum(CHART_OVERLAYS)).max(4).default(['SUPPORT_RESISTANCE']).describe('Lines to draw on the chart'),
+      }),
+      async ({ symbol, timeframe, candles, chartType, overlays }) => {
+        if (chartCount >= MAX_CHARTS_PER_TURN) throw new ToolInputError(`At most ${MAX_CHARTS_PER_TURN} charts per answer; the user already sees them.`);
+        const upper = symbol.toUpperCase();
+        // Extra history so moving averages are defined from the first visible candle.
+        const history = await market.candles(upper, timeframe, candles + CHART_WARMUP + 1);
+        const chart = buildChart({ exchange: market.exchange, symbol: upper, timeframe, chartType, candles: history.candles, visible: candles, overlays, source: history.source });
+        if (!chart) throw new ToolInputError(`Not enough candle data for ${upper} on ${timeframe}.`);
+        chartCount++;
+        const first = chart.candles[0]!, last = chart.candles.at(-1)!;
+        return {
+          result: {
+            shownToUser: true, exchange: chart.exchange, symbol: upper, timeframe, candles: chart.candles.length,
+            from: new Date(first[0]).toISOString(), to: new Date(last[0]).toISOString(),
+            lastClose: chart.lastClose, changePercent: chart.changePercent,
+            levels: chart.levels.map(l => ({ kind: l.kind, price: l.price })),
+            latest: Object.fromEntries(chart.lines.map(l => [l.id, l.values.at(-1)])),
+          },
+          blocks: [{ type: 'chart' as const, data: chart }],
+        };
       },
     ),
     defineTool(

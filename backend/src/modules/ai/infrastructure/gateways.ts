@@ -30,6 +30,10 @@ export function marketGateway(market: MarketDataService, exchange = 'BINANCE'): 
       const result = await market.candles({ exchange, symbol, timeframe, limit: candles });
       return { summary: summarizeMarket(result.candles), source: result.source };
     },
+    async candles(symbol, timeframe, limit) {
+      const result = await market.candles({ exchange, symbol, timeframe, limit });
+      return { candles: result.candles, source: result.source };
+    },
   };
 }
 

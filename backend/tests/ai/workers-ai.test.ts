@@ -85,3 +85,19 @@ test('number-only tokens sent as JSON numbers keep every digit', async () => {
   const events = await collect(provider);
   expect(events.filter(e => e.type === 'text').map(e => (e as any).delta).join('')).toBe('BTC is $74291.2113.90 and 0');
 });
+
+test('reasoning effort is sent for reasoning models only; their hidden reasoning is not shown as text', async () => {
+  const bodies: any[] = [];
+  const provider = new WorkersAiProvider({
+    accountId: 'acc', apiToken: 'tok',
+    fetch: async (_url, init) => {
+      bodies.push(JSON.parse(String(init!.body)));
+      return sse({ choices: [{ delta: { reasoning_content: 'thinking…' } }] }, { choices: [{ delta: { content: 'Answer' }, finish_reason: 'stop' }] }, '[DONE]');
+    },
+  });
+  const events = await collect(provider, { reasoningEffort: 'low' });
+  await collect(provider);
+  expect(bodies[0].reasoning_effort).toBe('low');
+  expect('reasoning_effort' in bodies[1]).toBe(false);
+  expect(events.filter(e => e.type === 'text')).toEqual([{ type: 'text', delta: 'Answer' }]);
+});

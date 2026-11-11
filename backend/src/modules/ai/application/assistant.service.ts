@@ -1,5 +1,6 @@
 // One assistant turn: user message → model ↔ tools loop → structured, persisted reply.
 import { assembleBlocks, type ResponseBlock } from '../domain/blocks';
+import { CODE_REMOVED_FALLBACK, createCodeFilter } from '../domain/code-filter';
 import { CONVERSATION_LIMITS, selectHistory, titleFromMessage } from '../domain/conversation';
 import { buildSystemPrompt } from '../domain/prompt';
 import { decideQuota, startOfUtcDay, type UsageLimits } from '../domain/usage-policy';
@@ -90,6 +91,7 @@ export class AssistantService {
 
     let userMessage: StoredMessage | undefined;
     let text = '';
+    let codeRemoved = false;
     try {
       const history = selectHistory(await conversations.history(conversation.id, CONVERSATION_LIMITS.historyMaxMessages * 2));
       userMessage = await conversations.addMessage({ conversationId: conversation.id, role: 'USER', content });
@@ -116,6 +118,8 @@ export class AssistantService {
         yield { type: 'status', stage: 'thinking' };
         const allowTools = model.supportsTools && rounds < CONVERSATION_LIMITS.maxToolRounds;
         const round = { text: '', calls: [] as ToolCall[] };
+        // Raw strategy definitions and code never reach the user (see domain/code-filter).
+        const filter = createCodeFilter();
         let done: { finishReason: string; usage: ModelUsage } | undefined;
 
         // Try the chain; a model may be skipped only if it failed before producing any output.
@@ -128,9 +132,13 @@ export class AssistantService {
               tools: allowTools ? tools.map(t => t.spec) : undefined,
               maxOutputTokens: model.maxOutputTokens,
               temperature: 0.3,
+              ...(model.reasoningEffort && { reasoningEffort: model.reasoningEffort }),
               signal: input.signal,
             })) {
-              if (event.type === 'text') { round.text += event.delta; text += event.delta; yield { type: 'delta', text: event.delta }; }
+              if (event.type === 'text') {
+                const safe = filter.push(event.delta);
+                if (safe) { round.text += safe; text += safe; yield { type: 'delta', text: safe }; }
+              }
               else if (event.type === 'tool_call') round.calls.push(event.call);
               else done = event;
             }
@@ -149,6 +157,10 @@ export class AssistantService {
             throw error;
           }
         }
+
+        const rest = filter.flush();
+        if (rest) { round.text += rest; text += rest; yield { type: 'delta', text: rest }; }
+        codeRemoved ||= filter.removed;
 
         total = sumUsage(total, done?.usage ?? { inputTokens: 0, outputTokens: 0 });
         finishReason = done?.finishReason ?? 'other';
@@ -169,12 +181,14 @@ export class AssistantService {
         }
       }
 
+      if (codeRemoved && !text.trim()) { text = CODE_REMOVED_FALLBACK; yield { type: 'delta', text }; }
+      if (codeRemoved) this.deps.log?.(`Removed code from an assistant reply (conversation ${conversation.id})`);
       const assistant = await conversations.addMessage({
         id: turnId,
         conversationId: conversation.id,
         role: 'ASSISTANT',
         content: text.trim(),
-        metadata: { blocks: assembleBlocks(text, blocks), toolCalls: toolLog, finishReason, rounds: Math.min(rounds + 1, CONVERSATION_LIMITS.maxToolRounds + 1), modelId: model.id },
+        metadata: { blocks: assembleBlocks(text, blocks), toolCalls: toolLog, finishReason, rounds: Math.min(rounds + 1, CONVERSATION_LIMITS.maxToolRounds + 1), modelId: model.id, ...(codeRemoved && { codeRemoved: true }) },
         modelProvider: model.provider,
         modelName: model.providerModel,
         tokenUsage: { ...total, calls: toolLog.length },

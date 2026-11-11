@@ -15,9 +15,9 @@ export const AiResponse = memo(function AiResponse({ content }: { content: strin
   return <View style={styles.body}>
     {blocks.map((block, index) => {
       if (block.type === 'divider') return <View key={index} style={styles.divider} />;
-      if (block.type === 'code') return <View key={index} style={styles.codeBlock}>
-        <Text selectable style={[styles.text, styles.code]}>{block.content}</Text>
-      </View>;
+      // The assistant explains strategies in words and charts, never as raw code or JSON. The
+      // backend strips code from new replies; this also hides it in replies saved before that.
+      if (block.type === 'code') return null;
       if (block.type === 'list') return <View key={index} style={[styles.list, { marginLeft: (block.depth ?? 0) * 14 }]}>
         <Text style={styles.marker}>{block.marker}</Text>
         <Text selectable style={[styles.text, styles.listText]}><Inline content={block.content} /></Text>
@@ -43,7 +43,6 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700', color: P.text },
   italic: { fontStyle: 'italic' },
   code: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 13, backgroundColor: P.soft },
-  codeBlock: { backgroundColor: P.soft, borderRadius: 12, padding: 14 },
   list: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   marker: { minWidth: 14, color: P.body, fontSize: 14, lineHeight: 22, fontWeight: '600' },
   listText: { flex: 1 },
