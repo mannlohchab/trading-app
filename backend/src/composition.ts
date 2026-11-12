@@ -43,6 +43,7 @@ export function composeModules() {
     defaultModelId: config.ai.defaultModel,
     fallbackModelIds: config.ai.fallbackModels,
     limits: config.ai.limits,
+    events: createLogger('ai'),
     market: market.service,
     strategies: strategies.service,
     profiles: profiles.service,

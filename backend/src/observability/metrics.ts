@@ -51,6 +51,21 @@ export function createMetrics(deps: { databaseStats?: () => Promise<DatabaseStat
     labelNames: ['source'] as const, registers: [registry],
   });
 
+  const aiTurnsTotal = new Counter({
+    name: 'trading_ai_turns_total', help: 'AI assistant turns recorded, by model and status',
+    labelNames: ['model', 'status'] as const, registers: [registry],
+  });
+  const aiTokensTotal = new Counter({
+    name: 'trading_ai_tokens_total', help: 'AI tokens used, by model and direction (input/output)',
+    labelNames: ['model', 'direction'] as const, registers: [registry],
+  });
+  const aiTurnDuration = new Histogram({
+    name: 'trading_ai_turn_duration_seconds', help: 'AI assistant turn latency, by model and status',
+    labelNames: ['model', 'status'] as const, registers: [registry], buckets: [0.5, 1, 2, 5, 10, 20, 30, 60, 120],
+  });
+  const aiToolCalls = new Counter({ name: 'trading_ai_tool_calls_total', help: 'Tool calls made during AI turns, by model', labelNames: ['model'] as const, registers: [registry] });
+  const aiErrors = new Counter({ name: 'trading_ai_errors_total', help: 'Failed AI turns, by model and error code', labelNames: ['model', 'code'] as const, registers: [registry] });
+
   const jobsGauge = new Gauge({ name: 'trading_background_jobs', help: 'Background jobs currently in the queue table, by type and status', labelNames: ['type', 'status'] as const, registers: [registry] });
   const aiTurns = new Gauge({ name: 'trading_ai_turns_24h', help: 'AI assistant turns in the last 24 hours, by model and status', labelNames: ['model', 'status'] as const, registers: [registry] });
   const aiTokens = new Gauge({ name: 'trading_ai_tokens_24h', help: 'AI tokens used in the last 24 hours, by model and direction', labelNames: ['model', 'direction'] as const, registers: [registry] });
@@ -99,6 +114,14 @@ export function createMetrics(deps: { databaseStats?: () => Promise<DatabaseStat
         jobsFailed.inc({ type: label(fields.type), outcome: label(fields.outcome) });
       } else if (message === 'Paper order filled') {
         paperFills.inc();
+      } else if (message === 'AI turn recorded') {
+        const model = label(fields.model), status = label(fields.status);
+        aiTurnsTotal.inc({ model, status });
+        aiTokensTotal.inc({ model, direction: 'input' }, number(fields.inputTokens));
+        aiTokensTotal.inc({ model, direction: 'output' }, number(fields.outputTokens));
+        aiTurnDuration.observe({ model, status }, number(fields.latencyMs) / 1000);
+        aiToolCalls.inc({ model }, number(fields.toolCalls));
+        if (status === 'FAILED') aiErrors.inc({ model, code: label(fields.errorCode) });
       } else if (message === 'News source polled') {
         newsInserted.inc({ source: label(fields.source) }, number(fields.inserted));
         newsItems.inc({ source: label(fields.source) }, number(fields.items));

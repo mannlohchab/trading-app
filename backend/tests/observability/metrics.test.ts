@@ -37,6 +37,9 @@ describe('log-derived metrics', () => {
       jobs('error', 'Job failed', { jobId: 'j2', type: 'backtest.run', outcome: 'FAILED', error: 'x' });
       createLogger('paper-trading', sink)('info', 'Paper order filled', { orderId: 'o1' });
       createLogger('news', sink)('info', 'News source polled', { source: 'cryptoslate', items: 10, inserted: 7 });
+      const ai = createLogger('ai', sink);
+      ai('info', 'AI turn recorded', { model: 'llama-4-scout', status: 'SUCCEEDED', inputTokens: 1200, outputTokens: 300, toolCalls: 2, latencyMs: 4200 });
+      ai('info', 'AI turn recorded', { model: 'llama-4-scout', status: 'FAILED', inputTokens: 50, outputTokens: 0, toolCalls: 0, latencyMs: 900, errorCode: 'AI_TIMEOUT' });
     } finally {
       stop();
     }
@@ -47,6 +50,12 @@ describe('log-derived metrics', () => {
     expect(line(body, 'trading_paper_order_fills_total')).toEndWith(' 1');
     expect(line(body, 'trading_news_articles_inserted_total{source="cryptoslate"}')).toEndWith(' 7');
     expect(line(body, 'trading_log_events_total{scope="jobs",level="error",event="Job failed"}')).toEndWith(' 1');
+    expect(line(body, 'trading_ai_turns_total{model="llama-4-scout",status="SUCCEEDED"}')).toEndWith(' 1');
+    expect(line(body, 'trading_ai_tokens_total{model="llama-4-scout",direction="input"}')).toEndWith(' 1250');
+    expect(line(body, 'trading_ai_tokens_total{model="llama-4-scout",direction="output"}')).toEndWith(' 300');
+    expect(line(body, 'trading_ai_tool_calls_total{model="llama-4-scout"}')).toEndWith(' 2');
+    expect(line(body, 'trading_ai_errors_total{model="llama-4-scout",code="AI_TIMEOUT"}')).toEndWith(' 1');
+    expect(line(body, 'trading_ai_turn_duration_seconds_count{model="llama-4-scout",status="SUCCEEDED"}')).toEndWith(' 1');
   });
 
   test('a throwing observer never breaks logging', () => {
