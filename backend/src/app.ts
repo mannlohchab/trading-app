@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import { logger } from 'hono/logger';
 import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
+import { httpMetrics } from './http/metrics-middleware';
 import type { AiModule } from './modules/ai';
 import type { BacktestingModule } from './modules/backtesting';
 import type { CommunityModule } from './modules/community';
@@ -27,11 +28,15 @@ export type AppDeps = {
   paperTrading: PaperTradingModule;
   news: NewsModule;
   community: CommunityModule;
+  /** Optional Prometheus HTTP metrics (count and latency per route pattern). */
+  metrics?: { recordHttp: (method: string, route: string, status: number, seconds: number) => void };
 };
 
 /** Builds the HTTP app from its modules. No I/O happens here; see ./index.ts for production wiring. */
-export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community }: AppDeps) {
+export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, metrics }: AppDeps) {
   const app = new Hono();
+
+  if (metrics) app.use(httpMetrics(metrics.recordHttp));
 
   app.use(requestId());
   app.use(logger());

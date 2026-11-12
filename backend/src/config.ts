@@ -23,6 +23,8 @@ if (isProduction && smsProvider === 'console') {
 export const config = {
   isProduction,
   port,
+  /** Internal Prometheus endpoint (never routed publicly). 0 disables it. */
+  metrics: { port: Number(env.METRICS_PORT ?? 9464) },
   // Comma-separated list of allowed origins, or "*" for any.
   clientOrigin: ((env.CLIENT_ORIGIN ?? '*') === '*' ? '*' : list(env.CLIENT_ORIGIN)) as '*' | string[],
   database: {
