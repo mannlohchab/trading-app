@@ -259,8 +259,13 @@ describe('streaming', () => {
       body: JSON.stringify({ content: 'ETH?' }),
     });
     expect(res.headers.get('content-type')).toContain('text/event-stream');
-    const events = (await res.text()).split('\n\n').filter(Boolean).map(chunk => chunk.match(/^event: (.+)$/m)?.[1]);
-    expect(events).toEqual(['user_message', 'status', 'status', 'block', 'status', 'delta', 'delta', 'assistant_message', 'done']);
+    const chunks = (await res.text()).split('\n\n').filter(Boolean);
+    const events = chunks.map(chunk => chunk.match(/^event: (.+)$/m)?.[1]);
+    expect(events).toEqual(['user_message', 'status', 'status', 'tool_result', 'block', 'status', 'delta', 'delta', 'assistant_message', 'done']);
+    const data = (i: number) => JSON.parse(chunks[i]!.match(/^data: (.+)$/m)![1]!);
+    // The app shows each tool call as it runs: what it was asked, then whether it worked and how long it took.
+    expect(data(2)).toEqual({ type: 'status', stage: 'tool', tool: 'get_tickers', callId: 'call_get_tickers', arguments: { symbols: ['ETHUSDT'] } });
+    expect(data(3)).toEqual({ type: 'tool_result', callId: 'call_get_tickers', tool: 'get_tickers', ok: true, durationMs: expect.any(Number) });
   });
 
   test('a provider failure mid-stream becomes an error event', async () => {

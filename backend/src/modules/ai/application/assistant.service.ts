@@ -13,7 +13,10 @@ import { ToolInputError, type AssistantTool } from './tools';
 
 export type TurnEvent =
   | { type: 'user_message'; message: StoredMessage }
-  | { type: 'status'; stage: 'thinking' | 'tool'; tool?: string }
+  | { type: 'status'; stage: 'thinking' }
+  /** A tool call is starting; `arguments` is what the model asked for (parsed when it is valid JSON). */
+  | { type: 'status'; stage: 'tool'; tool: string; callId: string; arguments?: unknown }
+  | { type: 'tool_result'; callId: string; tool: string; ok: boolean; durationMs: number; error?: string }
   | { type: 'delta'; text: string }
   | { type: 'block'; block: ResponseBlock }
   | { type: 'assistant_message'; message: StoredMessage };
@@ -45,6 +48,9 @@ type Deps = {
 };
 
 const TOOL_RESULT_MAX_CHARS = 8000;
+const parseArguments = (raw: string): unknown => {
+  try { return raw.trim() ? JSON.parse(raw) : {}; } catch { return undefined; }
+};
 const sumUsage = (a: ModelUsage, b: ModelUsage): ModelUsage => ({
   inputTokens: a.inputTokens + b.inputTokens,
   outputTokens: a.outputTokens + b.outputTokens,
@@ -173,10 +179,12 @@ export class AssistantService {
             turn.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify({ error: 'Too many tool calls in one step; call fewer at a time.' }) });
             continue;
           }
-          yield { type: 'status', stage: 'tool', tool: call.name };
+          yield { type: 'status', stage: 'tool', tool: call.name, callId: call.id, arguments: parseArguments(call.arguments) };
           const started = Date.now();
           const outcome = await this.runTool(tools, call);
-          toolLog.push({ name: call.name, arguments: outcome.args, ok: outcome.ok, durationMs: Date.now() - started, ...(outcome.error && { error: outcome.error }) });
+          const durationMs = Date.now() - started;
+          toolLog.push({ name: call.name, arguments: outcome.args, ok: outcome.ok, durationMs, ...(outcome.error && { error: outcome.error }) });
+          yield { type: 'tool_result', callId: call.id, tool: call.name, ok: outcome.ok, durationMs, ...(outcome.error && { error: outcome.error }) };
           for (const block of outcome.blocks) { blocks.push(block); yield { type: 'block', block }; }
           turn.push({ role: 'tool', toolCallId: call.id, content: outcome.content });
         }
