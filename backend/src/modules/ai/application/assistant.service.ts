@@ -36,7 +36,8 @@ type Deps = {
   conversations: ConversationRepository;
   usage: UsageRepository;
   persona: PersonaSource;
-  tools: () => AssistantTool[];
+  /** Tools for one turn, scoped to the user who is asking. */
+  tools: (userId: string) => AssistantTool[];
   limits: UsageLimits;
   clock: Clock;
   newId?: () => string;
@@ -100,7 +101,7 @@ export class AssistantService {
 
       const turnId = this.deps.newId ? this.deps.newId() : crypto.randomUUID();
       const persona = await this.deps.persona.forUser(input.userId);
-      const tools = this.deps.tools();
+      const tools = this.deps.tools(input.userId);
       const base: ChatMessage[] = [
         { role: 'system', content: buildSystemPrompt(persona, clock.now()) },
         ...history.map(m => ({ role: m.role === 'USER' ? 'user' as const : 'assistant' as const, content: m.content })),

@@ -10,6 +10,7 @@ import { createMarketModule } from '../../src/modules/market';
 import { createCommunityModule, marketInstrumentResolver } from '../../src/modules/community';
 import { createNewsModule, type NewsSource } from '../../src/modules/news';
 import { createPaperTradingModule } from '../../src/modules/paper-trading';
+import { createPortfolioModule, marketPriceSource } from '../../src/modules/portfolio';
 import { createProfilesModule } from '../../src/modules/profiles';
 import { createStrategiesModule } from '../../src/modules/strategies';
 import { FakeChatModel, FAKE_MODELS } from './fake-ai';
@@ -76,12 +77,13 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
     db: database.appDb, requireActiveUser: identity.requireActiveUser,
     instruments: { isActive: (exchange, symbol) => market.service.isActiveInstrument(exchange, symbol) },
   });
+  const portfolio = createPortfolioModule({ db: database.appDb, requireActiveUser: identity.requireActiveUser, prices: marketPriceSource(market.service), clock });
   const model = new FakeChatModel();
   const ai = createAiModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser,
     providers: options.aiConfigured === false ? [] : [model], models: FAKE_MODELS, defaultModelId: 'fake-main', fallbackModelIds: ['fake-backup'],
     limits: options.aiLimits ?? { turnsPerDay: 50, tokensPerDay: 1_000_000 },
-    market: market.service, strategies: strategies.service, profiles: profiles.service, clock,
+    market: market.service, strategies: strategies.service, profiles: profiles.service, portfolio: portfolio.service, clock,
   });
   const history = new FakeHistory();
   const backtesting = createBacktestingModule({
@@ -96,8 +98,8 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
   const community = createCommunityModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser, instruments: marketInstrumentResolver(market.service), publicBaseUrl: TEST_ORIGIN, clock,
   });
-  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community });
-  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, history, model, provider, feed, sms, clock, ...database };
+  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio });
+  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, history, model, provider, feed, sms, clock, ...database };
 }
 
 let clientCount = 0;

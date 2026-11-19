@@ -25,6 +25,11 @@ export interface StrategyDraftChecker {
   validate(draft: unknown): Promise<{ ok: true; draft: z.infer<typeof strategyDraftSchema>; summary: string[] } | { ok: false; errors: Record<string, string> }>;
 }
 
+/** The user's own holdings, valued by the portfolio module. */
+export interface PortfolioGateway {
+  valuation(userId: string): Promise<import('../../portfolio').PortfolioValuation & { updatedAt: Date | null }>;
+}
+
 /** Expected tool failures; the message goes back to the model so it can adjust. */
 export class ToolInputError extends Error {}
 
@@ -117,10 +122,13 @@ function normalizeDraft(draft: z.infer<typeof looseDraft>): unknown {
   };
 }
 
+/** Positions sent to the model; the rest are summarised so the result stays within the tool budget. */
+const MAX_POSITIONS_IN_TOOL = 30;
+
 /** Charts per reply: enough to compare two pairs, few enough to keep a phone screen readable. */
 const MAX_CHARTS_PER_TURN = 2;
 
-export function createTools(market: MarketGateway, strategies: StrategyDraftChecker): AssistantTool[] {
+export function createTools(market: MarketGateway, strategies: StrategyDraftChecker, portfolio?: { gateway: PortfolioGateway; userId: string }): AssistantTool[] {
   let draftCount = 0;
   let chartCount = 0;
   return [
@@ -220,5 +228,29 @@ export function createTools(market: MarketGateway, strategies: StrategyDraftChec
         };
       },
     ),
+    ...(portfolio ? [defineTool(
+      'get_my_holdings',
+      'The holdings this user entered in their Portfolio table (asset, quantity, buy date, buy price), merged per asset and valued by the server at current prices: value, cost, profit/loss, share of the portfolio, days held and concentration. Use for any question about their portfolio, holdings or investments.',
+      z.strictObject({}),
+      async () => {
+        const v = await portfolio.gateway.valuation(portfolio.userId);
+        if (!v.lots) return { result: { holdings: 0, note: 'The user has not entered any holdings yet. Ask them to add rows in the Portfolio table (AI tab, Portfolio mode, "Edit holdings").' } };
+        const shown = v.positions.slice(0, MAX_POSITIONS_IN_TOOL);
+        const rest = v.positions.slice(MAX_POSITIONS_IN_TOOL);
+        return {
+          result: {
+            currency: v.currency, asOf: v.asOf, tableUpdatedAt: v.updatedAt?.toISOString() ?? null, lots: v.lots,
+            totals: v.totals, concentration: v.concentration, unpricedAssets: v.unpricedAssets,
+            positions: shown,
+            ...(rest.length && { otherPositions: { count: rest.length, value: Math.round(rest.reduce((s, p) => s + (p.value ?? 0), 0) * 100) / 100 } }),
+            notes: [
+              `Values, cost and P/L are in ${v.currency} and already computed: quote them, do not recompute.`,
+              'buyPriceSource CLOSE_ON_BUY_DATE means the user gave no buy price, so the daily close on the buy date was used (an estimate).',
+              'Unpriced assets are not listed on the exchange; only their quantity, dates and any entered buy price are known.',
+            ],
+          },
+        };
+      },
+    )] : []),
   ];
 }

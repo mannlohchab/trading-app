@@ -91,7 +91,7 @@ describe('assistant turns', () => {
     expect(blocks[1].data).toMatchObject({ exchange: 'BINANCE', symbol: 'BTCUSDT', lastPrice: '73886.01' });
     expect(res.body.assistantMessage.metadata.toolCalls).toEqual([{ name: 'get_tickers', arguments: { symbols: ['btcusdt'] }, ok: true, durationMs: expect.any(Number) }]);
     expect(res.body.assistantMessage.tokenUsage).toMatchObject({ inputTokens: 350, outputTokens: 22 });
-    expect(t.model.requests[0]!.tools!.map(x => x.name)).toEqual(['search_symbols', 'get_tickers', 'get_top_movers', 'analyze_market', 'show_chart', 'draft_strategy']);
+    expect(t.model.requests[0]!.tools!.map(x => x.name)).toEqual(['search_symbols', 'get_tickers', 'get_top_movers', 'analyze_market', 'show_chart', 'draft_strategy', 'get_my_holdings']);
   });
 
   test('market analysis uses server-computed indicators', async () => {

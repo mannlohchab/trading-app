@@ -12,6 +12,7 @@ import { binanceAdapters, createMarketModule } from './modules/market';
 import { createCommunityModule, marketInstrumentResolver } from './modules/community';
 import { createNewsModule, newsSourcesFromConfig } from './modules/news';
 import { createPaperTradingModule } from './modules/paper-trading';
+import { createPortfolioModule, marketPriceSource } from './modules/portfolio';
 import { createProfilesModule } from './modules/profiles';
 import { createStrategiesModule } from './modules/strategies';
 import { JobRunner } from './modules/system/jobs';
@@ -35,6 +36,7 @@ export function composeModules() {
     requireActiveUser: identity.requireActiveUser,
     instruments: { isActive: (exchange, symbol) => market.service.isActiveInstrument(exchange, symbol) },
   });
+  const portfolio = createPortfolioModule({ db, requireActiveUser: identity.requireActiveUser, prices: marketPriceSource(market.service) });
   const ai = createAiModule({
     db,
     requireActiveUser: identity.requireActiveUser,
@@ -47,6 +49,7 @@ export function composeModules() {
     market: market.service,
     strategies: strategies.service,
     profiles: profiles.service,
+    portfolio: portfolio.service,
   });
   if (!config.ai.cloudflare) console.warn('[ai] CF_ACCOUNT_ID/CF_API_TOKEN not set: the AI assistant will answer 503 AI_NOT_CONFIGURED');
   const backtesting = createBacktestingModule({
@@ -76,7 +79,7 @@ export function composeModules() {
     instruments: marketInstrumentResolver(market.service),
     publicBaseUrl: config.auth.baseUrl,
   });
-  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community };
+  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio };
 }
 
 /** Starts the job runner after proving the sandbox isolates. Returns a stop function. */

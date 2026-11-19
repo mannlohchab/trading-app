@@ -10,7 +10,7 @@ import type { StrategyService } from '../strategies';
 import { AssistantService } from './application/assistant.service';
 import { ConversationService } from './application/conversation.service';
 import type { ChatModelProvider, Clock, ModelProfile, UsageRepository } from './application/ports';
-import { createTools } from './application/tools';
+import { createTools, type PortfolioGateway } from './application/tools';
 import type { UsageLimits } from './domain/usage-policy';
 import { aiRoutes } from './http/ai.routes';
 import { DrizzleConversationRepository } from './infrastructure/drizzle-conversation.repository';
@@ -33,6 +33,8 @@ export function createAiModule(deps: {
   market: MarketDataService;
   strategies: StrategyService;
   profiles: ProfileService;
+  /** The user's real holdings; without it the assistant has no portfolio tool. */
+  portfolio?: PortfolioGateway;
   clock?: Clock;
   /** Structured events for observability (one `AI turn recorded` per stored usage event). */
   events?: Logger;
@@ -49,7 +51,7 @@ export function createAiModule(deps: {
     conversations: conversationsRepo,
     usage: withUsageEvents(new DrizzleUsageRepository(deps.db), deps.events),
     persona: personaSource(deps.profiles),
-    tools: () => createTools(market, strategies),
+    tools: userId => createTools(market, strategies, deps.portfolio && { gateway: deps.portfolio, userId }),
     limits: deps.limits,
     clock: deps.clock ?? { now: () => new Date() },
     log,

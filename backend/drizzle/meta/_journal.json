@@ -78,6 +78,13 @@
       "when": 1794291138922,
       "tag": "0010_community",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795086236113,
+      "tag": "0011_portfolio_holdings",
+      "breakpoints": true
     }
   ]
 }
