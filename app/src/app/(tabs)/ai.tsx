@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
@@ -13,6 +13,7 @@ import { streamAiMessage, streamDemoAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
 import { conversationMessages, createConversation, deleteConversation as removeConversation, listConversations, promptFor } from '@/lib/aiApi';
 import { DEMO_MODE } from '@/lib/demoMode';
+import { listHoldings } from '@/lib/portfolioHoldings';
 import { useAuth } from '@/store/auth';
 import { AiChartCard } from '@/components/ai/AiChartCard';
 import { AiResponse } from '@/components/ai/AiResponse';
@@ -24,16 +25,26 @@ type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string
 const ALL_MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
   { kind: 'chat', label: 'Chat', hint: 'Ask anything about markets', icon: 'community' },
   { kind: 'analysis', label: 'Market', hint: 'Analyze one crypto pair', icon: 'chart' },
-  { kind: 'portfolio', label: 'Portfolio', hint: 'Review your paper portfolio', icon: 'wallet' },
+  { kind: 'portfolio', label: 'Portfolio', hint: DEMO_MODE ? 'Review your paper portfolio' : 'Analyse the holdings you enter', icon: 'wallet' },
 ];
-// The backend assistant has live market tools but cannot read the paper portfolio yet.
-const MODES = DEMO_MODE ? ALL_MODES : ALL_MODES.filter((mode) => mode.kind !== 'portfolio');
+const MODES = ALL_MODES;
 const STARTERS = [
   { title: 'Check Bitcoin right now', prompt: 'What is Bitcoin trading at right now? Show the latest available price and daily change.', icon: 'chart' as const },
   { title: 'Compare two markets', prompt: 'Compare the latest Bitcoin and Ethereum prices and daily changes. What should I watch?', icon: 'analytics' as const },
 ];
+// The assistant reads the user's holdings table itself (get_my_holdings), so prompts just ask.
+const PORTFOLIO_REVIEW = 'Analyse my portfolio: overall profit or loss, allocation and concentration, winners and losers, how long I have held each position, and the main risks.';
+const PORTFOLIO_STARTERS = [
+  { title: 'Review my portfolio', prompt: PORTFOLIO_REVIEW },
+  { title: 'Where am I concentrated?', prompt: 'How concentrated is my portfolio? Which positions dominate it and what does that mean for my risk?' },
+  { title: 'Which positions are losing?', prompt: 'Which of my holdings are in a loss, by how much, and how long have I held them?' },
+];
 // Warm, monochrome chat palette.
 const { text: INK, body: BODY, textMuted: MUTED, bg: PAGE, soft: SOFT, border: LINE, card: CARD, onSolid: ON_SOLID } = InsightPalette;
+
+let messageSeq = 0;
+/** Client-side id for a message until the server's saved copy arrives. */
+const localMessageId = (role: 'user' | 'assistant') => `${role}-${Date.now()}-${++messageSeq}`;
 
 function greeting(date = new Date()) {
   const hour = date.getHours();
@@ -68,6 +79,19 @@ export default function AiScreen() {
   const nearBottom = useRef(true);
   const activeAssistant = useRef<string | undefined>(undefined);
   const historyKey = ['ai-conversations', userId];
+  const { analyze } = useLocalSearchParams<{ analyze?: string }>();
+
+  // The user's real holdings (Portfolio mode). The demo preview keeps its sample paper portfolio.
+  const holdingsQuery = useQuery({
+    queryKey: ['portfolio-holdings', userId],
+    queryFn: ({ signal }) => listHoldings(signal),
+    enabled: kind === 'portfolio' && !DEMO_MODE,
+  });
+  const holdingCount = holdingsQuery.data?.holdings.length ?? 0;
+  const refetchHoldings = holdingsQuery.refetch;
+  useFocusEffect(useCallback(() => {
+    if (kind === 'portfolio' && !DEMO_MODE) void refetchHoldings();
+  }, [kind, refetchHoldings]));
 
   // Welcome-state backdrop: fades out once the conversation starts.
   const showMist = messages.length === 0 && !loadingConversation;
@@ -180,18 +204,21 @@ export default function AiScreen() {
     }
   }
 
-  async function send(text: string) {
+  /** `fresh` sends as the first message of a new conversation in that mode (state from this render is ignored). */
+  async function send(text: string, fresh?: { kind: AiKind }) {
     const trimmed = text.trim();
-    if (!trimmed || trimmed.length > 4000 || loadingConversation || needsNewChat || (kind === 'analysis' && !symbol.trim())) return;
+    const turnKind = fresh?.kind ?? kind;
+    const currentId = fresh ? undefined : conversationId;
+    if (!trimmed || trimmed.length > 4000 || (!fresh && (loadingConversation || needsNewChat)) || (turnKind === 'analysis' && !symbol.trim())) return;
     const request = gate.begin();
     if (!request) return;
-    const assistantId = `assistant-${Date.now()}`;
+    const assistantId = localMessageId('assistant');
     activeAssistant.current = assistantId;
-    setMessages((previous) => [...previous,
-      { id: `user-${Date.now()}`, role: 'user', content: trimmed },
+    setMessages((previous) => [...(fresh ? [] : previous),
+      { id: localMessageId('user'), role: 'user', content: trimmed },
       { id: assistantId, role: 'assistant', content: '', status: 'streaming' },
     ]);
-    if (!messages.length) setTitle(trimmed);
+    if (fresh || !messages.length) setTitle(trimmed);
     setInput('');
     setError(undefined);
     setStreaming(true);
@@ -200,16 +227,16 @@ export default function AiScreen() {
       const append = (text: string) => setMessages((previous) => previous.map((message) => message.id === assistantId
         ? { ...message, content: message.content + text } : message));
       if (DEMO_MODE) {
-        await streamDemoAiChat({ conversationId, message: trimmed, kind, ...(kind === 'analysis' ? { symbol: symbol.trim().toUpperCase(), exchange: 'BINANCE' } : {}) }, (event) => {
+        await streamDemoAiChat({ conversationId: currentId, message: trimmed, kind: turnKind, ...(turnKind === 'analysis' ? { symbol: symbol.trim().toUpperCase(), exchange: 'BINANCE' } : {}) }, (event) => {
           if (!gate.isCurrent(request)) return;
           if (event.type === 'meta' && event.conversationId) setConversationId(event.conversationId);
           if (event.type === 'token' && event.content) append(event.content);
         }, request.signal);
       } else {
-        const id = conversationId ?? (await createConversation(trimmed)).id;
+        const id = currentId ?? (await createConversation(trimmed)).id;
         if (!gate.isCurrent(request)) return;
         setConversationId(id);
-        await streamAiMessage(id, promptFor(kind, trimmed, symbol), (event) => {
+        await streamAiMessage(id, promptFor(turnKind, trimmed, symbol), (event) => {
           if (!gate.isCurrent(request)) return;
           if (event.type === 'delta' && event.text) append(event.text);
           // Charts arrive as soon as the tool runs, before the answer text finishes.
@@ -244,6 +271,19 @@ export default function AiScreen() {
       void queryClient.invalidateQueries({ queryKey: ['ai-conversations', userId] });
     }
   }
+
+  // "Analyse with AI" from the holdings table: start a fresh portfolio chat and ask for a review.
+  useEffect(() => {
+    if (analyze !== 'portfolio') return;
+    router.setParams({ analyze: undefined });
+    const timer = setTimeout(() => {
+      reset('portfolio', symbol || 'BTCUSDT');
+      void send(PORTFOLIO_REVIEW, { kind: 'portfolio' });
+    }, 0);
+    return () => clearTimeout(timer);
+    // Runs once per hand-off; reset/send/symbol are read from that render on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyze]);
 
   function stopResponse() {
     const assistantId = activeAssistant.current;
@@ -314,16 +354,34 @@ export default function AiScreen() {
                 <Text style={styles.welcomeTitle} accessibilityRole="header">
                   {kind === 'portfolio' ? 'Know your portfolio' : kind === 'analysis' ? 'Explore a pair' : `${greeting()}${firstName ? `, ${firstName}` : ''}`}
                 </Text>
-                {kind !== 'chat' && <Text style={styles.welcomeSubtitle}>{kind === 'portfolio' ? 'Understand your allocation and risk.' : 'Choose a symbol above to get started.'}</Text>}
+                {kind !== 'chat' && <Text style={styles.welcomeSubtitle}>{kind === 'portfolio'
+                  ? (DEMO_MODE ? 'Understand your allocation and risk.' : holdingCount ? 'AI reviews your holdings at today\'s prices.' : 'Add what you hold, how much and when you bought it. AI will review it for you.')
+                  : 'Choose a symbol above to get started.'}</Text>}
                 {kind === 'chat' && <View style={styles.starterChips}>{STARTERS.map((starter) => (
                   <Pressable key={starter.title} accessibilityRole="button" style={({ pressed }) => [styles.starterChip, pressed && styles.pressed]} onPress={() => send(starter.prompt)}>
                     <Text style={styles.starterTitle}>{starter.title}</Text>
                   </Pressable>
                 ))}</View>}
-                {kind === 'portfolio' && <View style={styles.starterChips}><Pressable accessibilityRole="button" style={({ pressed }) => [styles.starterChip, pressed && styles.pressed]}
+                {kind === 'portfolio' && DEMO_MODE && <View style={styles.starterChips}><Pressable accessibilityRole="button" style={({ pressed }) => [styles.starterChip, pressed && styles.pressed]}
                   onPress={() => send('Analyze my paper-trading portfolio: allocation, risk, and educational next steps.')}>
                   <Text style={styles.starterTitle}>Review my paper portfolio</Text>
                 </Pressable></View>}
+                {kind === 'portfolio' && !DEMO_MODE && <>
+                  <Pressable accessibilityRole="button" accessibilityLabel={holdingCount ? `Edit holdings, ${holdingCount} rows` : 'Add your holdings'}
+                    onPress={() => router.push('/portfolio/holdings' as Href)} style={({ pressed }) => [styles.holdingsCard, pressed && styles.pressed]}>
+                    <GlassIcon name="wallet" size={26} />
+                    <View style={styles.flex}>
+                      <Text style={styles.holdingsTitle}>{holdingsQuery.isPending ? 'Loading holdings…' : holdingCount ? `${holdingCount} holding${holdingCount === 1 ? '' : 's'} in your table` : 'Add your holdings'}</Text>
+                      <Text style={styles.holdingsHint}>{holdingsQuery.isError ? 'Could not load your holdings. Tap to open the table.' : holdingCount ? 'Tap to edit the table' : 'Asset, quantity and buy date: type or paste from Excel'}</Text>
+                    </View>
+                    <Text style={styles.holdingsAction}>{holdingCount ? 'Edit' : 'Add'}</Text>
+                  </Pressable>
+                  {holdingCount > 0 && <View style={styles.starterChips}>{PORTFOLIO_STARTERS.map((starter) => (
+                    <Pressable key={starter.title} accessibilityRole="button" style={({ pressed }) => [styles.starterChip, pressed && styles.pressed]} onPress={() => send(starter.prompt)}>
+                      <Text style={styles.starterTitle}>{starter.title}</Text>
+                    </Pressable>
+                  ))}</View>}
+                </>}
               </View>
             )}
             renderItem={({ item }) => item.role === 'user' ? (
@@ -358,7 +416,7 @@ export default function AiScreen() {
               <TextInput accessibilityLabel="Message AI Insight" style={styles.input} value={input} onChangeText={setInput}
                 editable={!disabled} multiline maxLength={4000} textAlignVertical="top" placeholderTextColor={MUTED}
                 onFocus={() => setModeMenuOpen(false)}
-                placeholder={kind === 'portfolio' ? 'Ask about your paper portfolio…' : kind === 'analysis' ? `Ask about ${symbol || 'an instrument'}…` : 'How can I help you today?'} />
+                placeholder={kind === 'portfolio' ? (DEMO_MODE ? 'Ask about your paper portfolio…' : 'Ask about your holdings…') : kind === 'analysis' ? `Ask about ${symbol || 'an instrument'}…` : 'How can I help you today?'} />
               <View style={styles.composerToolbar}>
                 <Pressable accessibilityRole="button" accessibilityLabel={`Mode: ${MODES.find((mode) => mode.kind === kind)?.label}. Change mode`}
                   accessibilityState={{ expanded: modeMenuOpen }} onPress={() => setModeMenuOpen((open) => !open)}
@@ -448,6 +506,10 @@ const styles = StyleSheet.create({
   starterChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 26, maxWidth: 340 },
   starterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
   starterTitle: { color: BODY, fontSize: 13, fontWeight: '500' },
+  holdingsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 22, width: '100%', maxWidth: 340, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
+  holdingsTitle: { color: INK, fontSize: 14, fontWeight: '600' },
+  holdingsHint: { color: MUTED, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  holdingsAction: { color: INK, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   promptLabel: { fontSize: 12, color: MUTED, fontWeight: '500' },
   userMessage: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 14, backgroundColor: '#EFE8FF', paddingHorizontal: 14, paddingVertical: 10 },
   messageText: { color: INK, fontSize: 14, lineHeight: 21 },
