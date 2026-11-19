@@ -7,6 +7,8 @@ export type AiKind = 'chat' | 'analysis' | 'portfolio';
 export type AiEvent = {
   type: string; content?: string; text?: string; conversationId?: string; error?: string; code?: string;
   stage?: string; tool?: string; message?: any; block?: any;
+  /** Tool steps: `status` (stage "tool") carries callId + arguments; `tool_result` carries callId, ok, durationMs, error. */
+  callId?: string; arguments?: unknown; ok?: boolean; durationMs?: number;
 };
 
 // One active request per visible conversation, including same-frame taps.

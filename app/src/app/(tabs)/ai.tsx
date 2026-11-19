@@ -19,8 +19,10 @@ import { AiChartCard } from '@/components/ai/AiChartCard';
 import { AiResponse } from '@/components/ai/AiResponse';
 import { chartsFromBlocks, parseChartBlock, type AiChart } from '@/lib/aiCharts';
 import { MovingMist } from '@/components/ai/MovingMist';
+import { AiTrace } from '@/components/ai/AiTrace';
+import { applyStepEvent, settleSteps, stepsFromToolCalls, type ToolStep } from '@/lib/aiTrace';
 
-type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error'; charts?: AiChart[] };
+type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error'; charts?: AiChart[]; steps?: ToolStep[] };
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
 const ALL_MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
   { kind: 'chat', label: 'Chat', hint: 'Ask anything about markets', icon: 'community' },
@@ -239,6 +241,11 @@ export default function AiScreen() {
         await streamAiMessage(id, promptFor(turnKind, trimmed, symbol), (event) => {
           if (!gate.isCurrent(request)) return;
           if (event.type === 'delta' && event.text) append(event.text);
+          // Tool calls show as trace lines while they run.
+          if (event.type === 'status' || event.type === 'tool_result') {
+            setMessages((previous) => previous.map((message) => message.id === assistantId
+              ? { ...message, steps: applyStepEvent(message.steps ?? [], event) } : message));
+          }
           // Charts arrive as soon as the tool runs, before the answer text finishes.
           if (event.type === 'block') {
             const chart = parseChartBlock(event.block);
@@ -249,18 +256,20 @@ export default function AiScreen() {
           if (event.type === 'assistant_message' && typeof event.message?.content === 'string') {
             const content: string = event.message.content;
             const charts = chartsFromBlocks(event.message.metadata?.blocks);
-            setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, content, charts } : message));
+            setMessages((previous) => previous.map((message) => message.id === assistantId
+              ? { ...message, content, charts, steps: message.steps?.length ? settleSteps(message.steps) : stepsFromToolCalls(event.message.metadata?.toolCalls, assistantId) }
+              : message));
           }
         }, request.signal);
       }
       if (gate.isCurrent(request)) {
-        setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: undefined } : message));
+        setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: undefined, steps: settleSteps(message.steps) } : message));
       }
     } catch (err) {
       if (gate.isCurrent(request)) {
         setError(err instanceof Error ? err.message : 'Could not get a response. Please start a new chat.');
         setNeedsNewChat(true);
-        setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: 'error' } : message));
+        setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: 'error', steps: settleSteps(message.steps, 'error') } : message));
       }
     } finally {
       if (gate.isCurrent(request)) {
@@ -290,7 +299,7 @@ export default function AiScreen() {
     gate.reset();
     setStreaming(false);
     setNeedsNewChat(true);
-    setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: 'stopped' } : message));
+    setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: 'stopped', steps: settleSteps(message.steps, 'error') } : message));
     activeAssistant.current = undefined;
   }
 
@@ -388,10 +397,12 @@ export default function AiScreen() {
               <View style={styles.userMessage}><Text selectable style={styles.messageText}>{item.content}</Text></View>
             ) : (
               <View style={styles.assistantMessage} accessibilityLabel="AI Insight response">
+                <AiTrace steps={item.steps}
+                  thinking={item.status === 'streaming' && !item.content && !item.steps?.some((step) => step.status === 'running')} />
                 {!!item.content && <AiResponse content={item.content} />}
                 {item.charts?.map((chart, index) => <AiChartCard key={`${chart.symbol}-${chart.timeframe}-${index}`} chart={chart} />)}
                 {item.status === 'streaming' && !!item.content && <ActivityIndicator size="small" color={MUTED} style={styles.streamingDot} />}
-                {!item.content && !item.charts?.length && <Text style={styles.muted}>{item.status === 'streaming' ? 'Looking into it…' : item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
+                {!item.content && !item.charts?.length && item.status !== 'streaming' && <Text style={styles.muted}>{item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
                 {item.status === 'stopped' && !!item.content && <Text style={styles.responseStatus}>Stopped · partial response</Text>}
                 {item.status === 'error' && !!item.content && <Text style={styles.responseStatus}>Incomplete response</Text>}
               </View>
@@ -407,29 +418,52 @@ export default function AiScreen() {
                 <Pressable key={mode.kind} accessibilityRole="menuitem" accessibilityState={{ selected: kind === mode.kind }}
                   style={({ pressed }) => [styles.modeOption, pressed && styles.modeOptionPressed]}
                   onPress={() => { setModeMenuOpen(false); if (kind !== mode.kind) reset(mode.kind, symbol || 'BTCUSDT'); }}>
+                  <GlassIcon name={mode.icon} size={22} />
                   <View style={styles.flex}><Text style={styles.modeOptionLabel}>{mode.label}</Text><Text style={styles.modeOptionHint}>{mode.hint}</Text></View>
                   {kind === mode.kind && <Text style={styles.modeCheck}>✓</Text>}
                 </Pressable>
               ))}
-            </View>}
-            <View style={styles.composer}>
-              <TextInput accessibilityLabel="Message AI Insight" style={styles.input} value={input} onChangeText={setInput}
-                editable={!disabled} multiline maxLength={4000} textAlignVertical="top" placeholderTextColor={MUTED}
-                onFocus={() => setModeMenuOpen(false)}
-                placeholder={kind === 'portfolio' ? (DEMO_MODE ? 'Ask about your paper portfolio…' : 'Ask about your holdings…') : kind === 'analysis' ? `Ask about ${symbol || 'an instrument'}…` : 'How can I help you today?'} />
-              <View style={styles.composerToolbar}>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Mode: ${MODES.find((mode) => mode.kind === kind)?.label}. Change mode`}
-                  accessibilityState={{ expanded: modeMenuOpen }} onPress={() => setModeMenuOpen((open) => !open)}
-                  style={({ pressed }) => [styles.modePicker, pressed && styles.pressed]}>
-                  <Text style={styles.modePickerText}>{MODES.find((mode) => mode.kind === kind)?.label}</Text>
-                  <View style={[styles.chevron, modeMenuOpen && styles.chevronUp]} />
+              {kind === 'portfolio' && !DEMO_MODE && <>
+                <View style={styles.menuDivider} />
+                <Pressable accessibilityRole="menuitem" style={({ pressed }) => [styles.modeOption, pressed && styles.modeOptionPressed]}
+                  onPress={() => { setModeMenuOpen(false); router.push('/portfolio/holdings' as Href); }}>
+                  <GlassIcon name="analytics" size={22} />
+                  <View style={styles.flex}><Text style={styles.modeOptionLabel}>Edit holdings</Text><Text style={styles.modeOptionHint}>Update the table the AI reviews</Text></View>
                 </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel={streaming ? 'Stop response' : 'Send message'}
-                  disabled={!streaming && (disabled || !input.trim())} onPress={streaming ? stopResponse : () => send(input)}
-                  style={({ pressed }) => [styles.sendButton, !streaming && (disabled || !input.trim()) && styles.sendDisabled, pressed && styles.pressed]}>
-                  {streaming ? <View style={styles.stopButton}><View style={styles.stopGlyph} /></View> : <GlassIcon name="send" size={34} tone={disabled || !input.trim() ? 'neutral' : 'purple'} />}
+              </>}
+            </View>}
+            {kind !== 'chat' && <View style={styles.modeTagRow}>
+              <View style={styles.modeTag}>
+                <Text style={styles.modeTagText}>{MODES.find((mode) => mode.kind === kind)?.label} mode</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel="Back to Chat mode" hitSlop={10}
+                  onPress={() => { setModeMenuOpen(false); reset('chat', symbol || 'BTCUSDT'); }} style={({ pressed }) => pressed && styles.pressed}>
+                  <Text style={styles.modeTagClose}>×</Text>
                 </Pressable>
               </View>
+            </View>}
+            <View style={styles.composer}>
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: modeMenuOpen }}
+                accessibilityLabel={`Mode: ${MODES.find((mode) => mode.kind === kind)?.label}. ${modeMenuOpen ? 'Close menu' : 'Change mode or open tools'}`}
+                onPress={() => { Keyboard.dismiss(); setModeMenuOpen((open) => !open); }}
+                style={({ pressed }) => [styles.roundButton, styles.plusButton, modeMenuOpen && styles.plusButtonOpen, pressed && styles.pressed]}>
+                <View style={[styles.plus, modeMenuOpen && styles.plusOpen]}>
+                  <View style={styles.plusBarH} /><View style={styles.plusBarV} />
+                </View>
+              </Pressable>
+              <TextInput accessibilityLabel="Message AI Insight" style={styles.input} value={input} onChangeText={setInput}
+                editable={!disabled} multiline maxLength={4000} textAlignVertical="center" placeholderTextColor={MUTED}
+                onFocus={() => setModeMenuOpen(false)}
+                placeholder={kind === 'portfolio' ? (DEMO_MODE ? 'Ask about your paper portfolio' : 'Ask about your holdings') : kind === 'analysis' ? `Ask about ${symbol || 'an instrument'}` : 'Type a message'} />
+              <Pressable accessibilityRole="button" accessibilityLabel={streaming ? 'Stop response' : 'Send message'}
+                disabled={!streaming && (disabled || !input.trim())} onPress={streaming ? stopResponse : () => send(input)}
+                style={({ pressed }) => [styles.roundButton, styles.sendButton, !streaming && (disabled || !input.trim()) && styles.sendDisabled, pressed && styles.pressed]}>
+                {streaming
+                  ? <View style={styles.stopGlyph} />
+                  : <View style={styles.arrow}>
+                      <View style={[styles.arrowHead, (disabled || !input.trim()) && styles.arrowMuted]} />
+                      <View style={[styles.arrowStem, (disabled || !input.trim()) && styles.arrowStemMuted]} />
+                    </View>}
+              </Pressable>
             </View>
             <Text style={styles.disclaimer}>For learning only. AI can make mistakes.</Text>
           </View>
@@ -522,23 +556,36 @@ const styles = StyleSheet.create({
   analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, backgroundColor: INK, borderRadius: 8 }, analyzeText: { color: ON_SOLID, fontSize: 12, fontWeight: '600' },
   instrumentHint: { fontSize: 11, lineHeight: 16, color: MUTED, paddingTop: 7 },
   composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
-  composer: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10, borderRadius: 16, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 1px 2px rgba(31,31,30,0.04)' },
-  input: { color: INK, fontSize: 15, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 4, paddingTop: 8, paddingBottom: 8 },
-  composerToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
-  modePicker: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 10, borderRadius: 8 },
-  modePickerText: { color: BODY, fontSize: 13, fontWeight: '500' },
-  chevron: { width: 6, height: 6, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: BODY, transform: [{ rotate: '45deg' }], marginTop: -3 },
-  chevronUp: { transform: [{ rotate: '-135deg' }], marginTop: 3 },
-  modeMenu: { position: 'absolute', right: 12, bottom: '100%', width: 248, padding: 6, borderRadius: 14, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
-  modeOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 9, minHeight: 44 },
+  // Pill composer: round "+" (modes and tools) · message · round send/stop. Buttons stay at the bottom as the message grows.
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: 30, backgroundColor: '#F6F6F4', borderWidth: 1, borderColor: LINE, boxShadow: '0 2px 10px rgba(31,31,30,0.06)' },
+  roundButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  plusButton: { backgroundColor: '#E9E9E5' },
+  plusButtonOpen: { backgroundColor: '#DEDED9' },
+  plus: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  plusOpen: { transform: [{ rotate: '45deg' }] },
+  plusBarH: { position: 'absolute', width: 18, height: 2, borderRadius: 1, backgroundColor: INK },
+  plusBarV: { position: 'absolute', width: 2, height: 18, borderRadius: 1, backgroundColor: INK },
+  input: { flex: 1, color: INK, fontSize: 16, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 6, paddingTop: 11, paddingBottom: 11 },
+  sendButton: { backgroundColor: INK },
+  sendDisabled: { backgroundColor: '#E9E9E5' },
+  arrow: { width: 18, height: 18, alignItems: 'center' },
+  arrowHead: { position: 'absolute', top: 2, width: 10, height: 10, borderTopWidth: 2.2, borderLeftWidth: 2.2, borderColor: ON_SOLID, transform: [{ rotate: '45deg' }] },
+  arrowStem: { position: 'absolute', top: 2, bottom: 1, width: 2.2, borderRadius: 1.1, backgroundColor: ON_SOLID },
+  arrowMuted: { borderColor: MUTED },
+  arrowStemMuted: { backgroundColor: MUTED },
+  stopGlyph: { height: 12, width: 12, borderRadius: 3, backgroundColor: ON_SOLID },
+  disabled: { opacity: 0.4 },
+  modeTagRow: { flexDirection: 'row', paddingHorizontal: 6, paddingBottom: 6 },
+  modeTag: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 10, paddingRight: 8, height: 26, borderRadius: 13, backgroundColor: '#EFE8FF' },
+  modeTagText: { color: '#4C3DB8', fontSize: 12, fontWeight: '600' },
+  modeTagClose: { color: '#4C3DB8', fontSize: 16, lineHeight: 18 },
+  modeMenu: { position: 'absolute', left: 12, bottom: '100%', width: 268, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
+  modeOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 12, minHeight: 44 },
   modeOptionPressed: { backgroundColor: PAGE },
   modeOptionLabel: { color: INK, fontSize: 14, fontWeight: '500' },
   modeOptionHint: { color: MUTED, fontSize: 12, marginTop: 2 },
   modeCheck: { color: INK, fontSize: 14, fontWeight: '600' },
-  sendButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  sendDisabled: { opacity: 0.4 },
-  stopButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#6E5CE6', alignItems: 'center', justifyContent: 'center' },
-  stopGlyph: { height: 10, width: 10, borderRadius: 2, backgroundColor: '#FFFFFF' }, disabled: { opacity: 0.4 },
+  menuDivider: { height: StyleSheet.hairlineWidth, backgroundColor: LINE, marginVertical: 4, marginHorizontal: 8 },
   disclaimer: { textAlign: 'center', color: MUTED, fontSize: 10, lineHeight: 15, paddingTop: 8, paddingBottom: 2 },
   errorBox: { padding: 10, backgroundColor: '#FEF2F2', borderRadius: 9, marginHorizontal: 16, marginTop: 6 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 },
   restart: { minHeight: 44, flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center', marginHorizontal: 16 }, restartText: { color: INK, fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
