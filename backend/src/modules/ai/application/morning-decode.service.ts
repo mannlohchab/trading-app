@@ -67,6 +67,16 @@ export class MorningDecodeService {
     return job;
   }
 
+  /** Replaces today's briefing only after both script and audio succeed. Ops only. */
+  async forceToday(): Promise<MorningDecodeView> {
+    const date = utcDateString((this.deps.clock ?? { now: () => new Date() }).now());
+    const pending = this.inflight.get(date);
+    if (pending) await pending;
+    const job = this.generate(date, true).finally(() => this.inflight.delete(date));
+    this.inflight.set(date, job);
+    return job;
+  }
+
   async audioToday(): Promise<{ bytes: Buffer; contentType: string } | null> {
     const date = utcDateString((this.deps.clock ?? { now: () => new Date() }).now());
     let row = await this.deps.db.query.aiMarketBriefs.findFirst({ where: eq(aiMarketBriefs.briefDate, date) });
@@ -130,7 +140,7 @@ export class MorningDecodeService {
     ].filter(Boolean).join(' '));
   }
 
-  private async generate(date: string): Promise<MorningDecodeView> {
+  private async generate(date: string, replace = false): Promise<MorningDecodeView> {
     const facts = await this.collectFacts(date);
     let script = '';
     let textModel: string | null = null;
@@ -148,6 +158,7 @@ export class MorningDecodeService {
       }
     }
 
+    if (replace && !script) throw new Error('Morning Decode script generation failed; previous briefing preserved.');
     if (!script) script = this.fallbackScript(date, facts);
 
     let audio: Buffer | null = null;
@@ -167,7 +178,9 @@ export class MorningDecodeService {
       }
     }
 
-    const [row] = await this.deps.db.insert(aiMarketBriefs).values({
+    if (replace && !audio?.length) throw new Error('Morning Decode audio generation failed; previous briefing preserved.');
+
+    const values = {
       briefDate: date,
       content: script,
       audio: audio ?? undefined,
@@ -175,7 +188,11 @@ export class MorningDecodeService {
       durationSeconds,
       textModel: textModel ?? undefined,
       audioModel: audioModel ?? undefined,
-    }).onConflictDoNothing().returning();
+    };
+    const insert = this.deps.db.insert(aiMarketBriefs).values(values);
+    const [row] = await (replace
+      ? insert.onConflictDoUpdate({ target: aiMarketBriefs.briefDate, set: { ...values, createdAt: (this.deps.clock ?? { now: () => new Date() }).now() } })
+      : insert.onConflictDoNothing()).returning();
 
     if (row) return this.view(row);
     const again = await this.deps.db.query.aiMarketBriefs.findFirst({ where: eq(aiMarketBriefs.briefDate, date) });

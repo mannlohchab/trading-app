@@ -8,7 +8,7 @@ export type TtsResult = { bytes: Buffer; contentType: string; model: string };
 
 /**
  * Speaks briefing text via OpenRouter's OpenAI-compatible audio speech endpoint.
- * Docs: https://openrouter.ai/docs — model id is configurable (default openai/gpt-4o-mini-tts).
+ * Docs: https://openrouter.ai/docs — model id is configurable (default hexgrad/kokoro-82m).
  */
 export class OpenRouterTts implements BriefTts {
   readonly name = 'openrouter-tts';
@@ -26,7 +26,7 @@ export class OpenRouterTts implements BriefTts {
 
   async speak(text: string, signal?: AbortSignal): Promise<TtsResult> {
     const url = `${this.options.baseUrl ?? 'https://openrouter.ai/api/v1'}/audio/speech`;
-    const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 60_000);
+    const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 180_000);
     let response: Response;
     try {
       response = await (this.options.fetch ?? fetch)(url, {
@@ -40,7 +40,7 @@ export class OpenRouterTts implements BriefTts {
         body: JSON.stringify({
           model: this.options.model,
           input: text.slice(0, 4000),
-          voice: this.options.voice ?? 'alloy',
+          voice: this.options.voice ?? 'af_heart',
           response_format: 'mp3',
         }),
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
@@ -57,11 +57,16 @@ export class OpenRouterTts implements BriefTts {
       }
       throw new AiProviderError('AI_PROVIDER_ERROR', `OpenRouter TTS failed (${response.status}): ${body.slice(0, 200)}`, response.status >= 500);
     }
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+    if (contentType !== 'audio/mpeg') {
+      await response.body?.cancel();
+      throw new AiProviderError('AI_PROVIDER_ERROR', 'OpenRouter did not return MP3 audio.', true);
+    }
     const bytes = Buffer.from(await response.arrayBuffer());
     if (!bytes.length) throw new AiProviderError('AI_PROVIDER_ERROR', 'OpenRouter returned empty audio.', true);
     return {
       bytes,
-      contentType: response.headers.get('content-type') || 'audio/mpeg',
+      contentType,
       model: this.options.model,
     };
   }

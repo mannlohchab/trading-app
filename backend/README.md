@@ -110,6 +110,26 @@ All endpoints require an ACTIVE user. `exchange` defaults to `BINANCE`. Prices a
 - **Shared ticker fetch:** REST tickers come from one cached all-symbols call (5 s TTL).
 - **Rate-limit backoff:** on HTTP 429/418 calls stop until Binance's `Retry-After` passes.
 
+## Economic calendar (`modules/calendar`)
+
+`GET /api/v1/calendar` requires an ACTIVE session, using the same authentication as market routes.
+It returns `{ items, source, sourceUrl, fetchedAt, stale, isDemo, notice }`. Items include event name,
+currency, impact (`importance`: 1/2/3 or null), UTC instant or a date-only day, and actual, forecast and
+previous strings (null when absent; zero remains a value).
+
+The source is the [Forex Factory weekly JSON feed](https://nfs.faireconomy.media/ff_calendar_thisweek.json).
+No credentials or migration are needed. The API shares a one-hour in-memory cache and coalesces concurrent
+requests; local client filters do not generate provider calls. Failures back off for at least one minute,
+or fifteen minutes on 429, honoring longer Retry-After values up to 24 hours. Saved data is served with
+`stale: true` for at most 24 hours, then the API returns 503 `CALENDAR_UNAVAILABLE`. The cache is per
+process and resets on restart; it is not a persistent historical archive. HTTP responses use private,
+no-store caching, so session checks always run.
+
+Coverage is the provider's published week, not a historical date-range API. Actual results may be
+unavailable; no synthetic dates or numbers are substituted. The older Finance Calendar adapter under
+`server/` is not used: that provider now requires an account/key. Provider information was checked on
+2026-11-22 against [its current API documentation](https://www.financecalendar.com/api/).
+
 ## Crypto news (`modules/news`)
 
 News from several free sources, stored in Postgres and served from there. User requests never reach a source, so app traffic never spends the sources' rate limits.
@@ -334,6 +354,20 @@ Simulated trading with virtual funds on **live Binance market data**. It never c
 3. It records `paper_signals`. Only the newest pending candle is traded; older ones are recorded as `SKIPPED`.
 4. It places orders sized from `positionSizePercent` of cash, floored to the lot step.
 5. It commits only if the instance is still running and its `lastProcessedCandleTime` has not moved.
+
+## Morning Decode generation
+
+Morning Decode uses OpenRouter with `nvidia/nemotron-3-ultra-550b-a55b:free` for the script and
+`hexgrad/kokoro-82m` with voice `af_heart` for MP3 audio by default. Set `OPENROUTER_API_KEY` on
+the backend. `MORNING_DECODE_SCRIPT_PROVIDER`, `OPENROUTER_SCRIPT_MODEL`, `OPENROUTER_TTS_MODEL`,
+and `OPENROUTER_TTS_VOICE` override those defaults; keep the voice compatible with the speech model.
+The text request allows 6,000 output tokens because Nemotron's reasoning shares the output budget.
+
+Run `bun run morning-decode:generate` to ensure today's UTC briefing exists, or add `--force` to
+regenerate it. Forced generation preserves the existing briefing until both a new script and audio
+succeed, then replaces the row atomically. A missing audio result exits with an error.
+To copy the generated briefing into another database, set `TARGET_DATABASE_URL` and add `--publish`;
+publishing atomically inserts or updates that UTC day's row. Neither command restarts the API.
 
 ## Health checks
 

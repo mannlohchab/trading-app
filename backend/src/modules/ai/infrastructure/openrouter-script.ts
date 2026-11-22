@@ -19,7 +19,7 @@ export class OpenRouterScriptLlm implements BriefScriptLlm {
 
   async complete(input: { system: string; user: string; signal?: AbortSignal }): Promise<{ text: string; model: string }> {
     const url = `${this.options.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`;
-    const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 90_000);
+    const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 180_000);
     let response: Response;
     try {
       response = await (this.options.fetch ?? fetch)(url, {
@@ -33,7 +33,8 @@ export class OpenRouterScriptLlm implements BriefScriptLlm {
         body: JSON.stringify({
           model: this.options.model,
           temperature: 0.4,
-          max_tokens: 1200,
+          // Nemotron counts reasoning against this budget before producing the spoken script.
+          max_tokens: 6000,
           messages: [
             { role: 'system', content: input.system },
             { role: 'user', content: input.user },

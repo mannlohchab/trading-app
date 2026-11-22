@@ -56,11 +56,11 @@ export const config = {
     },
     /**
      * Morning Decode (shared daily audio briefing).
-     * Script: GEMINI (primary) or OPENROUTER (e.g. free Nemotron — rate-limited).
+     * Script: OPENROUTER (free Nemotron) or optional GEMINI.
      * TTS: OpenRouter speech model when OPENROUTER_API_KEY is set.
      */
     morningDecode: (() => {
-      const scriptProvider = (env.MORNING_DECODE_SCRIPT_PROVIDER?.trim().toLowerCase() || 'gemini') as 'gemini' | 'openrouter';
+      const scriptProvider = (env.MORNING_DECODE_SCRIPT_PROVIDER?.trim().toLowerCase() || 'openrouter') as 'gemini' | 'openrouter';
       if (scriptProvider !== 'gemini' && scriptProvider !== 'openrouter') {
         throw new Error('MORNING_DECODE_SCRIPT_PROVIDER must be "gemini" or "openrouter"');
       }
@@ -76,8 +76,8 @@ export const config = {
               apiKey: openRouterKey,
               // Free endpoint is rate-limited; confirm availability on openrouter.ai before production use.
               scriptModel: env.OPENROUTER_SCRIPT_MODEL?.trim() || 'nvidia/nemotron-3-ultra-550b-a55b:free',
-              ttsModel: env.OPENROUTER_TTS_MODEL?.trim() || 'openai/gpt-4o-mini-tts',
-              voice: env.OPENROUTER_TTS_VOICE?.trim() || 'alloy',
+              ttsModel: env.OPENROUTER_TTS_MODEL?.trim() || 'hexgrad/kokoro-82m',
+              voice: env.OPENROUTER_TTS_VOICE?.trim() || 'af_heart',
             }
           : undefined,
       };

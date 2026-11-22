@@ -9,6 +9,7 @@ import type { CandleHistory } from '../../src/modules/backtesting/backtesting.ma
 import { silentLogger } from '../../src/logger';
 import { createMarketModule } from '../../src/modules/market';
 import { createCommunityModule, marketInstrumentResolver } from '../../src/modules/community';
+import { createCalendarModule, type CalendarRequest } from '../../src/modules/calendar';
 import { createNewsModule, type NewsSource } from '../../src/modules/news';
 import { createPaperTradingModule } from '../../src/modules/paper-trading';
 import { createPortfolioModule, marketPriceSource } from '../../src/modules/portfolio';
@@ -64,13 +65,14 @@ const authConfig = (overrides: Partial<AuthConfig> = {}): AuthConfig => ({
 });
 
 /** The real app (real Better Auth, real migrations) on an in-memory Postgres. */
-export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingDatabase?: () => Promise<boolean>; aiLimits?: { turnsPerDay: number; tokensPerDay: number }; aiConfigured?: boolean; backtestEngine?: import('../../src/modules/backtesting').BacktestEngine; signalEngine?: import('../../src/modules/backtesting').StrategySignalEngine; newsSources?: NewsSource[] } = {}) {
+export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingDatabase?: () => Promise<boolean>; aiLimits?: { turnsPerDay: number; tokensPerDay: number }; aiConfigured?: boolean; backtestEngine?: import('../../src/modules/backtesting').BacktestEngine; signalEngine?: import('../../src/modules/backtesting').StrategySignalEngine; newsSources?: NewsSource[]; calendarRequest?: CalendarRequest } = {}) {
   const database = await createTestDb();
   const sms = new FakeSms();
   const clock = new FakeClock();
   // Tests act as a trusted reverse proxy that sets X-Forwarded-For.
   const identity = createIdentityModule({ db: database.appDb, config: authConfig(options.auth), sms, clock, clientIp: clientIpResolver('x-forwarded-for') });
   const profiles = createProfilesModule({ db: database.appDb, requireActiveUser: identity.requireActiveUser });
+  const calendar = createCalendarModule({ requireActiveUser: identity.requireActiveUser, request: options.calendarRequest ?? (async () => Response.json([])), now: () => clock.now().getTime() });
   const provider = new FakeProvider();
   const feed = new FakeFeed();
   const market = createMarketModule({ db: database.appDb, requireActiveUser: identity.requireActiveUser, exchanges: [{ provider, feed }], clock });
@@ -100,8 +102,8 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
   const community = createCommunityModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser, instruments: marketInstrumentResolver(market.service), publicBaseUrl: TEST_ORIGIN, clock,
   });
-  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio });
-  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, history, model, provider, feed, sms, clock, ...database };
+  const app = createApp({ clientOrigin: '*', pingDatabase: options.pingDatabase ?? (async () => true), identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, calendar });
+  return { app, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, calendar, history, model, provider, feed, sms, clock, ...database };
 }
 
 let clientCount = 0;

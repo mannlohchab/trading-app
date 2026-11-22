@@ -8,6 +8,7 @@ import { httpMetrics } from './http/metrics-middleware';
 import type { AiModule } from './modules/ai';
 import type { BacktestingModule } from './modules/backtesting';
 import type { CommunityModule } from './modules/community';
+import type { CalendarModule } from './modules/calendar';
 import type { IdentityModule } from './modules/identity';
 import type { MarketModule } from './modules/market';
 import type { NewsModule } from './modules/news';
@@ -30,12 +31,13 @@ export type AppDeps = {
   news: NewsModule;
   community: CommunityModule;
   portfolio: PortfolioModule;
+  calendar: CalendarModule;
   /** Optional Prometheus HTTP metrics (count and latency per route pattern). */
   metrics?: { recordHttp: (method: string, route: string, status: number, seconds: number) => void };
 };
 
 /** Builds the HTTP app from its modules. No I/O happens here; see ./index.ts for production wiring. */
-export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, metrics }: AppDeps) {
+export function createApp({ clientOrigin, pingDatabase, identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, calendar, metrics }: AppDeps) {
   const app = new Hono();
 
   if (metrics) app.use(httpMetrics(metrics.recordHttp));
@@ -69,6 +71,7 @@ export function createApp({ clientOrigin, pingDatabase, identity, profiles, mark
   app.route('/', news.routes);
   app.route('/', community.routes);
   app.route('/', portfolio.routes);
+  app.route('/', calendar.routes);
 
   app.notFound(c => c.json({ error: 'Not found' }, 404));
   app.onError((err, c) => {

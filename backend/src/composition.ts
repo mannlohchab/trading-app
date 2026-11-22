@@ -11,6 +11,7 @@ import { verifySandboxIsolation } from './modules/backtesting/workers/backtest.w
 import { ConsoleSmsSender, createIdentityModule, type SmsSender } from './modules/identity';
 import { binanceAdapters, createMarketModule } from './modules/market';
 import { createCommunityModule, marketInstrumentResolver } from './modules/community';
+import { createCalendarModule } from './modules/calendar';
 import { createNewsModule, newsSourcesFromConfig } from './modules/news';
 import { createPaperTradingModule } from './modules/paper-trading';
 import { createPortfolioModule, marketPriceSource } from './modules/portfolio';
@@ -31,6 +32,7 @@ export function composeModules() {
     clientIp: clientIpResolver(config.http.trustedProxyIpHeader),
   });
   const profiles = createProfilesModule({ db, requireActiveUser: identity.requireActiveUser });
+  const calendar = createCalendarModule({ requireActiveUser: identity.requireActiveUser });
   const market = createMarketModule({ db, requireActiveUser: identity.requireActiveUser, exchanges: [binanceAdapters()] });
   const strategies = createStrategiesModule({
     db,
@@ -92,7 +94,7 @@ export function composeModules() {
     instruments: marketInstrumentResolver(market.service),
     publicBaseUrl: config.auth.baseUrl,
   });
-  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio };
+  return { identity, profiles, market, strategies, ai, backtesting, paperTrading, news, community, portfolio, calendar };
 }
 
 /** Starts the job runner after proving the sandbox isolates. Returns a stop function. */
