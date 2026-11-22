@@ -1,6 +1,7 @@
 // Crypto news articles: what sources deliver (`RawNewsItem`), how it is normalized into a stored
 // article, and the rules for de-duplication, relevance and scheduling. Plain TypeScript, no I/O.
 import { detectAssets } from './assets';
+import { detectMacroImpacts } from './impacts';
 
 /** One item as a source adapter delivers it: text may still contain HTML and entities. */
 export type RawNewsItem = {
@@ -145,6 +146,8 @@ export function normalizeItem(item: RawNewsItem, providerId: string, now: Date):
   const categories = [...new Set((item.categories ?? []).map(c => plainText(c).toLowerCase()).filter(c => c && c.length <= LIMITS.category))]
     .slice(0, LIMITS.categories);
   const tagged = (item.assets ?? []).map(a => a.trim().toUpperCase()).filter(a => /^[A-Z0-9]{2,10}$/.test(a));
+  const body = `${title} ${summary ?? ''}`;
+  const macroCodes = detectMacroImpacts(body).map(i => i.code);
   // Feeds sometimes date items in the future (time-zone mistakes): never store a date ahead of now.
   const published = item.publishedAt && !Number.isNaN(item.publishedAt.getTime()) ? item.publishedAt : now;
   return {
@@ -158,7 +161,8 @@ export function normalizeItem(item: RawNewsItem, providerId: string, now: Date):
     publisherKey: publisherKey(publisher),
     publishedAt: published > now ? now : published,
     categories,
-    assets: [...new Set([...tagged, ...detectAssets(`${title} ${summary ?? ''}`, categories)])].sort(),
+    // Crypto coins plus FX/commodity codes so `?asset=` and Home chips share one column.
+    assets: [...new Set([...tagged, ...detectAssets(body, categories), ...macroCodes])].sort(),
     providers: [providerId],
     breakingAt: item.breaking === true ? now : null,
     metadata: item.metadata && Object.keys(item.metadata).length ? { [providerId]: item.metadata } : {},

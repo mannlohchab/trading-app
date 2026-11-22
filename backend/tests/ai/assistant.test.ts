@@ -91,7 +91,7 @@ describe('assistant turns', () => {
     expect(blocks[1].data).toMatchObject({ exchange: 'BINANCE', symbol: 'BTCUSDT', lastPrice: '73886.01' });
     expect(res.body.assistantMessage.metadata.toolCalls).toEqual([{ name: 'get_tickers', arguments: { symbols: ['btcusdt'] }, ok: true, durationMs: expect.any(Number) }]);
     expect(res.body.assistantMessage.tokenUsage).toMatchObject({ inputTokens: 350, outputTokens: 22 });
-    expect(t.model.requests[0]!.tools!.map(x => x.name)).toEqual(['search_symbols', 'get_tickers', 'get_top_movers', 'analyze_market', 'show_chart', 'draft_strategy', 'get_my_holdings']);
+    expect(t.model.requests[0]!.tools!.map(x => x.name)).toEqual(['search_symbols', 'get_tickers', 'get_top_movers', 'analyze_market', 'show_chart', 'draft_strategy', 'run_backtest', 'get_my_holdings']);
   });
 
   test('market analysis uses server-computed indicators', async () => {
@@ -347,6 +347,87 @@ describe('usage limits', () => {
     } finally {
       await off.close();
     }
+  });
+});
+
+describe('run_backtest tool', () => {
+  const emaDraft = () => ({
+    name: 'EMA cross backtest',
+    definition: {
+      market: { exchange: 'BINANCE', symbol: 'BTCUSDT', timeframe: '1h' },
+      direction: 'LONG',
+      entry: { conditions: [{ left: { type: 'EMA', period: 10 }, operator: 'CROSSES_ABOVE', right: { type: 'EMA', period: 30 } }] },
+      exit: { conditions: [{ left: { type: 'EMA', period: 10 }, operator: 'CROSSES_BELOW', right: { type: 'EMA', period: 30 } }], stopLossPercent: 5 },
+      risk: { positionSizePercent: 20 },
+    },
+  });
+
+  test('draft then run_backtest returns engine metrics, equity and trades (not LLM fiction)', async () => {
+    const { eq } = await import('drizzle-orm');
+    const { marketCandles, tradingSymbols } = await import('../../src/db/schema');
+    const { recentWalk, seedCandles, symbolId } = await import('../backtesting/fixtures');
+    // Earlier AI tests may have stored off-grid candles for BTCUSDT via the fake feed; replace them.
+    const btcId = await symbolId(t, 'BTCUSDT');
+    await t.db.delete(marketCandles).where(eq(marketCandles.symbolId, btcId));
+    await seedCandles(t, recentWalk(t, 1200));
+    expect((await t.db.select().from(tradingSymbols).where(eq(tradingSymbols.symbol, 'BTCUSDT'))).length).toBe(1);
+
+    const id = await newConversation();
+    t.model.script(
+      [call('draft_strategy', emaDraft()), done(100, 20, 'tool_calls')],
+      req => {
+        const payload = JSON.parse((req.messages.at(-1) as any).content);
+        expect(payload.draftId).toMatch(/^draft-/);
+        expect(payload.error).toBeUndefined();
+        return [call('run_backtest', { draftId: payload.draftId, candles: 500 }), done(100, 20, 'tool_calls')];
+      },
+      req => {
+        const payload = JSON.parse((req.messages.at(-1) as any).content);
+        expect(payload.error).toBeUndefined();
+        expect(payload.metrics?.totalTrades).toBeGreaterThan(0);
+        return [text('The engine backtested the EMA cross on BTCUSDT.'), done()];
+      },
+    );
+    const res = await ask(id, 'Draft an EMA cross on BTC 1h and backtest it');
+    expect(res.status).toBe(201);
+    const blocks = res.body.assistantMessage.metadata.blocks;
+    expect(blocks.map((b: any) => b.type)).toEqual(expect.arrayContaining(['strategy_draft', 'backtest_result', 'markdown', 'disclaimer']));
+    const card = blocks.find((b: any) => b.type === 'backtest_result');
+    expect(card.data).toMatchObject({
+      saved: false,
+      market: { exchange: 'BINANCE', symbol: 'BTCUSDT', timeframe: '1h' },
+      engine: { name: 'resin' },
+    });
+    expect(card.data.metrics.totalTrades).toBeGreaterThan(0);
+    expect(card.data.metrics.totalReturnPercent).toMatch(/^-?\d+(\.\d+)?$/);
+    expect(card.data.equityCurve.length).toBeGreaterThan(2);
+    expect(card.data.equityCurve[0]).toMatchObject({ time: expect.any(Number), equity: expect.any(String) });
+    expect(card.data.trades.length).toBeGreaterThan(0);
+    expect(res.body.assistantMessage.metadata.toolCalls.map((x: any) => x.name)).toEqual(['draft_strategy', 'run_backtest']);
+    expect(res.body.assistantMessage.metadata.toolCalls.every((x: any) => x.ok)).toBe(true);
+  });
+
+  test('insufficient history fails clearly without inventing results', async () => {
+    const id = await newConversation();
+    // ETHUSDT is listed but this suite never seeds its candles.
+    const ethDef = {
+      ...emaDraft().definition,
+      market: { exchange: 'BINANCE', symbol: 'ETHUSDT', timeframe: '1h' as const },
+    };
+    t.model.script(
+      [call('run_backtest', { name: 'Thin', definition: ethDef, candles: 200 }), done(100, 20, 'tool_calls')],
+      req => {
+        const payload = JSON.parse((req.messages.at(-1) as any).content);
+        expect(payload.error).toMatch(/Backtest failed/i);
+        return [text('Not enough candle history to backtest that.'), done()];
+      },
+    );
+    const res = await ask(id, 'Backtest EMA on ETH without history');
+    expect(res.status).toBe(201);
+    expect(res.body.assistantMessage.metadata.blocks.some((b: any) => b.type === 'backtest_result')).toBe(false);
+    expect(res.body.assistantMessage.metadata.toolCalls).toEqual([
+      expect.objectContaining({ name: 'run_backtest', ok: false }),
+    ]);
   });
 });
 

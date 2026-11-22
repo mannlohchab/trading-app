@@ -5,6 +5,7 @@ import { parseJson, validationError } from '../../../http/validation';
 import type { AuthVariables } from '../../identity';
 import { AssistantError, type AssistantService, type TurnEvent } from '../application/assistant.service';
 import type { ConversationService } from '../application/conversation.service';
+import type { DailyBriefService } from '../application/daily-brief.service';
 import { AiProviderError } from '../application/errors';
 import { CONVERSATION_LIMITS } from '../domain/conversation';
 
@@ -34,8 +35,13 @@ const messageBody = z.strictObject({
 });
 const saveDraftBody = z.strictObject({ draftId: z.string().min(1).max(40) });
 
-export function aiRoutes(deps: { assistant: AssistantService; conversations: ConversationService; requireActiveUser: MiddlewareHandler<{ Variables: AuthVariables }> }) {
-  const { assistant, conversations } = deps;
+export function aiRoutes(deps: {
+  assistant: AssistantService;
+  conversations: ConversationService;
+  dailyBrief: DailyBriefService;
+  requireActiveUser: MiddlewareHandler<{ Variables: AuthVariables }>;
+}) {
+  const { assistant, conversations, dailyBrief } = deps;
   const routes = new Hono<{ Variables: AuthVariables }>().basePath('/api/v1/ai');
   routes.use('*', deps.requireActiveUser);
   routes.onError((error, c) => {
@@ -50,6 +56,20 @@ export function aiRoutes(deps: { assistant: AssistantService; conversations: Con
     models: assistant.availableModels().map(m => ({ id: m.id, label: m.label, supportsTools: m.supportsTools })),
   }));
   routes.get('/usage', async c => c.json(await assistant.usageToday(c.var.user.id)));
+
+  /** Cached Home daily brief (text). Audio is a separate endpoint so clients can stream it. */
+  routes.get('/daily-brief', async c => c.json(await dailyBrief.today()));
+  routes.get('/daily-brief/audio', async c => {
+    const audio = await dailyBrief.audioToday();
+    if (!audio) return c.json({ error: 'Audio is not available for today’s brief.', code: 'AUDIO_UNAVAILABLE' }, 404);
+    return new Response(new Uint8Array(audio.bytes), {
+      status: 200,
+      headers: {
+        'Content-Type': audio.contentType,
+        'Cache-Control': 'private, max-age=3600',
+      },
+    });
+  });
 
   routes.post('/conversations', async c => {
     const body = await parseJson(c, createBody);

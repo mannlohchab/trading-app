@@ -5,6 +5,7 @@ import { db } from './db/client';
 import { clientIpResolver } from './http/client-ip';
 import { createLogger } from './logger';
 import { createAiModule, WORKERS_AI_MODELS, WorkersAiProvider } from './modules/ai';
+import { backtestGateway } from './modules/ai/infrastructure/gateways';
 import { createBacktestingModule } from './modules/backtesting';
 import { verifySandboxIsolation } from './modules/backtesting/workers/backtest.worker-manager';
 import { ConsoleSmsSender, createIdentityModule, type SmsSender } from './modules/identity';
@@ -37,6 +38,13 @@ export function composeModules() {
     instruments: { isActive: (exchange, symbol) => market.service.isActiveInstrument(exchange, symbol) },
   });
   const portfolio = createPortfolioModule({ db, requireActiveUser: identity.requireActiveUser, prices: marketPriceSource(market.service) });
+  const backtesting = createBacktestingModule({
+    db,
+    requireActiveUser: identity.requireActiveUser,
+    market: market.service,
+    strategies: strategies.service,
+    sandbox: config.backtesting.sandbox,
+  });
   const ai = createAiModule({
     db,
     requireActiveUser: identity.requireActiveUser,
@@ -50,15 +58,11 @@ export function composeModules() {
     strategies: strategies.service,
     profiles: profiles.service,
     portfolio: portfolio.service,
+    backtest: backtestGateway(backtesting.service),
+    openRouter: config.ai.openRouter,
   });
   if (!config.ai.cloudflare) console.warn('[ai] CF_ACCOUNT_ID/CF_API_TOKEN not set: the AI assistant will answer 503 AI_NOT_CONFIGURED');
-  const backtesting = createBacktestingModule({
-    db,
-    requireActiveUser: identity.requireActiveUser,
-    market: market.service,
-    strategies: strategies.service,
-    sandbox: config.backtesting.sandbox,
-  });
+  if (!config.ai.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Home daily brief audio will be unavailable');
   const paperTrading = createPaperTradingModule({
     db,
     requireActiveUser: identity.requireActiveUser,

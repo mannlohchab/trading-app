@@ -12,8 +12,10 @@ export type NewsArticle = {
   author: string | null;
   publisher: { key: string; name: string };
   publishedAt: string;
-  /** Coin codes the story is about, e.g. ["BTC"]. */
+  /** Coin / FX / commodity codes, e.g. ["BTC","USD","XAU"]. */
   assets: string[];
+  /** Structured impact chips (kind + label). Older payloads may omit this. */
+  impacts?: { code: string; kind: 'crypto' | 'currency' | 'fx_pair' | 'commodity'; label: string }[];
   breaking: boolean;
 };
 

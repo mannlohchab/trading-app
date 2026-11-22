@@ -36,9 +36,22 @@ export const NewsRow = memo(function NewsRow({ article, last }: { article: NewsA
           <Text style={styles.time}>· {ago(article.publishedAt)}</Text>
         </View>
         <Text style={styles.title} numberOfLines={3}>{article.title}</Text>
-        {article.assets.length ? (
+        {(article.impacts?.length || article.assets.length) ? (
           <View style={styles.tags}>
-            {article.assets.slice(0, 3).map(asset => <Text key={asset} style={styles.tag}>{asset}</Text>)}
+            {(article.impacts?.length
+              ? article.impacts.slice(0, 4).map(impact => (
+                <Text
+                  key={impact.code}
+                  style={[
+                    styles.tag,
+                    impact.kind === 'fx_pair' || impact.kind === 'currency' ? styles.tagFx
+                      : impact.kind === 'commodity' ? styles.tagCommodity
+                        : null,
+                  ]}>
+                  {impact.code}
+                </Text>
+              ))
+              : article.assets.slice(0, 4).map(asset => <Text key={asset} style={styles.tag}>{asset}</Text>))}
           </View>
         ) : null}
       </View>
@@ -72,7 +85,9 @@ const styles = StyleSheet.create({
   publisher: { flexShrink: 1, color: Palette.textSecondary, fontSize: 11, fontWeight: '600' },
   time: { flexShrink: 0, color: Palette.textMuted, fontSize: 11 },
   title: { color: Palette.text, fontSize: 15, fontWeight: '600', lineHeight: 20, letterSpacing: -0.3 },
-  tags: { flexDirection: 'row', gap: 5, marginTop: 7 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 7 },
   tag: { color: Palette.accent, backgroundColor: Palette.accentMuted, fontSize: 10, fontWeight: '600', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  tagFx: { color: '#0F766E', backgroundColor: '#CCFBF1' },
+  tagCommodity: { color: '#92400E', backgroundColor: '#FEF3C7' },
   thumb: { width: 76, height: 76, borderRadius: 12, backgroundColor: Palette.pill },
 });

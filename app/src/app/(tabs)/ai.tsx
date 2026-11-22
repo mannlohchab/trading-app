@@ -15,14 +15,38 @@ import { conversationMessages, createConversation, deleteConversation as removeC
 import { DEMO_MODE } from '@/lib/demoMode';
 import { listHoldings } from '@/lib/portfolioHoldings';
 import { useAuth } from '@/store/auth';
+import { AiBacktestCard } from '@/components/ai/AiBacktestCard';
+import { AiAnalysisCard, AiMarketListCard, AiStrategyDraftCard, AiTickerCard } from '@/components/ai/AiBlockCards';
 import { AiChartCard } from '@/components/ai/AiChartCard';
 import { AiResponse } from '@/components/ai/AiResponse';
-import { chartsFromBlocks, parseChartBlock, type AiChart } from '@/lib/aiCharts';
+import { parseAiBlocks, type AiParsedBlocks } from '@/lib/aiBlocks';
 import { MovingMist } from '@/components/ai/MovingMist';
 import { AiTrace } from '@/components/ai/AiTrace';
 import { applyStepEvent, settleSteps, stepsFromToolCalls, type ToolStep } from '@/lib/aiTrace';
 
-type Message = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error'; charts?: AiChart[]; steps?: ToolStep[] };
+type Message = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status?: 'streaming' | 'stopped' | 'error';
+  blocks?: AiParsedBlocks;
+  steps?: ToolStep[];
+};
+
+const emptyBlocks = (): AiParsedBlocks => ({ charts: [], tickers: [], marketLists: [], analyses: [], drafts: [], backtests: [] });
+
+function mergeBlock(previous: AiParsedBlocks | undefined, raw: unknown): AiParsedBlocks {
+  const next = parseAiBlocks([raw]);
+  const base = previous ?? emptyBlocks();
+  return {
+    charts: [...base.charts, ...next.charts],
+    tickers: [...base.tickers, ...next.tickers],
+    marketLists: [...base.marketLists, ...next.marketLists],
+    analyses: [...base.analyses, ...next.analyses],
+    drafts: [...base.drafts, ...next.drafts],
+    backtests: [...base.backtests, ...next.backtests],
+  };
+}
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
 const ALL_MODES: { kind: AiKind; label: string; hint: string; icon: GlassIconName }[] = [
   { kind: 'chat', label: 'Chat', hint: 'Ask anything about markets', icon: 'community' },
@@ -33,6 +57,7 @@ const MODES = ALL_MODES;
 const STARTERS = [
   { title: 'Check Bitcoin right now', prompt: 'What is Bitcoin trading at right now? Show the latest available price and daily change.', icon: 'chart' as const },
   { title: 'Compare two markets', prompt: 'Compare the latest Bitcoin and Ethereum prices and daily changes. What should I watch?', icon: 'analytics' as const },
+  { title: 'Backtest an EMA cross', prompt: 'Draft a long-only EMA 10/30 crossover strategy on BTCUSDT 1h with a 5% stop, then backtest it on recent history and summarise the engine results.', icon: 'analytics' as const },
 ];
 // The assistant reads the user's holdings table itself (get_my_holdings), so prompts just ask.
 const PORTFOLIO_REVIEW = 'Analyse my portfolio: overall profit or loss, allocation and concentration, winners and losers, how long I have held each position, and the main risks.';
@@ -246,18 +271,17 @@ export default function AiScreen() {
             setMessages((previous) => previous.map((message) => message.id === assistantId
               ? { ...message, steps: applyStepEvent(message.steps ?? [], event) } : message));
           }
-          // Charts arrive as soon as the tool runs, before the answer text finishes.
+          // Structured cards arrive as soon as tools run, before the answer text finishes.
           if (event.type === 'block') {
-            const chart = parseChartBlock(event.block);
-            if (chart) setMessages((previous) => previous.map((message) => message.id === assistantId
-              ? { ...message, charts: [...(message.charts ?? []), chart] } : message));
+            setMessages((previous) => previous.map((message) => message.id === assistantId
+              ? { ...message, blocks: mergeBlock(message.blocks, event.block) } : message));
           }
           // The saved reply is authoritative (it also covers replies that arrived without deltas).
           if (event.type === 'assistant_message' && typeof event.message?.content === 'string') {
             const content: string = event.message.content;
-            const charts = chartsFromBlocks(event.message.metadata?.blocks);
+            const blocks = parseAiBlocks(event.message.metadata?.blocks);
             setMessages((previous) => previous.map((message) => message.id === assistantId
-              ? { ...message, content, charts, steps: message.steps?.length ? settleSteps(message.steps) : stepsFromToolCalls(event.message.metadata?.toolCalls, assistantId) }
+              ? { ...message, content, blocks, steps: message.steps?.length ? settleSteps(message.steps) : stepsFromToolCalls(event.message.metadata?.toolCalls, assistantId) }
               : message));
           }
         }, request.signal);
@@ -400,9 +424,14 @@ export default function AiScreen() {
                 <AiTrace steps={item.steps}
                   thinking={item.status === 'streaming' && !item.content && !item.steps?.some((step) => step.status === 'running')} />
                 {!!item.content && <AiResponse content={item.content} />}
-                {item.charts?.map((chart, index) => <AiChartCard key={`${chart.symbol}-${chart.timeframe}-${index}`} chart={chart} />)}
+                {item.blocks?.tickers.map((t, i) => <AiTickerCard key={`t-${t.symbol}-${i}`} ticker={t} />)}
+                {item.blocks?.marketLists.map((list, i) => <AiMarketListCard key={`ml-${i}`} list={list} />)}
+                {item.blocks?.analyses.map((a, i) => <AiAnalysisCard key={`a-${a.symbol}-${i}`} analysis={a} />)}
+                {item.blocks?.charts.map((chart, index) => <AiChartCard key={`${chart.symbol}-${chart.timeframe}-${index}`} chart={chart} />)}
+                {item.blocks?.drafts.map((d) => <AiStrategyDraftCard key={d.draftId} draft={d} />)}
+                {item.blocks?.backtests.map((b, i) => <AiBacktestCard key={`bt-${b.market.symbol}-${i}`} result={b} />)}
                 {item.status === 'streaming' && !!item.content && <ActivityIndicator size="small" color={MUTED} style={styles.streamingDot} />}
-                {!item.content && !item.charts?.length && item.status !== 'streaming' && <Text style={styles.muted}>{item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
+                {!item.content && !item.blocks?.charts.length && !item.blocks?.backtests.length && item.status !== 'streaming' && <Text style={styles.muted}>{item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
                 {item.status === 'stopped' && !!item.content && <Text style={styles.responseStatus}>Stopped · partial response</Text>}
                 {item.status === 'error' && !!item.content && <Text style={styles.responseStatus}>Incomplete response</Text>}
               </View>

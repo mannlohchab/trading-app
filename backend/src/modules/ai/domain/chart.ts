@@ -12,6 +12,15 @@ const LEVEL_WINDOW = 30;
 
 export type ChartCandleInput = { openTime: number; open: string; high: string; low: string; close: string; isClosed: boolean };
 
+export type ChartMarker = {
+  /** Candle open time (ms) the marker sits on. */
+  time: number;
+  price: number;
+  kind: 'entry' | 'exit' | 'label';
+  label: string;
+  side?: 'long' | 'short';
+};
+
 export type ChartData = {
   exchange: string;
   symbol: string;
@@ -22,6 +31,8 @@ export type ChartData = {
   /** One value per candle; null where there is not enough history. */
   lines: { id: LineId; label: string; values: (number | null)[] }[];
   levels: { kind: 'support' | 'resistance'; label: string; price: number }[];
+  /** Optional trade/annotation markers (entries, exits, labels). */
+  markers?: ChartMarker[];
   pricePrecision: number;
   lastClose: number;
   changePercent: number;

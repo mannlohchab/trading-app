@@ -30,6 +30,24 @@ export interface PortfolioGateway {
   valuation(userId: string): Promise<import('../../portfolio').PortfolioValuation & { updatedAt: Date | null }>;
 }
 
+/** Runs a real sandboxed backtest of an unsaved strategy definition (AI draft preview). */
+export interface BacktestGateway {
+  preview(userId: string, request: {
+    name?: string;
+    definition: unknown;
+    candles?: number;
+  }): Promise<{
+    market: { exchange: string; symbol: string; timeframe: string };
+    range: { start: number; end: number };
+    metrics: Record<string, unknown>;
+    warnings: { code: string; message: string }[];
+    trades: Record<string, unknown>[];
+    equityCurve: { time: number; equity: string }[];
+    engine: { name: string; version: string; revision?: string };
+    dataset: { candles: number };
+  }>;
+}
+
 /** Expected tool failures; the message goes back to the model so it can adjust. */
 export class ToolInputError extends Error {}
 
@@ -128,9 +146,22 @@ const MAX_POSITIONS_IN_TOOL = 30;
 /** Charts per reply: enough to compare two pairs, few enough to keep a phone screen readable. */
 const MAX_CHARTS_PER_TURN = 2;
 
-export function createTools(market: MarketGateway, strategies: StrategyDraftChecker, portfolio?: { gateway: PortfolioGateway; userId: string }): AssistantTool[] {
+/** Trades shown on the backtest card; full count stays in metrics.totalTrades. */
+const MAX_BACKTEST_TRADES_IN_BLOCK = 25;
+/** One backtest per turn keeps sandbox load and chat cards readable. */
+const MAX_BACKTESTS_PER_TURN = 1;
+
+export function createTools(
+  market: MarketGateway,
+  strategies: StrategyDraftChecker,
+  portfolio?: { gateway: PortfolioGateway; userId: string },
+  backtest?: { gateway: BacktestGateway; userId: string },
+): AssistantTool[] {
   let draftCount = 0;
   let chartCount = 0;
+  let backtestCount = 0;
+  /** Drafts produced earlier in this turn, so run_backtest can reference draftId. */
+  const drafts = new Map<string, { name: string; definition: unknown; summary: string[] }>();
   return [
     defineTool(
       'search_symbols',
@@ -222,12 +253,106 @@ export function createTools(market: MarketGateway, strategies: StrategyDraftChec
         const checked = await strategies.validate(normalizeDraft(draft));
         if (!checked.ok) throw new ToolInputError(`Strategy is invalid: ${Object.entries(checked.errors).map(([k, v]) => `${k}: ${v}`).join('; ')}`);
         const draftId = `draft-${++draftCount}`;
+        drafts.set(draftId, { name: checked.draft.name, definition: checked.draft.definition, summary: checked.summary });
         return {
           result: { ok: true, draftId, shownToUser: true, rules: checked.summary },
           blocks: [{ type: 'strategy_draft' as const, draftId, draft: checked.draft as unknown as Record<string, unknown>, summary: checked.summary }],
         };
       },
     ),
+    ...(backtest ? [defineTool(
+      'run_backtest',
+      'Run a real historical backtest of a strategy on closed candles in the sandboxed engine (not LLM-estimated). Prefer draftId from draft_strategy in this turn, or pass the full definition. Returns engine metrics, recent trades and an equity curve for the app to display. Call after drafting when the user asks to backtest, simulate, or see how a strategy would have performed.',
+      z.strictObject({
+        draftId: z.string().min(1).max(40).optional().describe('Id returned by draft_strategy in this turn'),
+        name: z.string().min(1).max(80).optional().describe('Strategy name when passing definition directly'),
+        definition: looseDraft.shape.definition.optional().describe('Full strategy definition when draftId is not used'),
+        candles: z.number().int().min(100).max(1500).default(500).describe('How many recent closed candles to simulate'),
+      }).refine(v => !!v.draftId || !!v.definition, { message: 'Provide draftId or definition' }),
+      async ({ draftId, name, definition, candles }) => {
+        if (backtestCount >= MAX_BACKTESTS_PER_TURN) {
+          throw new ToolInputError(`At most ${MAX_BACKTESTS_PER_TURN} backtest per answer; refer to the card already shown.`);
+        }
+        let resolvedName = name;
+        let resolvedDefinition: unknown = definition;
+        if (draftId) {
+          const prior = drafts.get(draftId);
+          if (!prior) throw new ToolInputError(`Unknown draftId "${draftId}". Call draft_strategy first in this turn, or pass definition.`);
+          resolvedName = resolvedName ?? prior.name;
+          resolvedDefinition = prior.definition;
+        }
+        if (!resolvedDefinition) throw new ToolInputError('Provide draftId or definition.');
+
+        // Normalize when the model sent a loose definition (same path as draft_strategy).
+        let validatedDefinition = resolvedDefinition;
+        if (definition && !draftId) {
+          const checked = await strategies.validate(normalizeDraft({ name: resolvedName ?? 'Backtest', definition }));
+          if (!checked.ok) {
+            throw new ToolInputError(`Strategy is invalid: ${Object.entries(checked.errors).map(([k, v]) => `${k}: ${v}`).join('; ')}`);
+          }
+          validatedDefinition = checked.draft.definition;
+          resolvedName = checked.draft.name;
+        }
+
+        let preview: Awaited<ReturnType<BacktestGateway['preview']>>;
+        try {
+          preview = await backtest.gateway.preview(backtest.userId, {
+            name: resolvedName,
+            definition: validatedDefinition,
+            candles,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+          throw new ToolInputError(code ? `Backtest failed (${code}): ${message}` : `Backtest failed: ${message}`);
+        }
+        backtestCount++;
+
+        const trades = preview.trades.slice(-MAX_BACKTEST_TRADES_IN_BLOCK).map(t => ({
+          side: t.side, entryTime: t.entryTime, exitTime: t.exitTime,
+          entryPrice: t.entryPrice, exitPrice: t.exitPrice,
+          quantity: t.quantity, profit: t.profit, profitPercent: t.profitPercent,
+          fees: t.commission ?? t.fees, exitReason: t.exitReason,
+        }));
+        const m = preview.metrics;
+        const result = {
+          shownToUser: true,
+          saved: false,
+          engine: preview.engine,
+          market: preview.market,
+          range: preview.range,
+          datasetCandles: preview.dataset.candles,
+          metrics: {
+            totalTrades: m.totalTrades,
+            winRatePercent: m.winRatePercent,
+            netProfit: m.netProfit,
+            totalReturnPercent: m.totalReturnPercent,
+            maxDrawdownPercent: m.maxDrawdownPercent,
+            profitFactor: m.profitFactor,
+            finalEquity: m.finalEquity,
+            buyAndHoldReturnPercent: m.buyAndHoldReturnPercent,
+          },
+          warnings: preview.warnings.map(w => ({ code: w.code, message: w.message })),
+          tradesShown: trades.length,
+        };
+        return {
+          result,
+          blocks: [{
+            type: 'backtest_result' as const,
+            data: {
+              saved: false,
+              market: preview.market,
+              range: preview.range,
+              metrics: preview.metrics as Record<string, unknown>,
+              warnings: preview.warnings,
+              trades,
+              equityCurve: preview.equityCurve,
+              engine: preview.engine,
+            },
+          }],
+        };
+      },
+    )] : []),
     ...(portfolio ? [defineTool(
       'get_my_holdings',
       'The holdings this user entered in their Portfolio table (asset, quantity, buy date, buy price), merged per asset and valued by the server at current prices: value, cost, profit/loss, share of the portfolio, days held and concentration. Use for any question about their portfolio, holdings or investments.',

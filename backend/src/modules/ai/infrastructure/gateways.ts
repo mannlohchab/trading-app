@@ -1,4 +1,5 @@
 // Adapters from the AI module's gateways to other modules' public services.
+import type { BacktestingService } from '../../backtesting/backtesting.service';
 import type { MarketDataService } from '../../market/application/market-data.service';
 import { summarizeMarket } from '../../market/domain/analysis';
 import type { Ticker } from '../../market/domain/types';
@@ -6,7 +7,7 @@ import type { ProfileService } from '../../profiles/application/profile.service'
 import { describeCondition, type StrategyService } from '../../strategies';
 import type { StrategySaver } from '../application/conversation.service';
 import type { PersonaSource } from '../application/ports';
-import type { MarketGateway, StrategyDraftChecker, TickerView } from '../application/tools';
+import type { BacktestGateway, MarketGateway, StrategyDraftChecker, TickerView } from '../application/tools';
 
 const view = (t: Ticker): TickerView => ({
   symbol: t.symbol, lastPrice: t.lastPrice, priceChangePercent: t.priceChangePercent,
@@ -65,6 +66,29 @@ export function personaSource(profiles: ProfileService): PersonaSource {
     async forUser(userId) {
       const p = await profiles.getPreferences(userId);
       return { responseStyle: p.ai.responseStyle, explanationLevel: p.ai.explanationLevel, language: p.ai.language ?? p.general.language, timezone: p.general.timezone };
+    },
+  };
+}
+
+/** Preview path into the real sandboxed engine (nothing stored). */
+export function backtestGateway(service: BacktestingService): BacktestGateway {
+  return {
+    async preview(userId, request) {
+      const result = await service.preview(userId, {
+        name: request.name,
+        definition: request.definition,
+        candles: request.candles,
+      });
+      return {
+        market: result.market,
+        range: result.range,
+        metrics: result.metrics as unknown as Record<string, unknown>,
+        warnings: result.warnings,
+        trades: result.trades as unknown as Record<string, unknown>[],
+        equityCurve: result.equityCurve,
+        engine: result.engine,
+        dataset: { candles: result.dataset.candles },
+      };
     },
   };
 }

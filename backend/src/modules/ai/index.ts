@@ -9,13 +9,15 @@ import type { ProfileService } from '../profiles/application/profile.service';
 import type { StrategyService } from '../strategies';
 import { AssistantService } from './application/assistant.service';
 import { ConversationService } from './application/conversation.service';
+import { DailyBriefService } from './application/daily-brief.service';
 import type { ChatModelProvider, Clock, ModelProfile, UsageRepository } from './application/ports';
-import { createTools, type PortfolioGateway } from './application/tools';
+import { createTools, type BacktestGateway, type PortfolioGateway } from './application/tools';
 import type { UsageLimits } from './domain/usage-policy';
 import { aiRoutes } from './http/ai.routes';
 import { DrizzleConversationRepository } from './infrastructure/drizzle-conversation.repository';
 import { DrizzleUsageRepository } from './infrastructure/drizzle-usage.repository';
 import { marketGateway, personaSource, strategyGateway } from './infrastructure/gateways';
+import { OpenRouterTts } from './infrastructure/openrouter-tts';
 
 export type { ChatModelProvider, ChatRequest, ChatStreamEvent, ModelProfile } from './application/ports';
 export { AiProviderError } from './application/errors';
@@ -35,6 +37,10 @@ export function createAiModule(deps: {
   profiles: ProfileService;
   /** The user's real holdings; without it the assistant has no portfolio tool. */
   portfolio?: PortfolioGateway;
+  /** Sandboxed strategy backtests; without it the assistant cannot run_backtest. */
+  backtest?: BacktestGateway;
+  /** OpenRouter TTS for Home daily brief audio. */
+  openRouter?: { apiKey: string; ttsModel: string; voice: string };
   clock?: Clock;
   /** Structured events for observability (one `AI turn recorded` per stored usage event). */
   events?: Logger;
@@ -43,6 +49,7 @@ export function createAiModule(deps: {
   const strategies = strategyGateway(deps.strategies);
   const market = marketGateway(deps.market);
   const log = (message: string, error?: unknown) => console.warn(`[ai] ${message}`, error ?? '');
+  const clock = deps.clock ?? { now: () => new Date() };
   const assistant = new AssistantService({
     providers: deps.providers,
     models: deps.models,
@@ -51,13 +58,34 @@ export function createAiModule(deps: {
     conversations: conversationsRepo,
     usage: withUsageEvents(new DrizzleUsageRepository(deps.db), deps.events),
     persona: personaSource(deps.profiles),
-    tools: userId => createTools(market, strategies, deps.portfolio && { gateway: deps.portfolio, userId }),
+    tools: userId => createTools(
+      market,
+      strategies,
+      deps.portfolio && { gateway: deps.portfolio, userId },
+      deps.backtest && { gateway: deps.backtest, userId },
+    ),
     limits: deps.limits,
-    clock: deps.clock ?? { now: () => new Date() },
+    clock,
     log,
   });
   const conversations = new ConversationService({ conversations: conversationsRepo, strategies });
-  return { assistant, conversations, routes: aiRoutes({ assistant, conversations, requireActiveUser: deps.requireActiveUser }) };
+  const dailyBrief = new DailyBriefService({
+    db: deps.db,
+    market: deps.market,
+    providers: deps.providers,
+    defaultModelId: deps.defaultModelId,
+    models: deps.models,
+    tts: deps.openRouter
+      ? new OpenRouterTts({ apiKey: deps.openRouter.apiKey, model: deps.openRouter.ttsModel, voice: deps.openRouter.voice })
+      : undefined,
+    clock,
+  });
+  return {
+    assistant,
+    conversations,
+    dailyBrief,
+    routes: aiRoutes({ assistant, conversations, dailyBrief, requireActiveUser: deps.requireActiveUser }),
+  };
 }
 
 export type AiModule = ReturnType<typeof createAiModule>;

@@ -3,6 +3,7 @@ import type { AuthConfig } from '../../src/config';
 import { clientIpResolver } from '../../src/http/client-ip';
 import { createIdentityModule, type SmsSender } from '../../src/modules/identity';
 import { createAiModule } from '../../src/modules/ai';
+import { backtestGateway } from '../../src/modules/ai/infrastructure/gateways';
 import { createBacktestingModule } from '../../src/modules/backtesting';
 import type { CandleHistory } from '../../src/modules/backtesting/backtesting.market-history';
 import { silentLogger } from '../../src/logger';
@@ -79,16 +80,17 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
   });
   const portfolio = createPortfolioModule({ db: database.appDb, requireActiveUser: identity.requireActiveUser, prices: marketPriceSource(market.service), clock });
   const model = new FakeChatModel();
-  const ai = createAiModule({
-    db: database.appDb, requireActiveUser: identity.requireActiveUser,
-    providers: options.aiConfigured === false ? [] : [model], models: FAKE_MODELS, defaultModelId: 'fake-main', fallbackModelIds: ['fake-backup'],
-    limits: options.aiLimits ?? { turnsPerDay: 50, tokensPerDay: 1_000_000 },
-    market: market.service, strategies: strategies.service, profiles: profiles.service, portfolio: portfolio.service, clock,
-  });
   const history = new FakeHistory();
   const backtesting = createBacktestingModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser, market: market.service, strategies: strategies.service,
     sandbox: { mode: TEST_SANDBOX_MODE }, history, clock, log: silentLogger, engine: options.backtestEngine,
+  });
+  const ai = createAiModule({
+    db: database.appDb, requireActiveUser: identity.requireActiveUser,
+    providers: options.aiConfigured === false ? [] : [model], models: FAKE_MODELS, defaultModelId: 'fake-main', fallbackModelIds: ['fake-backup'],
+    limits: options.aiLimits ?? { turnsPerDay: 50, tokensPerDay: 1_000_000 },
+    market: market.service, strategies: strategies.service, profiles: profiles.service, portfolio: portfolio.service,
+    backtest: backtestGateway(backtesting.service), clock, openRouter: undefined,
   });
   const paperTrading = createPaperTradingModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser, market: { service: market.service, hub: market.hub },

@@ -54,6 +54,16 @@ export const config = {
       turnsPerDay: Number(env.AI_DAILY_TURN_LIMIT ?? 50),
       tokensPerDay: Number(env.AI_DAILY_TOKEN_LIMIT ?? 250_000),
     },
+    /** OpenRouter TTS for the Home daily brief audio. Without a key, text briefs still work. */
+    openRouter: (() => {
+      const apiKey = env.OPENROUTER_API_KEY?.trim();
+      if (!apiKey) return undefined;
+      return {
+        apiKey,
+        ttsModel: env.OPENROUTER_TTS_MODEL?.trim() || 'openai/gpt-4o-mini-tts',
+        voice: env.OPENROUTER_TTS_VOICE?.trim() || 'alloy',
+      };
+    })(),
   },
   backtesting: (() => {
     const mode = (env.BACKTEST_SANDBOX ?? 'bwrap') as 'bwrap' | 'process';

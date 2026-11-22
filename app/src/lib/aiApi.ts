@@ -1,11 +1,18 @@
 // AI assistant conversations on the backend (`/api/v1/ai`). The demo preview keeps its local assistant.
 import type { AiKind } from './aiChat';
-import { chartsFromBlocks, type AiChart } from './aiCharts';
+import { parseAiBlocks, type AiParsedBlocks } from './aiBlocks';
 import { stepsFromToolCalls, type ToolStep } from './aiTrace';
 import { api } from './api';
 import { DEMO_MODE } from './demoMode';
 
-export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; status?: 'streaming' | 'stopped' | 'error'; charts?: AiChart[]; steps?: ToolStep[] };
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status?: 'streaming' | 'stopped' | 'error';
+  blocks?: AiParsedBlocks;
+  steps?: ToolStep[];
+};
 export type ConversationSummary = { id: string; title: string; kind: AiKind; updatedAt: string };
 
 type BackendConversation = { id: string; title: string | null; status: string; updatedAt: string };
@@ -38,7 +45,7 @@ export async function conversationMessages(id: string, signal?: AbortSignal): Pr
     .filter(m => m.role === 'USER' || m.role === 'ASSISTANT')
     .map(m => m.role === 'USER'
       ? { id: m.id, role: 'user' as const, content: m.content }
-      : { id: m.id, role: 'assistant' as const, content: m.content, charts: chartsFromBlocks(m.metadata?.blocks), steps: stepsFromToolCalls(m.metadata?.toolCalls, m.id) });
+      : { id: m.id, role: 'assistant' as const, content: m.content, blocks: parseAiBlocks(m.metadata?.blocks), steps: stepsFromToolCalls(m.metadata?.toolCalls, m.id) });
 }
 
 /** The assistant has market tools but no access to the paper portfolio, so "Market" mode names the pair in the prompt. */

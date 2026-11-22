@@ -36,6 +36,10 @@ export function stepTitle(step: Pick<ToolStep, 'tool' | 'args' | 'status'>): str
     case 'analyze_market': return `${verb('Analysing', 'Analysed')} ${text(a.symbol) || 'the market'}${a.timeframe ? ` (${String(a.timeframe)})` : ''}`;
     case 'show_chart': return `${verb('Drawing', 'Drew')} ${text(a.symbol) ? `${text(a.symbol)} ` : ''}chart`;
     case 'draft_strategy': return `${verb('Drafting', 'Drafted')} a strategy`;
+    case 'run_backtest': {
+      const symbol = text(a.symbol) || (typeof a.draftId === 'string' ? String(a.draftId) : '');
+      return `${verb('Backtesting', 'Backtested')} ${symbol || 'strategy'}`;
+    }
     case 'search_symbols': return `${verb('Searching', 'Searched')} for “${typeof a.query === 'string' ? a.query.trim() : '…'}”`;
     default: return `${verb('Using', 'Used')} ${step.tool.replace(/_/g, ' ')}`;
   }
@@ -43,7 +47,7 @@ export function stepTitle(step: Pick<ToolStep, 'tool' | 'args' | 'status'>): str
 
 const LABELS: Record<string, string> = {
   symbol: 'Pair', symbols: 'Pairs', timeframe: 'Timeframe', candles: 'Candles', chartType: 'Chart', overlays: 'Lines',
-  sort: 'Sort', quoteAsset: 'Quote', limit: 'Count', query: 'Search', name: 'Name',
+  sort: 'Sort', quoteAsset: 'Quote', limit: 'Count', query: 'Search', name: 'Name', draftId: 'Draft',
 };
 
 /** The call's inputs as label/value rows (never raw JSON). Nested objects are left out. */

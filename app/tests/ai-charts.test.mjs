@@ -37,6 +37,21 @@ test('drops malformed charts instead of drawing them wrong', () => {
   assert.deepEqual(chart.levels, []);
 });
 
+test('keeps entry/exit markers that sit on a candle time', () => {
+  const chart = parseChartBlock(block({
+    markers: [
+      { time: 1, price: 102, kind: 'entry', label: 'Buy', side: 'long' },
+      { time: 9, price: 100, kind: 'exit', label: 'Off chart' },
+      { time: 2, price: 118, kind: 'exit', label: 'Sell', side: 'long' },
+    ],
+  }));
+  assert.equal(chart.markers.length, 2);
+  assert.equal(chart.markers[0].kind, 'entry');
+  const layout = layoutChart(chart, 300, 150);
+  assert.equal(layout.markers.length, 2);
+  assert.ok(layout.markers.every(m => m.x > 0 && m.y > 0 && m.y < 150));
+});
+
 test('layout fits candles, lines and levels inside the plot', () => {
   const chart = parseChartBlock(block());
   const layout = layoutChart(chart, 300, 150);

@@ -4,6 +4,13 @@
 
 export type AiChartLine = { id: string; label: string; values: (number | null)[] };
 export type AiChartLevel = { kind: 'support' | 'resistance'; label: string; price: number };
+export type AiChartMarker = {
+  time: number;
+  price: number;
+  kind: 'entry' | 'exit' | 'label';
+  label: string;
+  side?: 'long' | 'short';
+};
 export type AiChart = {
   exchange: string;
   symbol: string;
@@ -13,6 +20,7 @@ export type AiChart = {
   candles: [number, number, number, number, number][];
   lines: AiChartLine[];
   levels: AiChartLevel[];
+  markers: AiChartMarker[];
   pricePrecision: number;
   lastClose: number;
   changePercent: number;
@@ -39,9 +47,19 @@ export function parseChartBlock(block: unknown): AiChart | null {
   const levels = (Array.isArray(d.levels) ? d.levels : []).flatMap((l: any) =>
     (l?.kind === 'support' || l?.kind === 'resistance') && isNum(l.price) && str(l.label, 80)
       ? [{ kind: l.kind, label: l.label, price: l.price } as AiChartLevel] : []);
+  const times = new Set(candles.map(c => c[0]));
+  const markers = (Array.isArray(d.markers) ? d.markers : []).flatMap((m: any): AiChartMarker[] => {
+    if (!isNum(m?.time) || !isNum(m?.price) || !str(m?.label, 80)) return [];
+    if (m.kind !== 'entry' && m.kind !== 'exit' && m.kind !== 'label') return [];
+    if (!times.has(m.time)) return [];
+    return [{
+      time: m.time, price: m.price, kind: m.kind, label: m.label,
+      side: m.side === 'long' || m.side === 'short' ? m.side : undefined,
+    }];
+  }).slice(0, 40);
   const last = candles[candles.length - 1]!;
   return {
-    exchange, symbol, timeframe, candles, lines, levels,
+    exchange, symbol, timeframe, candles, lines, levels, markers,
     chartType: d.chartType === 'line' ? 'line' : 'candle',
     pricePrecision: isNum(d.pricePrecision) ? Math.max(0, Math.min(10, Math.round(d.pricePrecision))) : 2,
     lastClose: isNum(d.lastClose) ? d.lastClose : last[4],
@@ -67,6 +85,7 @@ export type ChartLayout = {
   /** Each line split into runs without gaps. */
   lines: { id: string; label: string; runs: ChartPoint[][] }[];
   levels: (AiChartLevel & { y: number })[];
+  markers: (AiChartMarker & { x: number; y: number })[];
   /** Price gridlines, top to bottom. */
   ticks: { price: number; y: number }[];
 };
@@ -76,6 +95,7 @@ export function layoutChart(chart: AiChart, width: number, height: number): Char
     ...chart.candles.flatMap(c => (chart.chartType === 'candle' ? [c[2], c[3]] : [c[4]])),
     ...chart.lines.flatMap(l => l.values.filter(isNum)),
     ...chart.levels.map(l => l.price),
+    ...chart.markers.map(m => m.price),
   ];
   const low = Math.min(...prices), high = Math.max(...prices);
   const pad = Math.max((high - low) * 0.06, Math.abs(high) * 0.0005, 1e-9);
@@ -83,6 +103,7 @@ export function layoutChart(chart: AiChart, width: number, height: number): Char
   const y = (price: number) => ((max - price) / (max - min)) * height;
   const step = width / chart.candles.length;
   const x = (i: number) => step * (i + 0.5);
+  const indexByTime = new Map(chart.candles.map((c, i) => [c[0], i]));
   const bodyWidth = Math.max(1, Math.min(10, step * 0.7));
   return {
     min, max, y,
@@ -102,6 +123,10 @@ export function layoutChart(chart: AiChart, width: number, height: number): Char
       return { id: l.id, label: l.label, runs: runs.filter(r => r.length > 1) };
     }),
     levels: chart.levels.map(l => ({ ...l, y: y(l.price) })),
+    markers: chart.markers.flatMap(m => {
+      const i = indexByTime.get(m.time);
+      return i === undefined ? [] : [{ ...m, x: x(i), y: y(m.price) }];
+    }),
     ticks: [0, 1 / 3, 2 / 3, 1].map(f => ({ price: max - (max - min) * f, y: height * f })),
   };
 }

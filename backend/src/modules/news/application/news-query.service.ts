@@ -1,6 +1,7 @@
 // Read side of the news module: everything is served from Postgres, never from a source directly, so
 // user traffic never spends the sources' rate limits.
 import { sourceHealth, type NewsArticle } from '../domain/article';
+import { impactsForArticle, type NewsImpact } from '../domain/impacts';
 import { InvalidNewsQueryError } from './errors';
 import type { Clock, NewsRepository, NewsSource } from './ports';
 
@@ -17,6 +18,8 @@ export type ArticleView = {
   publisher: { key: string; name: string };
   publishedAt: string;
   assets: string[];
+  /** Currencies, FX pairs, commodities and crypto this story relates to (for impact chips). */
+  impacts: NewsImpact[];
   categories: string[];
   breaking: boolean;
   sources: string[];
@@ -27,7 +30,9 @@ export type ArticlePage = { articles: ArticleView[]; nextCursor: string | null }
 const view = (a: NewsArticle): ArticleView => ({
   id: a.id, title: a.title, summary: a.summary, url: a.url, imageUrl: a.imageUrl, author: a.author,
   publisher: { key: a.publisherKey, name: a.publisher }, publishedAt: a.publishedAt.toISOString(),
-  assets: a.assets, categories: a.categories, breaking: a.breakingAt !== null, sources: a.providers,
+  assets: a.assets,
+  impacts: impactsForArticle(`${a.title} ${a.summary ?? ''}`, a.assets),
+  categories: a.categories, breaking: a.breakingAt !== null, sources: a.providers,
 });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

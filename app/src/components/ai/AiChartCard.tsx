@@ -65,6 +65,19 @@ export const AiChartCard = memo(function AiChartCard({ chart }: { chart: AiChart
             {layout.levels.map(l => (
               <View key={l.kind} style={[styles.level, { top: l.y, borderColor: LEVEL_COLORS[l.kind] }]} />
             ))}
+            {layout.markers.map((m, i) => (
+              <View
+                key={`${m.kind}-${m.time}-${i}`}
+                style={[
+                  styles.marker,
+                  {
+                    left: m.x - 4,
+                    top: m.y - 4,
+                    backgroundColor: m.kind === 'exit' ? DOWN : m.kind === 'entry' ? UP : P.textSecondary,
+                  },
+                ]}
+              />
+            ))}
           </>}
         </View>
         <View style={styles.axis}>
@@ -76,13 +89,17 @@ export const AiChartCard = memo(function AiChartCard({ chart }: { chart: AiChart
         <Text style={styles.axisLabel}>{timeLabel(last, chart.timeframe)}</Text>
       </View>
 
-      {(chart.lines.length > 0 || chart.levels.length > 0) && <View style={styles.legend}>
+      {(chart.lines.length > 0 || chart.levels.length > 0 || chart.markers.length > 0) && <View style={styles.legend}>
         {chart.lines.map(l => <View key={l.id} style={styles.legendItem}>
           <View style={[styles.swatch, { backgroundColor: LINE_COLORS[l.id] ?? P.textSecondary }]} /><Text style={styles.legendText}>{l.label}</Text>
         </View>)}
         {chart.levels.map(l => <View key={l.kind} style={styles.legendItem}>
           <View style={[styles.swatch, styles.dashed, { borderColor: LEVEL_COLORS[l.kind] }]} />
           <Text style={styles.legendText}>{l.label} {price(l.price)}</Text>
+        </View>)}
+        {chart.markers.slice(0, 4).map((m, i) => <View key={`${m.kind}-${i}`} style={styles.legendItem}>
+          <View style={[styles.dot, { backgroundColor: m.kind === 'exit' ? DOWN : m.kind === 'entry' ? UP : P.textSecondary }]} />
+          <Text style={styles.legendText}>{m.label}</Text>
         </View>)}
       </View>}
       <Text style={styles.open}>Open full chart ›</Text>
@@ -107,6 +124,8 @@ const styles = StyleSheet.create({
   body: { position: 'absolute', borderRadius: 1 },
   segment: { position: 'absolute', borderRadius: 1 },
   level: { position: 'absolute', left: 0, right: 0, height: 0, borderTopWidth: 1, borderStyle: 'dashed' },
+  marker: { position: 'absolute', width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#fff' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   axis: { width: 62, marginLeft: 6 },
   axisText: { position: 'absolute', right: 0, color: P.textMuted, fontSize: 10, fontVariant: ['tabular-nums'] },
   timeAxis: { flexDirection: 'row', justifyContent: 'space-between', marginRight: 68 },
