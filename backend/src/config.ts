@@ -54,14 +54,32 @@ export const config = {
       turnsPerDay: Number(env.AI_DAILY_TURN_LIMIT ?? 50),
       tokensPerDay: Number(env.AI_DAILY_TOKEN_LIMIT ?? 250_000),
     },
-    /** OpenRouter TTS for the Home daily brief audio. Without a key, text briefs still work. */
-    openRouter: (() => {
-      const apiKey = env.OPENROUTER_API_KEY?.trim();
-      if (!apiKey) return undefined;
+    /**
+     * Morning Decode (shared daily audio briefing).
+     * Script: GEMINI (primary) or OPENROUTER (e.g. free Nemotron — rate-limited).
+     * TTS: OpenRouter speech model when OPENROUTER_API_KEY is set.
+     */
+    morningDecode: (() => {
+      const scriptProvider = (env.MORNING_DECODE_SCRIPT_PROVIDER?.trim().toLowerCase() || 'gemini') as 'gemini' | 'openrouter';
+      if (scriptProvider !== 'gemini' && scriptProvider !== 'openrouter') {
+        throw new Error('MORNING_DECODE_SCRIPT_PROVIDER must be "gemini" or "openrouter"');
+      }
+      const geminiKey = env.GEMINI_API_KEY?.trim();
+      const openRouterKey = env.OPENROUTER_API_KEY?.trim();
       return {
-        apiKey,
-        ttsModel: env.OPENROUTER_TTS_MODEL?.trim() || 'openai/gpt-4o-mini-tts',
-        voice: env.OPENROUTER_TTS_VOICE?.trim() || 'alloy',
+        scriptProvider,
+        gemini: geminiKey
+          ? { apiKey: geminiKey, model: env.GEMINI_MODEL?.trim() || 'gemini-2.0-flash' }
+          : undefined,
+        openRouter: openRouterKey
+          ? {
+              apiKey: openRouterKey,
+              // Free endpoint is rate-limited; confirm availability on openrouter.ai before production use.
+              scriptModel: env.OPENROUTER_SCRIPT_MODEL?.trim() || 'nvidia/nemotron-3-ultra-550b-a55b:free',
+              ttsModel: env.OPENROUTER_TTS_MODEL?.trim() || 'openai/gpt-4o-mini-tts',
+              voice: env.OPENROUTER_TTS_VOICE?.trim() || 'alloy',
+            }
+          : undefined,
       };
     })(),
   },

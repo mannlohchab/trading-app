@@ -90,7 +90,7 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
     providers: options.aiConfigured === false ? [] : [model], models: FAKE_MODELS, defaultModelId: 'fake-main', fallbackModelIds: ['fake-backup'],
     limits: options.aiLimits ?? { turnsPerDay: 50, tokensPerDay: 1_000_000 },
     market: market.service, strategies: strategies.service, profiles: profiles.service, portfolio: portfolio.service,
-    backtest: backtestGateway(backtesting.service), clock, openRouter: undefined,
+    backtest: backtestGateway(backtesting.service), clock, morningDecode: undefined,
   });
   const paperTrading = createPaperTradingModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser, market: { service: market.service, hub: market.hub },

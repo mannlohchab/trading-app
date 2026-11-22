@@ -1,4 +1,5 @@
-// OpenRouter text-to-speech for the Home daily brief. Secrets stay in env; missing key → no audio.
+// OpenRouter text-to-speech for Morning Decode. Secrets stay in env; missing key → no audio.
+import type { BriefTts } from '../application/brief-script';
 import { AiProviderError } from '../application/errors';
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
@@ -6,10 +7,12 @@ type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export type TtsResult = { bytes: Buffer; contentType: string; model: string };
 
 /**
- * Speaks brief text via OpenRouter's OpenAI-compatible audio speech endpoint.
+ * Speaks briefing text via OpenRouter's OpenAI-compatible audio speech endpoint.
  * Docs: https://openrouter.ai/docs — model id is configurable (default openai/gpt-4o-mini-tts).
  */
-export class OpenRouterTts {
+export class OpenRouterTts implements BriefTts {
+  readonly name = 'openrouter-tts';
+
   constructor(
     private readonly options: {
       apiKey: string;

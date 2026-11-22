@@ -10,7 +10,7 @@ import { AppTopBar } from '@/components/navigation/AppTopBar';
 
 import { InstrumentRow, type QuoteLike } from '@/components/markets/InstrumentRow';
 import { HomeQuoteCard } from '@/components/markets/HomeQuoteCard';
-import { HomeAiPrompt } from '@/components/ai/HomeAiPrompt';
+import { MorningDecodeCard } from '@/components/ai/MorningDecodeCard';
 import { HomeNews } from '@/components/markets/HomeNews';
 import { WelcomeGift } from '@/components/markets/WelcomeGift';
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
@@ -170,7 +170,7 @@ export default function MarketsScreen() {
 
       {!directory ? (
         <ScrollView contentContainerStyle={styles.homePad} showsVerticalScrollIndicator={false}>
-          <HomeAiPrompt />
+          <MorningDecodeCard />
           <View style={styles.hero}>
             <View style={styles.heroTop}>
               <View style={styles.heroCopy}>

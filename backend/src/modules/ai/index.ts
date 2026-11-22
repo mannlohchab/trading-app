@@ -9,20 +9,28 @@ import type { ProfileService } from '../profiles/application/profile.service';
 import type { StrategyService } from '../strategies';
 import { AssistantService } from './application/assistant.service';
 import { ConversationService } from './application/conversation.service';
-import { DailyBriefService } from './application/daily-brief.service';
+import { MorningDecodeService, type NewsHeadline } from './application/morning-decode.service';
 import type { ChatModelProvider, Clock, ModelProfile, UsageRepository } from './application/ports';
 import { createTools, type BacktestGateway, type PortfolioGateway } from './application/tools';
 import type { UsageLimits } from './domain/usage-policy';
 import { aiRoutes } from './http/ai.routes';
 import { DrizzleConversationRepository } from './infrastructure/drizzle-conversation.repository';
 import { DrizzleUsageRepository } from './infrastructure/drizzle-usage.repository';
+import { GeminiScriptLlm } from './infrastructure/gemini-script';
 import { marketGateway, personaSource, strategyGateway } from './infrastructure/gateways';
+import { OpenRouterScriptLlm } from './infrastructure/openrouter-script';
 import { OpenRouterTts } from './infrastructure/openrouter-tts';
 
 export type { ChatModelProvider, ChatRequest, ChatStreamEvent, ModelProfile } from './application/ports';
 export { AiProviderError } from './application/errors';
 export { WORKERS_AI_MODELS } from './infrastructure/model-registry';
 export { WorkersAiProvider } from './infrastructure/workers-ai.provider';
+
+export type MorningDecodeConfig = {
+  scriptProvider: 'gemini' | 'openrouter';
+  gemini?: { apiKey: string; model: string };
+  openRouter?: { apiKey: string; scriptModel: string; ttsModel: string; voice: string };
+};
 
 export function createAiModule(deps: {
   db: AppDatabase;
@@ -39,8 +47,10 @@ export function createAiModule(deps: {
   portfolio?: PortfolioGateway;
   /** Sandboxed strategy backtests; without it the assistant cannot run_backtest. */
   backtest?: BacktestGateway;
-  /** OpenRouter TTS for Home daily brief audio. */
-  openRouter?: { apiKey: string; ttsModel: string; voice: string };
+  /** Morning Decode script + TTS providers (Gemini / OpenRouter). */
+  morningDecode?: MorningDecodeConfig;
+  /** Optional headlines for the shared daily briefing. */
+  newsHeadlines?: { latest(limit: number): Promise<NewsHeadline[]> };
   clock?: Clock;
   /** Structured events for observability (one `AI turn recorded` per stored usage event). */
   events?: Logger;
@@ -69,22 +79,49 @@ export function createAiModule(deps: {
     log,
   });
   const conversations = new ConversationService({ conversations: conversationsRepo, strategies });
-  const dailyBrief = new DailyBriefService({
+
+  const md = deps.morningDecode;
+  const script = md?.scriptProvider === 'openrouter' && md.openRouter
+    ? new OpenRouterScriptLlm({ apiKey: md.openRouter.apiKey, model: md.openRouter.scriptModel })
+    : md?.gemini
+      ? new GeminiScriptLlm({ apiKey: md.gemini.apiKey, model: md.gemini.model })
+      : md?.openRouter
+        ? new OpenRouterScriptLlm({ apiKey: md.openRouter.apiKey, model: md.openRouter.scriptModel })
+        : undefined;
+  const tts = md?.openRouter
+    ? new OpenRouterTts({ apiKey: md.openRouter.apiKey, model: md.openRouter.ttsModel, voice: md.openRouter.voice })
+    : undefined;
+
+  const morningDecode = new MorningDecodeService({
     db: deps.db,
     market: deps.market,
-    providers: deps.providers,
-    defaultModelId: deps.defaultModelId,
-    models: deps.models,
-    tts: deps.openRouter
-      ? new OpenRouterTts({ apiKey: deps.openRouter.apiKey, model: deps.openRouter.ttsModel, voice: deps.openRouter.voice })
-      : undefined,
+    script,
+    tts,
+    news: deps.newsHeadlines,
     clock,
   });
+
+  /** Pre-publish once per UTC day in the jobs process so Home rarely waits on first open. */
+  let warmTimer: ReturnType<typeof setInterval> | undefined;
+  const warmMorningDecode = () =>
+    morningDecode.today().catch(error =>
+      console.warn('[ai] morning decode warm failed', error instanceof Error ? error.message : error),
+    );
+
   return {
     assistant,
     conversations,
-    dailyBrief,
-    routes: aiRoutes({ assistant, conversations, dailyBrief, requireActiveUser: deps.requireActiveUser }),
+    morningDecode,
+    /** @deprecated alias */
+    dailyBrief: morningDecode,
+    routes: aiRoutes({ assistant, conversations, morningDecode, requireActiveUser: deps.requireActiveUser }),
+    async startScheduling(everyMs = 30 * 60_000) {
+      await warmMorningDecode();
+      warmTimer = setInterval(() => void warmMorningDecode(), everyMs);
+    },
+    stop() {
+      clearInterval(warmTimer);
+    },
   };
 }
 

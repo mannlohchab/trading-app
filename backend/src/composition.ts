@@ -45,6 +45,14 @@ export function composeModules() {
     strategies: strategies.service,
     sandbox: config.backtesting.sandbox,
   });
+  const news = createNewsModule({
+    db,
+    requireActiveUser: identity.requireActiveUser,
+    sources: newsSourcesFromConfig(config.news.sources),
+    retentionDays: config.news.retentionDays,
+    log: createLogger('news'),
+  });
+  const md = config.ai.morningDecode;
   const ai = createAiModule({
     db,
     requireActiveUser: identity.requireActiveUser,
@@ -59,23 +67,24 @@ export function composeModules() {
     profiles: profiles.service,
     portfolio: portfolio.service,
     backtest: backtestGateway(backtesting.service),
-    openRouter: config.ai.openRouter,
+    morningDecode: md,
+    newsHeadlines: {
+      latest: async (limit) => {
+        const page = await news.service.list({ limit });
+        return page.articles.map(a => ({ title: a.title, publisher: a.publisher.name, assets: a.assets }));
+      },
+    },
   });
   if (!config.ai.cloudflare) console.warn('[ai] CF_ACCOUNT_ID/CF_API_TOKEN not set: the AI assistant will answer 503 AI_NOT_CONFIGURED');
-  if (!config.ai.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Home daily brief audio will be unavailable');
+  if (md.scriptProvider === 'gemini' && !md.gemini) console.warn('[ai] GEMINI_API_KEY not set: Morning Decode will use the factual fallback script');
+  if (md.scriptProvider === 'openrouter' && !md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode script provider openrouter is unavailable');
+  if (!md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode audio (TTS) will be unavailable');
   const paperTrading = createPaperTradingModule({
     db,
     requireActiveUser: identity.requireActiveUser,
     market: { service: market.service, hub: market.hub },
     signals: backtesting.signals,
     queue: backtesting.queue,
-  });
-  const news = createNewsModule({
-    db,
-    requireActiveUser: identity.requireActiveUser,
-    sources: newsSourcesFromConfig(config.news.sources),
-    retentionDays: config.news.retentionDays,
-    log: createLogger('news'),
   });
   const community = createCommunityModule({
     db,
@@ -116,7 +125,9 @@ export async function startJobRunner(modules: ReturnType<typeof composeModules>,
   runner.start();
   if (config.paperTrading.engineEnabled) await modules.paperTrading.engine.start();
   await modules.news.startScheduling();
+  await modules.ai.startScheduling();
   return async () => {
+    modules.ai.stop();
     modules.news.stop();
     await modules.paperTrading.engine.stop();
     await runner.stop();
