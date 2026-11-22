@@ -8,32 +8,40 @@ export type ChartDrawing = {
 
 export const drawingToolsCss = `
   #chart{position:relative;}
+  /* Drawings are painted here. While a tool is armed the layer also takes the taps that place points. */
   #draw-layer{position:absolute;left:0;top:0;z-index:6;pointer-events:none;overflow:hidden;}
   #draw-layer.active{pointer-events:auto;touch-action:none;cursor:crosshair;}
-  #drawing-ui{position:absolute;left:10px;top:10px;z-index:8;color:#3A4050;font-size:12px;}
-  #drawing-ui button{font:inherit;color:inherit;cursor:pointer;min-height:42px;border:1px solid #E3E6F0;border-radius:10px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 10px;}
-  #drawing-ui button:hover{background:#F7F7FC;}
-  #drawing-ui button:focus-visible{outline:2px solid #0066FF;outline-offset:2px;}
-  #drawing-ui button[aria-pressed=true]{background:#EEF4FF;border-color:#0066FF;color:#0052D6;}
-  #drawing-ui button:disabled{opacity:.4;cursor:default;}
-  #drawing-ui svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
-  #tools-toggle{box-shadow:0 2px 10px rgba(0,66,173,.08);font-weight:600!important;}
-  #drawing-menu{margin-top:6px;padding:10px;background:#FFFFFF;border:1px solid #E3E6F0;border-radius:14px;box-shadow:0 8px 24px rgba(0,66,173,.12);width:min(260px,calc(100vw - 44px));max-height:calc(100vh - 85px);overflow:auto;}
-  #drawing-menu[hidden],#drawing-hint[hidden],#clear-confirm[hidden],#drawing-editor[hidden]{display:none;}
-  .draw-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  #drawing-menu .draw-grid button{justify-content:flex-start;}
-  .draw-section{font-size:11px;color:#6B7185;margin:2px 0 8px;}
-  .draw-actions{display:flex;gap:6px;border-top:1px solid #E3E6F0;margin-top:10px;padding-top:10px;flex-wrap:wrap;}
+  #drawing-ui{position:absolute;left:10px;top:78px;z-index:8;color:#131722;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+  #drawing-ui button{font:inherit;color:inherit;cursor:pointer;border:1px solid #E0E3EB;border-radius:10px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:8px;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  #drawing-ui button:active{background:#F0F3FA;}
+  #drawing-ui button:focus-visible{outline:2px solid #2962FF;outline-offset:2px;}
+  #drawing-ui button[aria-pressed=true]{background:#E3ECFF;border-color:#2962FF;color:#2962FF;}
+  #drawing-ui button:disabled{opacity:.35;cursor:default;}
+  #drawing-ui svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  /* The in-chart pencil: always there, so drawing never depends on the app's toolbar. */
+  #tools-toggle{width:40px;height:40px;border-radius:20px!important;box-shadow:0 2px 8px rgba(19,23,34,.12);}
+  #tools-toggle[aria-expanded=true],#tools-toggle.armed{background:#2962FF!important;border-color:#2962FF!important;color:#FFFFFF!important;}
+  #drawing-menu{margin-top:8px;display:flex;flex-direction:column;gap:6px;padding:6px;width:max-content;background:rgba(255,255,255,.96);border:1px solid #E0E3EB;border-radius:14px;box-shadow:0 6px 20px rgba(19,23,34,.14);max-height:calc(100vh - 140px);overflow-y:auto;}
+  #drawing-menu button{width:40px;height:40px;}
+  .draw-divider{height:1px;background:#E0E3EB;margin:2px 4px;}
+  #drawing-menu[hidden],#drawing-hint[hidden],#clear-confirm[hidden],#drawing-editor[hidden]{display:none!important;}
+  .draw-section{font-size:11px;color:#787B86;margin:2px 0 8px;letter-spacing:.3px;}
+  /* Popovers sit beside the column, never on top of it. */
+  #drawing-hint,#clear-confirm,#drawing-editor{position:absolute;left:52px;top:0;background:#FFFFFF;border:1px solid #E0E3EB;border-radius:12px;box-shadow:0 6px 20px rgba(19,23,34,.14);}
+  #drawing-hint{padding:10px 12px;width:max-content;max-width:min(230px,calc(100vw - 150px));line-height:1.4;}
+  #drawing-hint strong{display:block;margin-bottom:2px;}
+  #drawing-hint button,#clear-confirm button,#drawing-editor-done{margin-top:8px;min-height:36px;padding:0 12px!important;}
+  #clear-confirm{padding:12px;width:max-content;max-width:min(230px,calc(100vw - 150px));line-height:1.4;}
+  .draw-actions{display:flex;gap:6px;}
   .draw-actions button{flex:1;}
-  #drawing-hint{margin-top:6px;background:#F7F7FC;border:1px solid #E3E6F0;padding:8px 10px;border-radius:10px;max-width:220px;line-height:1.4;}
-  #drawing-hint button{margin-top:6px;min-height:32px;}
-  #clear-confirm{padding-top:10px;line-height:1.5;}
-  #drawing-editor{margin-top:6px;padding:12px;background:#FFFFFF;border:1px solid #E3E6F0;border-radius:14px;box-shadow:0 8px 24px rgba(0,66,173,.12);width:min(260px,calc(100vw - 44px));max-height:calc(100vh - 85px);overflow:auto;}
-  .drawing-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+  #drawing-editor{padding:12px;width:min(240px,calc(100vw - 150px));}
+  .drawing-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+  .drawing-editor-heading #drawing-editor-done{margin-top:0;}
   .draw-colors{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;}
-  #drawing-ui .draw-color{min-width:0;min-height:44px;padding:4px;}
+  #drawing-ui .draw-color{min-width:0;height:40px;border-color:transparent;}
+  #drawing-ui .draw-color[aria-pressed=true]{background:#F0F3FA;border-color:#2962FF;}
   .draw-color span{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.08);}
-  #drawing-ui #draw-delete{color:#E11D48;width:100%;margin-top:10px;background:#FFF1F3;border-color:#FECDD3;}
+  #drawing-ui #draw-delete{color:#F23645;width:100%;margin-top:10px;min-height:40px;background:#FFF1F3;border-color:#FECDD3;}
   #draw-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
 `;
 
@@ -45,6 +53,11 @@ const paths: Record<string, string> = {
   rectangle: '<rect x="4" y="5" width="16" height="14" rx="1"/>',
   fib: '<path d="M3 4h18M3 10h18M3 14h18M3 20h18M5 20L19 4"/>',
   measure: '<path d="M4 17L17 4l4 4L8 21zM9 12l3 3M13 8l3 3"/>',
+  pencil: '<path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20z"/><path d="M14 7l3 3"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
 };
 const toolLabels = { cursor: 'Cursor', trend: 'Trend line', horizontal: 'Horizontal', vertical: 'Vertical', rectangle: 'Rectangle', fib: 'Fib retracement', measure: 'Measure' };
 const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
@@ -54,18 +67,19 @@ const drawingColors = [
   { name: 'amber', value: '#B98428' }, { name: 'slate', value: '#414869' },
 ];
 export const drawingToolsHtml = `
-  <svg id="draw-layer" aria-label="Chart drawing surface"></svg>
+  <svg id="draw-layer" aria-hidden="true"></svg>
   <div id="drawing-ui">
-    <button id="tools-toggle" aria-expanded="false" aria-controls="drawing-menu">${icon('trend')}Tools</button>
-    <div id="drawing-menu" hidden>
-      <p class="draw-section">DRAWING TOOLS</p>
-      <div class="draw-grid">${Object.entries(toolLabels).map(([id, label]) => `<button data-draw-tool="${id}" aria-pressed="${id === 'cursor'}">${icon(id)}${label}</button>`).join('')}</div>
-      <div class="draw-actions"><button id="draw-undo" disabled>Undo</button><button id="draw-redo" disabled>Redo</button></div>
-      <div class="draw-actions"><button id="draw-hide" aria-pressed="false">Hide drawings</button><button id="draw-clear" disabled>Clear all</button></div>
-      <div id="clear-confirm" hidden>Clear all drawings on this timeframe?<div class="draw-actions"><button id="clear-yes">Clear</button><button id="clear-no">Cancel</button></div></div>
-      <p class="draw-section" style="margin-top:10px;margin-bottom:0">Drawings stay while this chart page is open.</p>
+    <button id="tools-toggle" aria-expanded="false" aria-controls="drawing-menu" aria-label="Drawing tools" title="Drawing tools">${icon('pencil')}</button>
+    <div id="drawing-menu" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools" hidden>
+      ${Object.entries(toolLabels).map(([id, label]) => `<button data-draw-tool="${id}" aria-pressed="${id === 'cursor'}" aria-label="${label}" title="${label}">${icon(id)}</button>`).join('')}
+      <div class="draw-divider"></div>
+      <button id="draw-undo" aria-label="Undo" title="Undo" disabled>${icon('undo')}</button>
+      <button id="draw-redo" aria-label="Redo" title="Redo" disabled>${icon('redo')}</button>
+      <button id="draw-hide" aria-label="Hide drawings" title="Hide drawings" aria-pressed="false">${icon('eye')}</button>
+      <button id="draw-clear" aria-label="Clear all drawings" title="Clear all drawings" disabled>${icon('trash')}</button>
     </div>
-    <div id="drawing-hint" hidden><span id="hint-text"></span><button id="draw-cancel">Cancel drawing</button></div>
+    <div id="clear-confirm" role="alertdialog" aria-label="Clear all drawings" hidden>Clear all drawings on this timeframe?<div class="draw-actions"><button id="clear-yes">Clear</button><button id="clear-no">Cancel</button></div></div>
+    <div id="drawing-hint" role="status" hidden><strong id="hint-title"></strong><span id="hint-text"></span><button id="draw-cancel">Cancel</button></div>
     <div id="drawing-editor" role="group" aria-label="Selected drawing" hidden>
       <div class="drawing-editor-heading"><strong id="drawing-editor-title">Selected drawing</strong><button id="drawing-editor-done">Done</button></div>
       <p class="draw-section">COLOR</p>
@@ -99,17 +113,26 @@ export const drawingToolsScript = `
 
   function setMenu(open) {
     if (open) selectDrawing(-1);
+    else document.getElementById('clear-confirm').hidden = true;
     drawingMenu.hidden = !open;
     document.getElementById('tools-toggle').setAttribute('aria-expanded', String(open));
   }
   function announce(message) { document.getElementById('draw-status').textContent = message; }
   function persistDrawings() {
-    const message = JSON.stringify({ type: 'chart-drawings', key: drawingKey, drawings });
+    // The app's toolbar mirrors this state: undo/redo availability, the armed tool, hidden drawings.
+    const message = JSON.stringify({ type: 'chart-drawings', key: drawingKey, drawings, canUndo: undoHistory.length > 0, canRedo: redoHistory.length > 0, activeTool, hidden: drawingsHidden });
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
     else window.parent.postMessage(message, '*');
     document.getElementById('draw-undo').disabled = !undoHistory.length;
     document.getElementById('draw-redo').disabled = !redoHistory.length;
     document.getElementById('draw-clear').disabled = !drawings.length;
+  }
+  function setHideButton() {
+    const button = document.getElementById('draw-hide');
+    const label = drawingsHidden ? 'Show drawings' : 'Hide drawings';
+    button.setAttribute('aria-pressed', String(drawingsHidden));
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
   }
   function rememberChange() {
     undoHistory.push(JSON.parse(JSON.stringify(drawings)));
@@ -138,17 +161,19 @@ export const drawingToolsScript = `
     preview = null;
     drawingLayer.classList.toggle('active', tool !== 'cursor');
     toolButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.drawTool === tool)));
+    // The in-chart pencil turns blue while a tool waits for taps.
+    document.getElementById('tools-toggle').classList.toggle('armed', tool !== 'cursor');
     chart.applyOptions({ handleScroll: tool === 'cursor', handleScale: tool === 'cursor' });
     drawingHint.hidden = tool === 'cursor';
     if (tool !== 'cursor') {
       drawingsHidden = false;
-      document.getElementById('draw-hide').textContent = 'Hide drawings';
-      document.getElementById('draw-hide').setAttribute('aria-pressed', 'false');
+      setHideButton();
+      document.getElementById('hint-title').textContent = drawingNames[tool];
       document.getElementById('hint-text').textContent = tool === 'horizontal' || tool === 'vertical'
-        ? 'Tap the chart to place your line.' : 'Tap a start point, then an end point.';
-      tip.style.display = 'none';
+        ? 'Tap the chart to place it.' : 'Tap a start point, then an end point.';
     }
     renderDrawings();
+    persistDrawings();
   }
   // Preserve market coordinates rather than screen pixels, including gaps between sessions.
   function timeAt(logical) {
@@ -188,7 +213,7 @@ export const drawingToolsScript = `
     svg('line', { x1, y1, x2, y2, stroke: color, 'stroke-width': strokeWidth, 'stroke-dasharray': dashed ? '5 4' : 'none' });
   }
   function label(x, y, text, color = '#0052D6') {
-    svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': 'Georgia, Times New Roman, serif', stroke: '#FFFFFF', 'stroke-width': 3, 'paint-order': 'stroke' }, text);
+    svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': '-apple-system, Segoe UI, Roboto, Arial, sans-serif', stroke: '#FFFFFF', 'stroke-width': 3, 'paint-order': 'stroke' }, text);
   }
   function renderDrawing(drawing, width, height) {
     const color = drawingColor(drawing);
@@ -280,11 +305,59 @@ export const drawingToolsScript = `
     return point.x >= Math.min(a.x, b.x) - tolerance && point.x <= Math.max(a.x, b.x) + tolerance
       && point.y >= Math.min(a.y, b.y) - tolerance && point.y <= Math.max(a.y, b.y) + tolerance;
   }
+  function inPlot(point) {
+    return !!point && point.x >= 0 && point.x <= chart.timeScale().width()
+      && point.y >= 0 && point.y <= chartHost.clientHeight - chart.timeScale().height();
+  }
+  // Placing points. WebViews differ in which events a tap produces (pointer, touch, click), so all
+  // three are handled and the same tap reported twice is counted once. The chart library's own click
+  // is not the main input: on touch it swallows a second tap within ~500 ms as a double-tap, which
+  // broke two-tap tools whenever the start and end points were tapped quickly.
+  let lastTap = null;
+  function placeAt(x, y) {
+    if (activeTool === 'cursor') return;
+    const now = Date.now();
+    if (lastTap && now - lastTap.at < 250 && Math.hypot(x - lastTap.x, y - lastTap.y) < 12) return;
+    lastTap = { at: now, x, y };
+    finishDrawing(toAnchor(x, y));
+  }
+  function layerPoint(clientX, clientY) {
+    const rect = drawingLayer.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+  drawingLayer.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); });
+  drawingLayer.addEventListener('pointerup', event => {
+    if (event.isPrimary === false) return;
+    event.preventDefault(); event.stopPropagation();
+    const p = layerPoint(event.clientX, event.clientY); placeAt(p.x, p.y);
+  });
+  drawingLayer.addEventListener('touchend', event => {
+    const touch = event.changedTouches && event.changedTouches[0];
+    if (!touch) return;
+    event.preventDefault();
+    const p = layerPoint(touch.clientX, touch.clientY); placeAt(p.x, p.y);
+  }, { passive: false });
+  drawingLayer.addEventListener('click', event => { const p = layerPoint(event.clientX, event.clientY); placeAt(p.x, p.y); });
+  function previewAt(clientX, clientY) {
+    if (!anchor) return;
+    const p = layerPoint(clientX, clientY);
+    preview = toAnchor(p.x, p.y);
+    scheduleDrawings();
+  }
+  drawingLayer.addEventListener('pointermove', event => previewAt(event.clientX, event.clientY));
+  drawingLayer.addEventListener('touchmove', event => {
+    const touch = event.touches && event.touches[0];
+    if (touch) { event.preventDefault(); previewAt(touch.clientX, touch.clientY); }
+  }, { passive: false });
+  // With no tool armed, taps on the chart select a drawing. If the layer ever misses a tap while a tool
+  // is armed, the chart's click still places the point (deduplicated like the rest).
   chart.subscribeClick(param => {
-    if (activeTool !== 'cursor') return;
+    if (activeTool !== 'cursor') {
+      if (inPlot(param.point)) placeAt(param.point.x, param.point.y);
+      return;
+    }
     let hit = -1;
-    if (!drawingsHidden && param.point && param.point.x >= 0 && param.point.x <= chart.timeScale().width()
-        && param.point.y >= 0 && param.point.y <= chartHost.clientHeight - chart.timeScale().height()) {
+    if (!drawingsHidden && inPlot(param.point)) {
       for (let i = drawings.length - 1; i >= 0; i--) {
         if (hitDrawing(param.point, drawings[i])) { hit = i; break; }
       }
@@ -306,21 +379,9 @@ export const drawingToolsScript = `
     rememberChange(); drawings.splice(selectedDrawing, 1);
     selectDrawing(-1); persistDrawings(); announce('Drawing deleted. Use Undo to restore it.');
   });
-  drawingLayer.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); });
-  drawingLayer.addEventListener('pointerup', event => {
-    if (event.isPrimary === false) return;
-    event.preventDefault(); event.stopPropagation();
-    const rect = drawingLayer.getBoundingClientRect();
-    finishDrawing(toAnchor(event.clientX - rect.left, event.clientY - rect.top));
-  });
-  drawingLayer.addEventListener('pointermove', event => {
-    if (!anchor) return;
-    const rect = drawingLayer.getBoundingClientRect();
-    preview = toAnchor(event.clientX - rect.left, event.clientY - rect.top);
-    scheduleDrawings();
-  });
   document.getElementById('tools-toggle').addEventListener('click', () => setMenu(drawingMenu.hidden));
-  toolButtons.forEach(button => button.addEventListener('click', () => { setTool(button.dataset.drawTool); setMenu(false); }));
+  // Close the menu first so it can never be left covering the chart.
+  toolButtons.forEach(button => button.addEventListener('click', () => { setMenu(false); setTool(button.dataset.drawTool); }));
   document.getElementById('draw-cancel').addEventListener('click', () => setTool('cursor'));
   document.getElementById('draw-undo').addEventListener('click', () => {
     if (undoHistory.length) {
@@ -336,11 +397,11 @@ export const drawingToolsScript = `
     }
     setTool('cursor'); persistDrawings(); announce('Drawing restored.');
   });
-  document.getElementById('draw-hide').addEventListener('click', event => {
+  document.getElementById('draw-hide').addEventListener('click', () => {
     setTool('cursor'); drawingsHidden = !drawingsHidden;
-    event.currentTarget.textContent = drawingsHidden ? 'Show drawings' : 'Hide drawings';
-    event.currentTarget.setAttribute('aria-pressed', String(drawingsHidden));
+    setHideButton();
     renderDrawings();
+    persistDrawings();
   });
   document.getElementById('draw-clear').addEventListener('click', () => { document.getElementById('clear-confirm').hidden = false; });
   document.getElementById('clear-no').addEventListener('click', () => { document.getElementById('clear-confirm').hidden = true; });
@@ -353,8 +414,43 @@ export const drawingToolsScript = `
   });
   chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleDrawings);
   chart.subscribeCrosshairMove(scheduleDrawings);
-  ['pointermove', 'pointerup', 'wheel', 'touchmove'].forEach(name => chartHost.addEventListener(name, scheduleDrawings, { passive: true }));
+  ['pointermove', 'pointerup', 'wheel', 'touchmove', 'touchend'].forEach(name => chartHost.addEventListener(name, scheduleDrawings, { passive: true }));
   new ResizeObserver(scheduleDrawings).observe(chartHost);
+  // Commands from the app's native toolbar and drawing sheet. Each carries an id, and a repeated id is
+  // ignored, so a message delivered twice can't toggle something back.
+  let lastCommandId = null;
+  function acknowledge(command, ok) {
+    const message = JSON.stringify({ type: 'chart-command-ack', id: command.id, command: command.type, ok, activeTool });
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
+    else window.parent.postMessage(message, '*');
+  }
+  window.chartDrawingCommand = function(command) {
+    const ok = runDrawingCommand(command);
+    if (ok && command) acknowledge(command, ok);
+    return ok;
+  };
+  function runDrawingCommand(command) {
+    if (!command || typeof command.type !== 'string') return false;
+    if (command.id !== undefined) { if (command.id === lastCommandId) return false; lastCommandId = command.id; }
+    if (command.type === 'set-drawing-tool' && toolButtons.some(button => button.dataset.drawTool === command.tool)) { setMenu(false); setTool(command.tool); return true; }
+    if (command.type === 'drawing-undo') { document.getElementById('draw-undo').click(); return true; }
+    if (command.type === 'drawing-redo') { document.getElementById('draw-redo').click(); return true; }
+    if (command.type === 'drawing-hidden') {
+      if (drawingsHidden !== Boolean(command.hidden)) document.getElementById('draw-hide').click();
+      return true;
+    }
+    if (command.type === 'drawing-clear') {
+      if (drawings.length) { rememberChange(); drawings = []; }
+      setTool('cursor'); persistDrawings(); announce('Drawings cleared.');
+      return true;
+    }
+    if (command.type === 'open-drawing-tools') { setMenu(true); return true; }
+    if (command.type === 'toggle-drawing-tools') {
+      if (activeTool !== 'cursor') { setTool('cursor'); setMenu(true); } else setMenu(drawingMenu.hidden);
+      return true;
+    }
+    return false;
+  }
   persistDrawings();
   scheduleDrawings();
 `;

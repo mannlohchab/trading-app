@@ -1,11 +1,10 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/ui/AppText';
 import { authClient } from '@/lib/authClient';
-import { Palette, Spacing } from '@/constants/theme';
 import { useAuth } from '@/store/auth';
 
 export default function RegisterScreen() {
@@ -35,55 +34,61 @@ export default function RegisterScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
-        <Text style={styles.brand}>Create account</Text>
-        <Text style={styles.subtitle}>Practice with 100,000 virtual USDT on live crypto prices</Text>
-        <View style={styles.form}>
-          <Text style={styles.label}>Name</Text>
-          <TextInput accessibilityLabel="Name" style={styles.input} value={name} onChangeText={setName} autoComplete="name" placeholderTextColor={Palette.textMuted} placeholder="Your name" />
-          <Text style={styles.label}>Email</Text>
-          <TextInput accessibilityLabel="Email" style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} placeholderTextColor={Palette.textMuted} placeholder="you@email.com" />
-          <Text style={styles.label}>Password</Text>
-          <TextInput accessibilityLabel="Password" style={styles.input} secureTextEntry autoComplete="new-password" value={password} onChangeText={setPassword} placeholderTextColor={Palette.textMuted} placeholder="min 8 characters" />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Pressable style={styles.button} onPress={onSubmit} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
-          </Pressable>
-          <Link href="/(auth)/login" style={styles.link}>
-            Already have an account?
-          </Link>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <View style={styles.screen}>
+      <SafeAreaView style={styles.safe}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
+          <Text accessibilityRole="header" style={styles.brand}>Create account</Text>
+          <Text style={styles.subtitle}>Practice with 100,000 virtual USDT on live crypto prices</Text>
+          <View style={styles.form}>
+            <Text style={styles.label}>Name</Text>
+            <TextInput accessibilityLabel="Name" style={styles.input} value={name} onChangeText={setName} autoComplete="name" placeholderTextColor="#9A9FB0" placeholder="Your name" />
+            <Text style={styles.label}>Email</Text>
+            <TextInput accessibilityLabel="Email" style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} placeholderTextColor="#9A9FB0" placeholder="you@email.com" />
+            <Text style={styles.label}>Password</Text>
+            <TextInput accessibilityLabel="Password" style={styles.input} secureTextEntry autoComplete="new-password" value={password} onChangeText={setPassword} placeholderTextColor="#9A9FB0" placeholder="min 8 characters" />
+            {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+            <Pressable style={({ pressed }) => [styles.button, pressed && styles.pressed]} onPress={onSubmit} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create account</Text>}
+            </Pressable>
+            <Link href="/(auth)/login" style={styles.link}>
+              I already have an account
+            </Link>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.bg },
-  wrap: { flex: 1, padding: Spacing.four, justifyContent: 'center', maxWidth: 420, width: '100%', alignSelf: 'center' },
-  brand: { color: Palette.text, fontSize: 28, fontWeight: '800' },
-  subtitle: { color: Palette.textSecondary, marginTop: 6, marginBottom: Spacing.five },
-  form: { gap: Spacing.two },
-  label: { color: Palette.textSecondary, fontSize: 12, fontWeight: '600', marginTop: 8 },
+  screen: { flex: 1, backgroundColor: '#F2EDEA' },
+  safe: { flex: 1 },
+  wrap: { flex: 1, padding: 24, justifyContent: 'center', maxWidth: 420, width: '100%', alignSelf: 'center' },
+  brand: { color: '#16181D', fontSize: 32, fontWeight: '600', letterSpacing: -0.8 },
+  subtitle: { color: '#5C6578', fontSize: 15, lineHeight: 21, marginTop: 8, marginBottom: 28 },
+  form: { gap: 8 },
+  label: { color: '#5C6578', fontSize: 13, fontWeight: '600', marginTop: 8 },
   input: {
-    backgroundColor: Palette.card,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 10,
+    borderColor: '#E4DDD8',
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: Palette.text,
+    color: '#16181D',
     fontSize: 16,
+    minHeight: 48,
   },
   button: {
-    marginTop: Spacing.three,
-    backgroundColor: Palette.accent,
-    borderRadius: 10,
-    paddingVertical: 14,
+    marginTop: 16,
+    backgroundColor: '#16181D',
+    borderRadius: 14,
+    minHeight: 52,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  error: { color: Palette.red, marginTop: 8 },
-  link: { color: Palette.accent, textAlign: 'center', marginTop: 16, fontWeight: '600' },
+  pressed: { opacity: 0.72 },
+  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  error: { color: '#E11D48', marginTop: 8 },
+  link: { color: '#0066FF', textAlign: 'center', marginTop: 16, fontWeight: '600', paddingVertical: 12 },
 });

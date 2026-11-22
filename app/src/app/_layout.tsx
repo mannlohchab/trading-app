@@ -6,6 +6,8 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
+import { LaunchSplash } from '@/components/auth/LaunchSplash';
+import { UpdateBanner } from '@/components/ui/UpdateBanner';
 import { AppFont, Palette } from '@/constants/theme';
 import { useAuth } from '@/store/auth';
 import { setAuthProblemHandler } from '@/lib/api';
@@ -48,6 +50,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <View style={{ flex: 1, backgroundColor: Palette.bg }}>
       <StatusBar style="dark" />
+      <View style={{ flex: 1 }}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -72,6 +75,9 @@ export default function RootLayout() {
         <Stack.Screen name="news" options={{ headerShown: true, title: 'Crypto news' }} />
         <Stack.Screen name="portfolio/holdings" options={{ headerShown: true, title: 'My holdings' }} />
       </Stack>
+      <LaunchSplash />
+      <UpdateBanner />
+      </View>
       {DEMO_MODE && <View style={{ backgroundColor: Palette.card, paddingVertical: 6, paddingHorizontal: 12 }}>
         <Text style={{ color: '#0052D6', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
       </View>}

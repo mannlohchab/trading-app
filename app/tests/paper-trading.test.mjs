@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
 // paperTrading.ts imports the API client; load it with those modules stubbed out.
-const { orderProblem, requiredCash, toPortfolio } = (() => {
+const { orderProblem, requiredCash, toPortfolio, toChartTrades } = (() => {
   const source = readFileSync(new URL('../src/lib/paperTrading.ts', import.meta.url), 'utf8');
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
   const modules = { './api': { api: () => { throw new Error('No network in unit tests'); } }, './demoMode': { DEMO_MODE: false }, './marketData': { pairName: s => s } };
@@ -66,4 +66,18 @@ test('backend portfolios map so invested value plus uninvested cash equals equit
   const unpriced = toPortfolio({ ...{ accountId: 'a', initialBalance: '1', cashBalance: '1', availableBalance: '1', reservedBalance: '0', totalEquity: '1',
     realizedPnl: '0', unrealizedPnl: '0', totalFees: '0', netPnl: '0', returnPercent: '0' }, openPositions: [], unpricedSymbols: ['BTCUSDT'] });
   assert.equal(unpriced.equity, null); // never shows a total built from missing prices
+});
+
+test('chart marks keep filled buys and sells for the open pair only', () => {
+  const trades = toChartTrades([
+    { symbol: 'btcusdt', exchange: 'binance', side: 'BUY', averageFillPrice: '67000.5', filledAt: '2026-11-12T01:00:00.000Z' },
+    { symbol: 'BTCUSDT', exchange: 'BINANCE', side: 'SELL', averageFillPrice: '68000', createdAt: '2026-11-12T02:00:00.000Z' },
+    { symbol: 'ETHUSDT', exchange: 'BINANCE', side: 'BUY', averageFillPrice: '3000', filledAt: '2026-11-12T01:00:00.000Z' },
+    { symbol: 'BTCUSDT', exchange: 'BINANCE', side: 'BUY', averageFillPrice: null, filledAt: '2026-11-12T01:00:00.000Z' },
+    { symbol: 'BTCUSDT', exchange: 'BINANCE', side: 'BUY', averageFillPrice: '1', filledAt: null },
+  ], 'BTCUSDT', 'BINANCE');
+  assert.deepEqual(JSON.parse(JSON.stringify(trades)), [
+    { time: Math.floor(Date.parse('2026-11-12T01:00:00.000Z') / 1000), price: 67000.5, side: 'BUY' },
+    { time: Math.floor(Date.parse('2026-11-12T02:00:00.000Z') / 1000), price: 68000, side: 'SELL' },
+  ]);
 });

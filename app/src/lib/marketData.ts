@@ -6,6 +6,9 @@ import { api } from './api';
 import { DEMO_MODE } from './demoMode';
 import { marketAssets } from './marketAssets';
 import type { HistoryResponse } from './marketHistory';
+import { candlePrecision, decimalsOf } from './pricePrecision';
+
+export { candlePrecision, decimalsOf };
 
 export const EXCHANGE = 'BINANCE';
 
@@ -39,11 +42,7 @@ export function pairName(symbol: string, base?: string, quote?: string) {
   return NAMES[b] ?? (q ? `${b} / ${q}` : b);
 }
 
-/** Decimal places worth showing for a price string ("74569.26000000" → 2). */
-export function decimalsOf(price: string | null | undefined) {
-  const fraction = (price ?? '').split('.')[1]?.replace(/0+$/, '') ?? '';
-  return Math.max(2, Math.min(8, fraction.length));
-}
+
 
 const num = (value: string | null | undefined) => (value == null ? undefined : Number(value));
 
@@ -92,7 +91,7 @@ export async function fetchCandles(symbol: string, timeframe: string, limit = 50
   const res = await api<{ candles: BackendCandle[] }>(`/api/v1/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`, { signal });
   const candles = res.candles.map(candleToChart);
   return { candles, source: 'binance', currency: marketAssets(symbol, EXCHANGE)?.[1] ?? 'USDT',
-    pricePrecision: decimalsOf(res.candles.at(-1)?.close) };
+    pricePrecision: candlePrecision(res.candles) };
 }
 
 /** Closing prices for sparklines and previews. */

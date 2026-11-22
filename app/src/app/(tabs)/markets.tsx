@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import { useLayoutEffect, useState } from 'react';
+import { AppState, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppTopBar } from '@/components/navigation/AppTopBar';
 
 import { InstrumentRow, type QuoteLike } from '@/components/markets/InstrumentRow';
 import { HomeQuoteCard } from '@/components/markets/HomeQuoteCard';
+import { HomeAiPrompt } from '@/components/ai/HomeAiPrompt';
 import { HomeNews } from '@/components/markets/HomeNews';
 import { WelcomeGift } from '@/components/markets/WelcomeGift';
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
@@ -21,6 +23,54 @@ import { formatPct } from '@/lib/format';
 import { marketAssets } from '@/lib/marketAssets';
 import { fetchTickerList, searchPairs } from '@/lib/marketData';
 import { useLiveMarket } from '@/hooks/use-live-market';
+
+const HERO_ART = [
+  require('@/assets/images/home-insight.png'),
+  require('@/assets/images/home-summit.png'),
+] as const;
+const HERO_ART_KEY = 'gurukul.heroArt';
+const HERO_SESSION_KEY = 'gurukul.heroArtSession';
+
+function storedHeroIndex(raw: string | null) {
+  if (raw === null || raw === '') return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function nextHeroIndex(previous: number | null) {
+  if (previous === null) return 1;
+  return (previous + 1) % HERO_ART.length;
+}
+
+/** Keep the same illustration for a browser session, including reloads. A new visit advances it. */
+function heroIndexForWebVisit() {
+  const session = storedHeroIndex(sessionStorage.getItem(HERO_SESSION_KEY));
+  if (session !== null) return session % HERO_ART.length;
+  const next = nextHeroIndex(storedHeroIndex(localStorage.getItem(HERO_ART_KEY)));
+  localStorage.setItem(HERO_ART_KEY, String(next));
+  sessionStorage.setItem(HERO_SESSION_KEY, String(next));
+  return next;
+}
+
+let nativeHeroIndex: Promise<number> | null = null;
+
+function heroIndexForNativeLaunch() {
+  nativeHeroIndex ??= SecureStore.getItemAsync(HERO_ART_KEY).then(async stored => {
+    const next = nextHeroIndex(storedHeroIndex(stored));
+    try { await SecureStore.setItemAsync(HERO_ART_KEY, String(next)); } catch { /* shown for this launch anyway */ }
+    return next;
+  }).catch(() => 1);
+  return nativeHeroIndex;
+}
+
+/** The next time the app is opened from the background, show the other illustration. */
+function advanceNativeHero() {
+  nativeHeroIndex = (nativeHeroIndex ?? heroIndexForNativeLaunch()).then(current => {
+    const next = nextHeroIndex(current);
+    return SecureStore.setItemAsync(HERO_ART_KEY, String(next)).then(() => next);
+  });
+  return nativeHeroIndex;
+}
 
 const HERO_COINS: Record<string, number> = {
   BTC: require('@/assets/images/hero-btc.png'),
@@ -47,6 +97,22 @@ export default function MarketsScreen() {
   const [query, setQuery] = useState('');
   const [directory, setDirectory] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(true);
+  const [heroIndex, setHeroIndex] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    let cancelled = false;
+    const apply = (index: number) => { if (!cancelled) setHeroIndex(index); };
+    if (Platform.OS === 'web' && typeof sessionStorage !== 'undefined' && typeof localStorage !== 'undefined') {
+      try { apply(heroIndexForWebVisit()); } catch { apply(1); }
+      return () => { cancelled = true; };
+    }
+    void heroIndexForNativeLaunch().then(apply);
+    const appState = { current: AppState.currentState };
+    const subscription = AppState.addEventListener('change', next => {
+      if (appState.current === 'background' && next === 'active') void advanceNativeHero().then(apply);
+      appState.current = next;
+    });
+    return () => { cancelled = true; subscription.remove(); };
+  }, []);
   const [pageWidth, setPageWidth] = useState(390);
 
   const exploreQuery = useQuery({
@@ -82,6 +148,7 @@ export default function MarketsScreen() {
   const shortcuts: { label: string; icon?: GlassIconName; art?: number; onPress: () => void }[] = [
     { label: 'Search', icon: 'add', onPress: () => setSearchOpen(true) },
     { label: 'Markets', art: require('@/assets/images/home-markets.png'), onPress: () => router.push('/(tabs)/market') },
+    { label: 'Community', art: require('@/assets/images/home-community.png'), onPress: () => router.push('/(tabs)/community') },
     { label: 'Portfolio', art: require('@/assets/images/home-portfolio.png'), onPress: () => router.push('/(tabs)/profile') },
     { label: 'AI Insight', art: require('@/assets/images/home-ai.png'), onPress: () => router.push('/(tabs)/ai') },
   ];
@@ -103,6 +170,7 @@ export default function MarketsScreen() {
 
       {!directory ? (
         <ScrollView contentContainerStyle={styles.homePad} showsVerticalScrollIndicator={false}>
+          <HomeAiPrompt />
           <View style={styles.hero}>
             <View style={styles.heroTop}>
               <View style={styles.heroCopy}>
@@ -115,13 +183,15 @@ export default function MarketsScreen() {
                   )}
                 </Text>
               </View>
-              <Image
-                source={require('@/assets/images/home-insight.png')}
-                style={styles.heroArt}
-                contentFit="contain"
-                accessible={false}
-                pointerEvents="none"
-              />
+              {heroIndex !== null ? (
+                <Image
+                  source={HERO_ART[heroIndex]}
+                  style={styles.heroArt}
+                  contentFit="contain"
+                  accessible={false}
+                  pointerEvents="none"
+                />
+              ) : null}
             </View>
             <View style={styles.heroPills}>
               {exploreQuery.isLoading
@@ -187,8 +257,6 @@ export default function MarketsScreen() {
             ))}
           </ScrollView>
 
-          <HomeNews />
-
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>Discover markets</Text>
             <GlassPressable accessibilityRole="button" accessibilityLabel="See all markets" style={styles.seeAllButton} onPress={() => setDirectory(true)}>
@@ -208,6 +276,8 @@ export default function MarketsScreen() {
               ))}
             </ScrollView>
           )}
+
+          <HomeNews />
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.homePad}>

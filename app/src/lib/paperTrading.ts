@@ -27,6 +27,8 @@ export type PaperActivity = {
   id: string; type: string; symbol: string | null; quantity: number | null; price: number | null; amount: number;
   realizedPnl: number | null; createdAt: string;
 };
+/** A filled paper order, positioned on the chart by fill time (unix seconds) and price. */
+export type ChartTrade = { time: number; price: number; side: 'BUY' | 'SELL' };
 type Balance = { availableCash: number; positions: { symbol: string; exchange: string; availableQuantity: number }[] };
 export type OrderDraft = { symbol: string; exchange: string; side: 'BUY' | 'SELL'; orderType: 'MARKET' | 'LIMIT'; quantity: string; limitPrice: string };
 
@@ -161,6 +163,47 @@ export async function fetchOrders(userId: string, signal?: AbortSignal): Promise
   const accountId = await paperAccountId(userId);
   const { orders } = await api<{ orders: BackendOrder[] }>(`/api/v1/paper/orders?accountId=${accountId}&limit=30`, { signal });
   return { orders: orders.map(toOrder) };
+}
+
+type FillRow = {
+  symbol: string; exchange: string; side: string; averageFillPrice: string | number | null;
+  filledAt?: string | null; createdAt?: string | null;
+};
+
+/** Filled orders for one pair, kept only when the fill has a time and a price. */
+export function toChartTrades(orders: FillRow[], symbol: string, exchange: string): ChartTrade[] {
+  const wanted = symbol.toUpperCase();
+  const venue = exchange.toUpperCase();
+  const trades: ChartTrade[] = [];
+  for (const order of orders) {
+    if (order.symbol.toUpperCase() !== wanted || order.exchange.toUpperCase() !== venue) continue;
+    const side = order.side === 'BUY' || order.side === 'SELL' ? order.side : null;
+    if (!side) continue;
+    const price = typeof order.averageFillPrice === 'number' ? order.averageFillPrice : n(order.averageFillPrice);
+    const time = Math.floor(new Date(order.filledAt ?? order.createdAt ?? '').getTime() / 1000);
+    if (price === null || !Number.isFinite(price) || price <= 0 || !Number.isFinite(time)) continue;
+    trades.push({ time, price, side });
+  }
+  return trades;
+}
+
+/** Filled paper buys and sells for the chart of one pair. */
+export async function fetchChartTrades(userId: string, symbol: string, exchange: string, signal?: AbortSignal): Promise<ChartTrade[]> {
+  const wanted = symbol.toUpperCase();
+  const venue = exchange.toUpperCase();
+  if (DEMO_MODE) {
+    const { transactions } = await api<{ transactions: { type: string; symbol: string | null; exchange?: string; price: number | null; createdAt: string }[] }>('/api/trading/transactions', { signal });
+    return toChartTrades(transactions.flatMap(tx => {
+      if (!tx.symbol || (tx.type !== 'BUY' && tx.type !== 'SELL')) return [];
+      return [{ symbol: tx.symbol, exchange: tx.exchange ?? venue, side: tx.type, averageFillPrice: tx.price, createdAt: tx.createdAt }];
+    }), wanted, venue);
+  }
+  const accountId = await paperAccountId(userId);
+  const { orders } = await api<{ orders: BackendOrder[] }>(
+    `/api/v1/paper/orders?accountId=${accountId}&symbol=${encodeURIComponent(wanted)}&status=FILLED&limit=200`,
+    { signal },
+  );
+  return toChartTrades(orders, wanted, venue);
 }
 
 /** Recent fills, newest first, as account activity. */

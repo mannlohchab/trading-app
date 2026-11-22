@@ -3,61 +3,14 @@ import { Link, router, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Text, TextInput } from '@/components/ui/AppText';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/ui/AppText';
+import { SwipeButton, type SwipeButtonHandle } from '@/components/ui/SwipeButton';
 import { authClient } from '@/lib/authClient';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { demoApi } from '@/lib/demoData';
-import { SwipeButton, type SwipeButtonHandle } from '@/components/ui/SwipeButton';
 import { useAuth, type User } from '@/store/auth';
-
-function LoginButtonGradient() {
-  const progress = useSharedValue(0);
-  const width = useSharedValue(0);
-
-  useFocusEffect(useCallback(() => {
-    progress.value = 0;
-    progress.value = withRepeat(
-      withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-      undefined,
-      ReduceMotion.System,
-    );
-    return () => cancelAnimation(progress);
-  }, [progress]));
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: (progress.value - 0.5) * width.value * 1.5 }],
-  }));
-
-  return (
-    <View
-      pointerEvents="none"
-      accessible={false}
-      style={StyleSheet.absoluteFill}
-      onLayout={(event) => { width.value = event.nativeEvent.layout.width; }}>
-      <Animated.View style={[styles.loginGradient, animatedStyle]}>
-        <Image
-          source={require('@/assets/images/login-button-gradient.svg')}
-          style={StyleSheet.absoluteFill}
-          contentFit="fill"
-          accessible={false}
-        />
-      </Animated.View>
-    </View>
-  );
-}
 
 export default function LoginScreen() {
   const setSession = useAuth((s) => s.setSession);
@@ -68,12 +21,13 @@ export default function LoginScreen() {
   const nextRoute = useRef<'/(tabs)/markets' | '/(auth)/verify-phone'>('/(tabs)/markets');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedAction, setFocusedAction] = useState<'start' | 'account' | null>(null);
   const submitting = useRef(false);
   const swipeButton = useRef<SwipeButtonHandle>(null);
   const onSignInSuccess = useCallback(() => router.replace(nextRoute.current), []);
 
   useFocusEffect(useCallback(() => {
-    setStatusBarStyle('light');
+    setStatusBarStyle('dark');
     return () => setStatusBarStyle('dark');
   }, []));
 
@@ -110,13 +64,6 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.screen}>
-      <Image
-        source={require('@/assets/images/login-curtain.svg')}
-        style={StyleSheet.absoluteFill}
-        contentFit="fill"
-        accessible={false}
-        pointerEvents="none"
-      />
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safe}>
           <ScrollView
@@ -129,10 +76,10 @@ export default function LoginScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Back to welcome"
                   onPress={() => { setShowLogin(false); setError(null); }}
-                  style={styles.backButton}>
-                  <Text style={styles.backText}>← Back</Text>
+                  style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+                  <Text style={styles.backText}>Back</Text>
                 </Pressable>
-                <Text style={styles.formTitle}>Welcome back</Text>
+                <Text accessibilityRole="header" style={styles.formTitle}>Welcome back</Text>
                 <Text style={styles.formSubtitle}>Log in to TradingGurukul</Text>
                 <Text style={styles.label}>Email</Text>
                 <TextInput
@@ -143,7 +90,7 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   value={email}
                   onChangeText={setEmail}
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#9A9FB0"
                   autoComplete="email"
                   placeholder="you@email.com"
                 />
@@ -154,7 +101,7 @@ export default function LoginScreen() {
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#9A9FB0"
                   autoComplete="current-password"
                   returnKeyType="go"
                   onSubmitEditing={() => { void swipeButton.current?.submit(); }}
@@ -169,26 +116,40 @@ export default function LoginScreen() {
               </View>
             ) : (
               <View style={styles.welcome}>
-                <View style={styles.headline}>
-                  <Text accessibilityRole="header" style={styles.title}>Invest Smarter</Text>
-                  <Text style={styles.subtitle}>Not Harder</Text>
+                <Text style={styles.wordmark}>Gurukul</Text>
+                <View style={styles.stage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <Image
+                    source={require('@/assets/images/login-safe.png')}
+                    style={styles.hero}
+                    contentFit="contain"
+                    accessible={false}
+                  />
+                  <Image source={require('@/assets/images/login-chart.png')} style={[styles.orbit, styles.chart]} contentFit="contain" accessible={false} />
+                  <Image source={require('@/assets/images/login-piggy.png')} style={[styles.orbit, styles.piggy]} contentFit="contain" accessible={false} />
+                  <Image source={require('@/assets/images/login-cash.png')} style={[styles.orbit, styles.cash]} contentFit="contain" accessible={false} />
+                  <Image source={require('@/assets/images/login-wallet.png')} style={[styles.orbit, styles.wallet]} contentFit="contain" accessible={false} />
                 </View>
-                <Text style={styles.description}>
-                  Practice trading forex and crypto with{'\n'}real-time insights at your fingertips
-                </Text>
-                <View style={styles.actions}>
+                <View style={styles.copy}>
+                  <Text accessibilityRole="header" style={styles.title}>Forex and crypto,</Text>
+                  <Text style={styles.titleSoft}>side by side.</Text>
+                  <Text style={styles.description}>
+                    Practice on live prices, with 100,000 virtual USDT to start.
+                  </Text>
                   <Pressable
                     accessibilityRole="button"
-                    style={({ pressed }) => [styles.button, styles.welcomeButton, styles.loginButton, pressed && styles.buttonPressed]}
-                    onPress={() => setShowLogin(true)}>
-                    <LoginButtonGradient />
-                    <Text style={[styles.buttonText, styles.loginButtonText]}>Log in</Text>
+                    onFocus={() => setFocusedAction('start')}
+                    onBlur={() => setFocusedAction((current) => (current === 'start' ? null : current))}
+                    style={({ pressed }) => [styles.primary, pressed && styles.pressed, focusedAction === 'start' && styles.focused]}
+                    onPress={() => router.push('/(auth)/register')}>
+                    <Text style={styles.primaryText}>Get started</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    style={({ pressed }) => [styles.button, styles.welcomeButton, pressed && styles.buttonPressed]}
-                    onPress={() => router.push('/(auth)/register')}>
-                    <Text style={styles.buttonText}>Register</Text>
+                    onFocus={() => setFocusedAction('account')}
+                    onBlur={() => setFocusedAction((current) => (current === 'account' ? null : current))}
+                    style={({ pressed }) => [styles.secondary, pressed && styles.pressed, focusedAction === 'account' && styles.focused]}
+                    onPress={() => setShowLogin(true)}>
+                    <Text style={styles.secondaryText}>I already have an account</Text>
                   </Pressable>
                 </View>
               </View>
@@ -201,50 +162,100 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#191a18' },
+  screen: { flex: 1, backgroundColor: '#F2EDEA' },
   safe: { flex: 1 },
-  wrap: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: 18, paddingTop: 32, paddingBottom: 28, maxWidth: 460, width: '100%', alignSelf: 'center' },
-  loginWrap: { justifyContent: 'center' },
-  welcome: { paddingTop: 32 },
-  headline: { alignItems: 'center' },
-  title: { color: '#fff', fontSize: 42, fontWeight: '700', letterSpacing: -1.8, textAlign: 'center' },
-  subtitle: { color: '#fff', fontSize: 28, fontWeight: '400', letterSpacing: -0.8, textAlign: 'center' },
-  description: { color: '#fff', fontSize: 14, lineHeight: 18, textAlign: 'center', marginTop: 14, marginBottom: 40 },
-  actions: { flexDirection: 'row', gap: 14 },
-  welcomeButton: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, height: 48 },
-  loginButton: { overflow: 'hidden', backgroundColor: '#fff', borderColor: '#fff' },
-  loginButtonText: { color: '#0F172A', fontWeight: '500' },
-  loginGradient: { position: 'absolute', top: 0, bottom: 0, left: '-100%', width: '300%' },
-  form: { gap: 10, backgroundColor: 'rgba(15, 23, 42, 0.86)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.18)', padding: 24 },
-  backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 16 },
-  backText: { color: '#f1f5f9', fontSize: 14 },
-  formTitle: { color: '#fff', fontSize: 30, fontWeight: '700', letterSpacing: -0.8 },
-  formSubtitle: { color: '#bcd3ff', fontSize: 14, marginBottom: 16 },
-  label: { color: '#f1f5f9', fontSize: 12, fontWeight: '600', marginTop: 8 },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  wrap: { flexGrow: 1, maxWidth: 460, width: '100%', alignSelf: 'center' },
+  loginWrap: { justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
+  welcome: { flexGrow: 1, paddingBottom: 12 },
+  wordmark: {
+    color: '#16181D',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    paddingTop: 8,
+  },
+  stage: { flex: 1, minHeight: 280 },
+  hero: { width: '86%', height: '86%', alignSelf: 'center', marginTop: '6%' },
+  orbit: { position: 'absolute' },
+  chart: { width: '30%', aspectRatio: 1, top: '2%', left: '1%' },
+  piggy: { width: '32%', aspectRatio: 1, top: '4%', right: '0%' },
+  cash: { width: '24%', aspectRatio: 1, bottom: '14%', left: '3%' },
+  wallet: { width: '34%', aspectRatio: 670 / 663, bottom: '8%', right: '0%' },
+  copy: { paddingHorizontal: 22, paddingBottom: 8 },
+  title: {
+    color: '#16181D',
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '600',
+    letterSpacing: -1.1,
+    textAlign: 'center',
+  },
+  titleSoft: {
+    color: '#16181D',
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '400',
+    letterSpacing: -1.1,
+    textAlign: 'center',
+  },
+  description: {
+    color: '#5C6578',
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 22,
+    paddingHorizontal: 12,
+  },
+  primary: {
+    backgroundColor: '#16181D',
+    borderRadius: 14,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#16181D',
+  },
+  primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  secondary: {
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E4DDD8',
+  },
+  secondaryText: { color: '#16181D', fontSize: 16, fontWeight: '600' },
+  focused: { borderColor: '#0066FF' },
+  pressed: { opacity: 0.72 },
+  form: {
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.24)',
-    borderRadius: 10,
+    borderColor: '#E6E8F0',
+  },
+  backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 16 },
+  backText: { color: '#0066FF', fontSize: 15, fontWeight: '600' },
+  formTitle: { color: '#16181D', fontSize: 30, fontWeight: '600', letterSpacing: -0.8 },
+  formSubtitle: { color: '#5C6578', fontSize: 15, marginBottom: 8 },
+  label: { color: '#5C6578', fontSize: 13, fontWeight: '600', marginTop: 6 },
+  input: {
+    backgroundColor: '#F7F4F2',
+    borderWidth: 1,
+    borderColor: '#E3E6F0',
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#fff',
+    color: '#16181D',
     fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#faf9ff',
-    borderColor: '#fff',
-    borderWidth: 1,
-    borderRadius: 12,
     minHeight: 48,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  buttonPressed: { opacity: 0.75 },
-  buttonText: { color: '#0F172A', fontWeight: '500', fontSize: 14 },
-  error: { color: '#ffbdc8', marginTop: 8 },
-  hint: { color: '#bcd3ff', fontSize: 12, textAlign: 'center', marginTop: 12 },
-  link: { color: '#fff', textAlign: 'center', marginTop: 16, fontWeight: '600', paddingVertical: 12 },
+  error: { color: '#E11D48', marginTop: 4 },
+  hint: { color: '#5C6578', fontSize: 12, textAlign: 'center', marginTop: 12 },
+  link: { color: '#0066FF', textAlign: 'center', marginTop: 8, fontWeight: '600', paddingVertical: 12 },
 });

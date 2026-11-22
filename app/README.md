@@ -38,9 +38,9 @@ See [../README.md](../README.md) for full setup and [../backend/README.md](../ba
 ## Build an installable Android APK
 
 The `preview` profile in `eas.json` produces a standalone release APK with demo
-mode disabled, using `http://192.168.29.2:4001` as its backend. Keep the backend
-running on that computer and connect the phone to the same Wi-Fi. Metro and Expo
-Go are not needed after installation. The backend is not bundled into the APK.
+mode disabled, using the hosted staging backend `https://194-163-189-72.sslip.io`.
+It works on any network. Metro and Expo Go are not needed after installation.
+The backend is not bundled into the APK.
 
 From this directory:
 
@@ -57,9 +57,40 @@ finishes. Open that link on the phone to install the APK.
 commit. Local `.env` files are excluded from uploads; the profile provides the
 public build configuration explicitly.
 
-To use the APK outside this Wi-Fi, set `build.preview.env.EXPO_PUBLIC_API_URL` in
-`eas.json` to your deployed HTTPS API URL, remove `ANDROID_ALLOW_HTTP_BACKEND`,
-and rebuild. The HTTP opt-in enables Android cleartext traffic for this internal
-build only. Changing local `.env` does not change an already installed APK.
+To build against a backend on your own computer instead, set
+`build.preview.env.EXPO_PUBLIC_API_URL` in `eas.json` to its LAN address (e.g.
+`http://192.168.1.20:4001`), add `"ANDROID_ALLOW_HTTP_BACKEND": "true"` (Android
+blocks plain HTTP otherwise), and rebuild; the phone must be on the same Wi-Fi.
+Changing local `.env` does not change an already installed APK.
 
 See [Expo's APK build guide](https://docs.expo.dev/build-reference/apk/).
+
+## Over-the-air updates (EAS Update)
+
+Preview APKs check the `preview` channel for JavaScript updates on launch, and again
+when the app returns to the foreground (at most every 15 minutes). A downloaded update
+applies on the next cold start, or immediately when the user taps **Restart** on the
+"A new version is ready" banner.
+
+Publish the current JavaScript and assets to everyone on the preview build:
+
+```bash
+bun run update:preview                       # message = latest commit subject
+bun run update:preview -- "Fix chart drawing" # or your own message
+```
+
+`scripts/eas-update.mjs` takes the channel, EAS environment and `EXPO_PUBLIC_*`
+values from the `preview` build profile in `eas.json`, so an update always talks to the
+same backend as the APK. Calling `eas update` directly would bundle the local `.env`
+instead.
+
+- **Only JavaScript, styles and assets** ship this way. A new native dependency,
+  permission, or `app.json` native setting needs a new `eas build`.
+- **Runtime version:** `runtimeVersion` uses the `fingerprint` policy, so an update
+  only reaches builds whose native code matches. If an update isn't arriving after a
+  native change, the installed APK is too old: rebuild it.
+- **APKs built before OTA was added** (without `expo-updates`) never receive updates.
+  Build once more with the command above, then use `update:preview` from then on.
+- Updates do nothing in Expo Go, development builds and on web.
+
+See [Expo's EAS Update guide](https://docs.expo.dev/eas-update/getting-started/).

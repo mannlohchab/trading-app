@@ -17,8 +17,10 @@ export const liveChartScript = `
     for (const indicator of indicatorSeries) indicator.series.setData(indicator.values());
     const added = candles.length - 1 - previousLast;
     if (range) chart.timeScale().setVisibleLogicalRange(followingLiveCandle && added ? {from: range.from + added, to: range.to + added} : range);
+    if (typeof window.applyTradeMarks === 'function') window.applyTradeMarks();
     if (typeof scheduleDrawings === 'function') scheduleDrawings();
     if (typeof window.renderLatestLegend === 'function') window.renderLatestLegend();
+    if (typeof window.repaintSessions === 'function') window.repaintSessions();
     if (typeof updateCountdown === 'function') updateCountdown();
   };
   function receiveCandles(event) {

@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { InsightPalette as P } from '@/constants/theme';
+import { InsightPalette as P, Palette } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { COMMUNITY_API, type CommunityPage } from '@/lib/community';
 import { useAuth } from '@/store/auth';

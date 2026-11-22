@@ -2,7 +2,16 @@
   "expo": {
     "name": "TradingGurukul",
     "slug": "tradinggurukul",
+    "owner": "mannlohchab",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1a41726a-3868-4b41-b9ce-21bb0bb7b084",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tradinggurukul",
@@ -60,7 +69,7 @@
         }
       },
       "eas": {
-        "projectId": "d7eabce0-0bc4-4a5f-9d33-5669fd8e5278"
+        "projectId": "1a41726a-3868-4b41-b9ce-21bb0bb7b084"
       }
     }
   }
