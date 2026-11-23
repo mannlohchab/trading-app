@@ -20,7 +20,6 @@ services:
     pids_limit: 256
     env_file:
       - path: .env
-        format: raw
     environment:
       BACKTEST_SANDBOX: bwrap
     healthcheck:

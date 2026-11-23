@@ -37,6 +37,10 @@ jobs:
         working-directory: elysia-backend
         run: bun run typecheck
 
+      - name: Check Dokploy environment parsing
+        working-directory: elysia-backend
+        run: python3 deploy/validate-environment.py
+
       # These checks use in-memory PostgreSQL and do not require worker namespaces.
       - name: Check HTTP health and migrations
         working-directory: elysia-backend

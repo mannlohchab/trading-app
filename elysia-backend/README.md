@@ -126,7 +126,8 @@ docker exec -i -w /app CONTAINER bun - < elysia-backend/deploy/smoke.ts
 Require the isolation, namespace, system-path access and resource-limit checks to pass under
 the final runtime. Transfer the existing backend environment through Dokploy's protected
 configuration into the Compose `.env` file; `env_file` in the supplied configuration passes it
-to the container. Preserve the database, auth secret, public auth URL and trusted origins.
+to the container. Use Compose's default environment-file parsing to decode the quotes added by
+Dokploy. Preserve the database, auth secret, public auth URL and trusted origins.
 Keep credentials out of Git. Attach the Compose backend to `dokploy-network`, retain the public
 domain `https://194-163-189-72.sslip.io` on service `backend` port 4001, and keep metrics private.
 Verify API/database access and repeat the isolation checks after container recreation to confirm
