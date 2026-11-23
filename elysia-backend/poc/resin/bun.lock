@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "resin-backtest-poc",
+      "dependencies": {
+        "@nullarch/resin": "github:nullarch/resin#fa683a0ce81bf54832805f3e386c504c144d451a",
+      },
+    },
+  },
+  "packages": {
+    "@nullarch/resin": ["@nullarch/resin@github:nullarch/resin#fa683a0", { "bin": { "resin": "bin/resin.mjs" } }, "nullarch-resin-fa683a0", "sha512-ZT0v6WHLrSQ4b/vsdMX0eu21o6Lruy72iapRiljgrCLkGe0AZ7dTO0RdrQuoNJBgPRhu37cERZ2cXGnWdx/Fyg=="],
+  }
+}
