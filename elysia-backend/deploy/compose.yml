@@ -1,0 +1,45 @@
+# Dokploy: regular Docker Compose mode, with the policies installed on its host.
+# Dokploy writes the protected application environment to .env before deployment.
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/mannlohchab/trading-backend:latest}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=268435456,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - apparmor=trading-elysia-sandbox
+      - seccomp=/etc/dokploy/trading-elysia/seccomp.json
+      # AppArmor enforces these path restrictions without mounts that block nested procfs.
+      - systempaths=unconfined
+    pids_limit: 256
+    env_file:
+      - path: .env
+        format: raw
+    environment:
+      BACKTEST_SANDBOX: bwrap
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "const r = await fetch('http://127.0.0.1:' + (process.env.PORT || '4001') + '/health/ready', { signal: AbortSignal.timeout(4000) }); process.exit(r.ok ? 0 : 1);"
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    expose:
+      - '4001'
+    networks:
+      dokploy-network:
+        aliases:
+          - trading-elysia-backend
+
+networks:
+  dokploy-network:
+    external: true

@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: Copyright The Moby Authors
+# SPDX-License-Identifier: Apache-2.0
+# Derived from moby/profiles/apparmor/template.go at
+# a0fa70805f742f7da15b367770d802ea2a86c68b (see upstream/).
+# Local changes: named profile; ABI 4.0 plus explicit UNIX networking; userns,
+# mount and pivot_root for unprivileged bubblewrap. All upstream denies except
+# "deny mount" remain. No container capabilities are granted by this policy.
+# Deploy only with a non-root container user and no added capabilities.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile trading-elysia-sandbox flags=(attach_disconnected,mediate_deleted) {
+  include <abstractions/base>
+
+  network,
+  network unix,
+  deny network ax25,
+  deny network ipx,
+  deny network appletalk,
+  deny network netrom,
+  deny network rose,
+  deny network econet,
+  deny network atmsvc,
+  deny network irda,
+  deny network wanpipe,
+  deny network isdn,
+  deny network caif,
+  deny network alg,
+  deny network vsock,
+  capability,
+  file,
+  umount,
+
+  # bubblewrap creates its own user/mount/network/PID/IPC/UTS namespaces.
+  # Kernel namespace ownership/capability checks still apply to every mount.
+  userns,
+  mount,
+  pivot_root,
+
+  deny @{PROC}/* w,
+  deny @{PROC}/{[^1-9/],[^1-9/][^0-9/],[^1-9s/][^0-9y/][^0-9s/],[^1-9/][^0-9/][^0-9/][^0-9/]*}/** w,
+  deny @{PROC}/sys/[^k]** w,
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  # Replace this container's Docker path overmounts with enforcing LSM denies.
+  # Overmounts under /proc prevent a nested unprivileged PID namespace from
+  # mounting its own procfs. See docker-system-paths.json and PROVENANCE.txt.
+  deny /proc/acpi{,/**} rwklx,
+  deny /proc/asound{,/**} rwklx,
+  deny /proc/interrupts{,/**} rwklx,
+  deny /proc/kcore{,/**} rwklx,
+  deny /proc/keys{,/**} rwklx,
+  deny /proc/latency_stats{,/**} rwklx,
+  deny /proc/sched_debug{,/**} rwklx,
+  deny /proc/scsi{,/**} rwklx,
+  deny /proc/timer_list{,/**} rwklx,
+  deny /proc/timer_stats{,/**} rwklx,
+  deny /sys/devices/virtual/powercap{,/**} rwklx,
+  deny /sys/firmware{,/**} rwklx,
+  deny /proc/bus{,/**} wklx,
+  deny /proc/fs{,/**} wklx,
+  deny /proc/irq{,/**} wklx,
+  deny /proc/sys{,/**} wklx,
+  deny /proc/sysrq-trigger{,/**} wklx,
+
+  signal (receive) peer=unconfined,
+  signal (receive) peer=runc,
+  signal (receive) peer=crun,
+  signal (send,receive) peer=trading-elysia-sandbox,
+  signal (send,receive) peer="trading-elysia-sandbox//&unconfined",
+  ptrace (trace,tracedby,read,readby) peer=trading-elysia-sandbox,
+  ptrace (trace,tracedby,read,readby) peer="trading-elysia-sandbox//&unconfined",
+}

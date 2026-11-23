@@ -66,19 +66,43 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Dokploy pulls :latest; rollout order and rollback policy are configured on its service.
+      # Dokploy Compose pulls :latest and waits for container health before completing deployment.
       - name: Trigger Dokploy deploy
         if: vars.DOKPLOY_DEPLOY_PAUSED != 'true'
         env:
           DOKPLOY_DEPLOY_WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
         run: |
           if [ -z "$DOKPLOY_DEPLOY_WEBHOOK" ]; then
-            echo "DOKPLOY_DEPLOY_WEBHOOK is not set; image published without deploying."
-            exit 0
+            echo "DOKPLOY_DEPLOY_WEBHOOK is not set; production deployment cannot proceed."
+            exit 1
           fi
           curl --fail-with-body -sS -X POST "$DOKPLOY_DEPLOY_WEBHOOK" \
             -H 'Content-Type: application/json' \
             -d '{"push_data":{"tag":"latest"},"repository":{"repo_name":"${{ env.IMAGE }}"}}'
+
+      - name: Verify production revision
+        if: vars.DOKPLOY_DEPLOY_PAUSED != 'true'
+        env:
+          BACKEND_PUBLIC_URL: ${{ vars.BACKEND_PUBLIC_URL }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          if [ -z "$BACKEND_PUBLIC_URL" ]; then
+            echo "BACKEND_PUBLIC_URL is required to verify production."
+            exit 1
+          fi
+          base="${BACKEND_PUBLIC_URL%/}"
+          for attempt in $(seq 1 60); do
+            version="$(curl -fsS --connect-timeout 5 --max-time 10 "$base/health/version" 2>/dev/null || true)"
+            if printf '%s' "$version" | jq -e --arg revision "$EXPECTED_REVISION" '.framework == "elysia" and .revision == $revision' >/dev/null 2>&1; then
+              if curl -fsS --connect-timeout 5 --max-time 10 "$base/health/ready" | jq -e '.ok == true and .database == "up"' >/dev/null; then
+                echo "Production is ready at revision $EXPECTED_REVISION."
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Production did not become ready at the expected revision."
+          exit 1
 
       - name: Report paused deployment
         if: vars.DOKPLOY_DEPLOY_PAUSED == 'true'

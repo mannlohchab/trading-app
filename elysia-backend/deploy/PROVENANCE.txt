@@ -1,0 +1,85 @@
+Deployment policy provenance
+============================
+
+Upstream project: https://github.com/moby/profiles
+Pinned revision: a0fa70805f742f7da15b367770d802ea2a86c68b
+Copyright: The Moby Authors
+License: Apache-2.0; complete license in upstream/LICENSE.moby
+
+Unmodified source files are retained in upstream/:
+
+  moby-seccomp-default.json
+  https://raw.githubusercontent.com/moby/profiles/a0fa70805f742f7da15b367770d802ea2a86c68b/seccomp/default.json
+  SHA256 3320527d4568265ac97a077609b1bfd4cfd0d789eeb9239b7e094b1526675406
+
+  moby-apparmor-template.go
+  https://raw.githubusercontent.com/moby/profiles/a0fa70805f742f7da15b367770d802ea2a86c68b/apparmor/template.go
+  SHA256 3e10fd44140c527b01c70fb0e79b05c1f9a128b9b31a59c9627b497b8dfba475
+
+  LICENSE.moby
+  https://raw.githubusercontent.com/moby/profiles/a0fa70805f742f7da15b367770d802ea2a86c68b/LICENSE
+  SHA256 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+
+Local modifications
+-------------------
+
+trading-elysia-sandbox.apparmor renders the Docker template as a named profile.
+The host daemon is assumed unconfined, as in the reviewed Docker deployment.
+ABI 4.0 enables explicit userns mediation; explicit network unix preserves the
+upstream ABI 3.0 UNIX socket permission. The profile adds userns and pivot_root,
+and replaces deny mount with mount. All other upstream deny rules are retained.
+The host and container capability checks remain active. This policy is intended
+for a non-root container, without additional capabilities or host namespaces.
+AppArmor capability permissions do not grant Linux capabilities to a process.
+
+The deployment additionally disables Docker's per-container system-path
+overmounts using security_opt systempaths=unconfined. This is not an unconfined
+AppArmor or seccomp profile: both custom policies remain enforcing, with the
+container non-root, all container capabilities dropped and no-new-privileges.
+docker-system-paths.json records the actual Docker 29.9.3 masked/readonly lists.
+The profile explicitly denies rwklx for every masked path and descendants and
+wklx for every readonly path and descendants. These are pathname-based LSM
+rules, not an assertion that masking and LSM denial are identical mechanisms.
+Host-wide defaults remain unchanged. The kernel refuses a nested procfs mount
+when only a procfs with locked child overmounts is visible; replacing these
+overmounts allows bubblewrap's isolated PID namespace to mount its own procfs.
+Validate both the API and worker access denials under the final runtime.
+
+Primary references:
+https://github.com/moby/buildkit/blob/master/docs/rootless.md#docker
+https://github.com/containers/bubblewrap/issues/738
+
+seccomp.json retains every upstream setting and rule and appends four rules:
+
+1. Allow mount, umount2, pivot_root and chroot for bubblewrap setup.
+2. Allow unshare only with NEWNS, NEWCGROUP, NEWUTS, NEWIPC, NEWUSER, NEWPID and/or
+   NEWNET flags (mask 0x81fdffff must equal zero).
+3. Allow clone with only those namespace flags and SIGCHLD (the same mask must
+   equal 17), preserving upstream restrictions for other clone flags.
+4. The same clone rule with argument index 1 on s390/s390x, whose ABI differs.
+
+The default deny action, clone3 ENOSYS fallback, architecture mappings and all
+capability-conditioned upstream rules remain unchanged. No setns or sethostname
+permission is added. No privileged, unconfined or additional-capability setting
+is part of these files. Mount operations still require capabilities in a user
+namespace that owns the mount namespace; the non-root API gains no host mount
+capability from these rules.
+
+Offline validation
+------------------
+
+Run from the repository root:
+
+  python3 elysia-backend/deploy/validate-policies.py
+
+This verifies pinned source hashes, exact seccomp differences and preservation
+of AppArmor denies, then invokes apparmor_parser with --skip-kernel-load and
+cache disabled. It never loads a policy or starts a container. Python 3 and
+an AppArmor parser with ABI 4.0 support are required.
+
+Offline checks do not prove runtime isolation. Validate the actual image on the
+target host with the named profile and seccomp file, first in a disposable
+container without production credentials or network. Require the application
+sandbox probe to pass, then verify API connectivity and policy persistence after
+container recreation. A probe failure must stop deployment; do not broaden
+policies or fall back to process-only execution without reviewing the denial.

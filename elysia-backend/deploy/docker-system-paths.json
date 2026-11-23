@@ -1,0 +1,12 @@
+{
+  "source": "Docker 29.9.3 container inspect: HostConfig.MaskedPaths and HostConfig.ReadonlyPaths",
+  "maskedPaths": [
+    "/proc/acpi", "/proc/asound", "/proc/interrupts", "/proc/kcore",
+    "/proc/keys", "/proc/latency_stats", "/proc/sched_debug", "/proc/scsi",
+    "/proc/timer_list", "/proc/timer_stats", "/sys/devices/virtual/powercap",
+    "/sys/firmware"
+  ],
+  "readonlyPaths": [
+    "/proc/bus", "/proc/fs", "/proc/irq", "/proc/sys", "/proc/sysrq-trigger"
+  ]
+}

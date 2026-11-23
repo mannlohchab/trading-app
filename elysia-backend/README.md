@@ -63,53 +63,86 @@ The GitHub Actions repository variable `DOKPLOY_DEPLOY_PAUSED=true` publishes a 
 tagged with the commit SHA while skipping both `:latest` and the deployment webhook. Keep this
 pause until the runtime below is validated, then clear it and manually dispatch the workflow for
 the same reviewed commit. Image publication alone does not mean production has changed.
+Set `DOKPLOY_DEPLOY_WEBHOOK` to this Compose project's webhook and the repository variable
+`BACKEND_PUBLIC_URL` to the API origin. The release workflow waits for the expected commit at
+`/health/version` and a successful database readiness check before reporting success.
 
-**Runtime proposal — requires isolated validation before deployment.** On the existing Ubuntu /
-Docker host, the current container security settings prevent bubblewrap from creating its
-namespaces. Removing only one of the seccomp or AppArmor restrictions did not produce a working
-sandbox. Ubuntu also restricts capabilities inside user namespaces created by unconfined
-processes; a dedicated AppArmor policy must explicitly permit the required user-namespace
-operations. See [Ubuntu's user-namespace restrictions](https://documentation.ubuntu.com/release-notes/24.04/#unprivileged-user-namespace-restrictions).
+Use this installation and cutover runbook for the dedicated Dokploy Compose project
+`trading-elysia-backend`, service `backend`. Select **regular Docker Compose mode**, not Swarm
+stack mode. Dokploy 0.31.1's Application
+[service builder](https://github.com/Dokploy/dokploy/blob/v0.31.1/packages/server/src/utils/builders/index.ts)
+reconstructs `ContainerSpec` without the custom security settings; a manual Swarm patch would
+be lost on redeployment. The runbook describes the required validation, not a deployment result.
 
-The current Dokploy 0.31.1 Application deployment cannot persist the required custom security
-settings: its [service builder](https://github.com/Dokploy/dokploy/blob/v0.31.1/packages/server/src/utils/builders/index.ts)
-reconstructs `ContainerSpec` on every deploy and does not carry over `Privileges`. Manually
-patching the running Swarm service would therefore be lost on the next deployment.
+The versioned deployment files are:
 
-The proposed runtime is a dedicated [Dokploy Docker Compose deployment](https://docs.dokploy.com/docs/core/docker-compose)
-using **Docker Compose mode**, with this configuration reviewed and validated first:
+- [`deploy/compose.yml`](deploy/compose.yml): one non-root backend on the external, attachable
+  `dokploy-network`, with a read-only root filesystem, temporary `/tmp`, `cap_drop: ALL`,
+  `no-new-privileges`, `BACKTEST_SANDBOX=bwrap`, and a database readiness health check. Set `BACKEND_IMAGE`
+  to the reviewed GHCR digest for initial validation; the default is `:latest` for subsequent
+  webhook releases.
+- [`deploy/trading-elysia-sandbox.apparmor`](deploy/trading-elysia-sandbox.apparmor) and
+  [`deploy/seccomp.json`](deploy/seccomp.json): enforcing policies permitting bubblewrap's
+  namespace and mount setup. Neither privileged mode nor added container capabilities are used.
+- [`deploy/docker-system-paths.json`](deploy/docker-system-paths.json): the reviewed Docker
+  masked and read-only system paths. Compose uses `security_opt: systempaths=unconfined` to
+  remove their overmounts, which otherwise prevent the worker from mounting its own procfs.
+  The AppArmor policy instead explicitly denies access to the masked paths and writes to the
+  read-only paths. These are pathname-based restrictions, a different mechanism from masking;
+  AppArmor and seccomp remain enforcing, and host-wide Docker defaults remain unchanged.
+- [`deploy/validate-policies.py`](deploy/validate-policies.py) checks pinned upstream hashes,
+  exact seccomp additions, retained AppArmor denials and offline policy syntax without loading
+  a policy. [`deploy/PROVENANCE.txt`](deploy/PROVENANCE.txt) records the source and policy changes.
+- [`deploy/smoke.ts`](deploy/smoke.ts) verifies worker namespaces, empty environment, blocked
+  network, hidden application files, deterministic Resin trades/signals and enforced time/CPU
+  limits. It uses synthetic candles and temporary files, with no database or order writes.
 
-- Pin the existing GHCR backend image to the approved digest. Keep its non-root user and startup
-  command, one backend instance, and the current CPU/memory limits.
-- Declare service-specific [`security_opt`](https://docs.docker.com/reference/compose-file/container-spec/#security_opt)
-  entries for a named, enforcing [AppArmor profile](https://docs.docker.com/engine/security/apparmor/)
-  loaded on the selected host and a versioned [seccomp profile](https://docs.docker.com/engine/security/seccomp/).
-  Start from the Docker policies and permit only the namespace and mount operations required
-  by this bubblewrap invocation. Validate the resulting rules on the actual kernel; no working
-  profile or Compose configuration has been established yet. Use no added container capabilities,
-  privileged mode, host namespaces, Docker socket mount, or globally disabled host protections.
-- Preserve `BACKTEST_SANDBOX=bwrap`, workers' empty environment, network isolation, hidden app
-  directory, read-only runtime mounts and resource limits. The API needs database/provider access,
-  so process-only strategy execution in that container is not an acceptable fallback.
-- Transfer the existing environment through Dokploy's protected configuration, keeping the same
-  database, auth secret, public auth URL and trusted origins. Compose must explicitly pass its
-  environment into the container. Keep credentials out of Git. Verify that the existing database
-  and proxy networks support attachment by a regular Compose container before selecting them.
-- Reuse the public domain and proxy target port 4001, keep metrics private, and retain the image
-  health check. Point the deployment webhook at the new Compose deployment only after validation.
+Before installing policies or changing the runtime, take a fresh database backup and preserve
+the old image digest, Dokploy application/environment/domain settings, Swarm specification and
+Traefik configuration. Validate policy files on the target host with Python 3 and an AppArmor
+parser supporting ABI 4.0, then install the reviewed files:
 
-The approval required for this proposal covers installing a backend-specific host AppArmor
-profile, validating it with a custom seccomp policy, and converting this backend to Dokploy
-Compose. First save a database backup and the old image digest, service/environment/proxy
-settings. Validate the new image without production credentials or network access, proving
-isolation and resource limits. Then verify API/database access with the final Compose configuration
-and repeat isolation checks after recreation to prove policy persistence.
+```bash
+python3 elysia-backend/deploy/validate-policies.py
+sudo install -d -m 0755 /etc/dokploy/trading-elysia
+sudo install -m 0644 elysia-backend/deploy/seccomp.json /etc/dokploy/trading-elysia/seccomp.json
+sudo install -m 0644 elysia-backend/deploy/trading-elysia-sandbox.apparmor /etc/apparmor.d/trading-elysia-sandbox
+sudo apparmor_parser --replace /etc/apparmor.d/trading-elysia-sandbox
+```
+
+GitHub image builds **do not install or update host policies**. For every future policy change,
+review and validate the new files, manually update the selected host, and revalidate the actual
+image before rollout. Keep `DOKPLOY_DEPLOY_PAUSED=true` while this work is pending. A failed
+policy or sandbox check blocks deployment; do not fall back to process-only strategy execution
+inside the API container, which has database credentials and provider access.
+
+First run the candidate image with these policies in a disposable container without production
+credentials or network access. Run the smoke script from `/app`:
+
+```bash
+docker exec -i -w /app CONTAINER bun - < elysia-backend/deploy/smoke.ts
+```
+
+Require the isolation, namespace, system-path access and resource-limit checks to pass under
+the final runtime. Transfer the existing backend environment through Dokploy's protected
+configuration into the Compose `.env` file; `env_file` in the supplied configuration passes it
+to the container. Preserve the database, auth secret, public auth URL and trusted origins.
+Keep credentials out of Git. Attach the Compose backend to `dokploy-network`, retain the public
+domain `https://194-163-189-72.sslip.io` on service `backend` port 4001, and keep metrics private.
+Verify API/database access and repeat the isolation checks after container recreation to confirm
+policy persistence. Point the deployment webhook at this Compose project only after validation.
+Set its Dokploy command to wait for actual container health:
+
+```text
+compose -p trading-elysia-backend --env-file .env -f docker-compose.yml up -d --build --remove-orphans --pull always --wait --wait-timeout 180
+```
 
 Use a **stop-first** cutover: pause job intake, drain or cancel running backtests, stop the old
 backend, and start the new backend so only one job runner/paper engine consumes shared work.
 Verify migrations, revision, readiness, an authenticated market stream and an isolated backtest
-before resuming traffic/jobs. Retain the stopped old application for rollback; stop new workers
-before restoring its service/domain. Review schema compatibility before rollback. Regular Compose
+before resuming traffic/jobs. Retain the old Dokploy application and Swarm service
+`trading-backend-9pq2xl` stopped after cutover for rollback; stop new workers before restoring
+its service/domain. Review schema compatibility before rollback. Regular Compose
 does not provide Swarm's automatic rolling rollback, so coordinate this explicitly; restoring a
 database backup over newer user data requires a separate recovery decision.
 
