@@ -4,7 +4,7 @@ import { config } from './config';
 import { db } from './db/client';
 import { clientIpResolver } from './http/client-ip';
 import { createLogger } from './logger';
-import { createAiModule, WORKERS_AI_MODELS, WorkersAiProvider } from './modules/ai';
+import { createAiModule, NEMOTRON_FREE_MODEL, WORKERS_AI_MODELS, OpenRouterChatProvider, WorkersAiProvider } from './modules/ai';
 import { backtestGateway } from './modules/ai/infrastructure/gateways';
 import { backtestResearchGateway } from './modules/ai/infrastructure/backtest-research.gateway';
 import { createLiveTestingGateway } from './modules/ai/infrastructure/live-testing.gateway';
@@ -67,8 +67,14 @@ export function composeModules() {
   const ai = createAiModule({
     db,
     requireActiveUser: identity.requireActiveUser,
-    providers: config.ai.cloudflare ? [new WorkersAiProvider(config.ai.cloudflare)] : [],
-    models: WORKERS_AI_MODELS,
+    providers: [
+      ...(config.ai.openRouter ? [new OpenRouterChatProvider(config.ai.openRouter)] : []),
+      ...(config.ai.cloudflare ? [new WorkersAiProvider(config.ai.cloudflare)] : []),
+    ],
+    models: [
+      ...(config.ai.openRouter ? [NEMOTRON_FREE_MODEL] : []),
+      ...WORKERS_AI_MODELS,
+    ],
     defaultModelId: config.ai.defaultModel,
     fallbackModelIds: config.ai.fallbackModels,
     limits: config.ai.limits,
@@ -89,7 +95,8 @@ export function composeModules() {
       },
     },
   });
-  if (!config.ai.cloudflare) console.warn('[ai] CF_ACCOUNT_ID/CF_API_TOKEN not set: the AI assistant will answer 503 AI_NOT_CONFIGURED');
+  if (!config.ai.openRouter && !config.ai.cloudflare) console.warn('[ai] No chat model configured: set OPENROUTER_API_KEY or CF_ACCOUNT_ID/CF_API_TOKEN');
+  else if (config.ai.openRouter) console.log('[ai] default chat model is free Nemotron when AI_DEFAULT_MODEL is nemotron-free');
   if (md.scriptProvider === 'gemini' && !md.gemini) console.warn('[ai] GEMINI_API_KEY not set: Morning Decode will use the factual fallback script');
   if (md.scriptProvider === 'openrouter' && !md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode script provider openrouter is unavailable');
   if (config.ai.webResearch) {

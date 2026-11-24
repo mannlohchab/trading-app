@@ -12,7 +12,7 @@ export type ToolCall = { id: string; name: string; arguments: string };
 
 export type ChatMessage =
   | { role: 'system' | 'user'; content: string }
-  | { role: 'assistant'; content: string | null; toolCalls?: ToolCall[] }
+  | { role: 'assistant'; content: string | null; toolCalls?: ToolCall[]; reasoning?: string; reasoningDetails?: unknown[] }
   | { role: 'tool'; toolCallId: string; content: string };
 
 export type ToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
@@ -22,7 +22,7 @@ export type ModelUsage = { inputTokens: number; outputTokens: number; costUnits?
 export type ChatStreamEvent =
   | { type: 'text'; delta: string }
   | { type: 'tool_call'; call: ToolCall }
-  | { type: 'done'; finishReason: 'stop' | 'length' | 'tool_calls' | 'other'; usage: ModelUsage };
+  | { type: 'done'; finishReason: 'stop' | 'length' | 'tool_calls' | 'other'; usage: ModelUsage; reasoning?: string; reasoningDetails?: unknown[] };
 
 export type ChatRequest = {
   /** Provider-specific model id, e.g. "@cf/meta/llama-4-scout-17b-16e-instruct". */

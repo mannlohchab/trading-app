@@ -1,4 +1,16 @@
 import type { ModelProfile } from '../application/ports';
+import { FREE_NEMOTRON_MODEL } from '../domain/free-nemotron';
+
+/** Default chat model. OpenRouter's free Nemotron endpoint; the provider refuses any other id. */
+export const NEMOTRON_FREE_MODEL: ModelProfile = {
+  id: 'nemotron-free',
+  provider: 'openrouter',
+  providerModel: FREE_NEMOTRON_MODEL,
+  label: 'Nemotron 3 Ultra',
+  supportsTools: true,
+  contextWindow: 128_000,
+  maxOutputTokens: 4096,
+};
 
 /**
  * Models verified end to end (streaming + tool calls + answering from tool results) on Workers AI.

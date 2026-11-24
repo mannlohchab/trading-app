@@ -27,7 +27,8 @@ import { WebResearchAgent } from './application/web-research-agent';
 
 export type { ChatModelProvider, ChatRequest, ChatStreamEvent, ModelProfile } from './application/ports';
 export { AiProviderError } from './application/errors';
-export { WORKERS_AI_MODELS } from './infrastructure/model-registry';
+export { NEMOTRON_FREE_MODEL, WORKERS_AI_MODELS } from './infrastructure/model-registry';
+export { OpenRouterChatProvider } from './infrastructure/openrouter-chat';
 export { WorkersAiProvider } from './infrastructure/workers-ai.provider';
 
 export type MorningDecodeConfig = {

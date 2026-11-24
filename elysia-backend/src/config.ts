@@ -50,7 +50,12 @@ export const config = {
   sms: { provider: smsProvider },
   ai: {
     cloudflare: pair({ accountId: env.CF_ACCOUNT_ID?.trim(), apiToken: env.CF_API_TOKEN?.trim() }),
-    defaultModel: env.AI_DEFAULT_MODEL?.trim() || 'gpt-oss-120b',
+    defaultModel: env.AI_DEFAULT_MODEL?.trim() || 'nemotron-free',
+    openRouter: (() => {
+      const apiKey = env.OPENROUTER_API_KEY?.trim();
+      if (!apiKey) return undefined;
+      return { apiKey, baseUrl: env.OPENROUTER_BASE_URL?.trim() || undefined };
+    })(),
     fallbackModels: list(env.AI_FALLBACK_MODELS ?? 'llama-4-scout,mistral-small-3.1'),
     limits: {
       turnsPerDay: Number(env.AI_DAILY_TURN_LIMIT ?? 50),

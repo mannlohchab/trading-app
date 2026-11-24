@@ -126,7 +126,7 @@ export class AssistantService {
       for (; rounds <= CONVERSATION_LIMITS.maxToolRounds; rounds++) {
         yield { type: 'status', stage: 'thinking' };
         const allowTools = model.supportsTools && rounds < CONVERSATION_LIMITS.maxToolRounds;
-        const round = { text: '', calls: [] as ToolCall[] };
+        const round = { text: '', calls: [] as ToolCall[], reasoning: undefined as string | undefined, reasoningDetails: undefined as unknown[] | undefined };
         // Raw strategy definitions and code never reach the user (see domain/code-filter).
         const filter = createCodeFilter();
         let done: { finishReason: string; usage: ModelUsage } | undefined;
@@ -149,7 +149,11 @@ export class AssistantService {
                 if (safe) { round.text += safe; text += safe; yield { type: 'delta', text: safe }; }
               }
               else if (event.type === 'tool_call') round.calls.push(event.call);
-              else done = event;
+              else {
+                done = event;
+                if (event.reasoning) round.reasoning = event.reasoning;
+                if (event.reasoningDetails?.length) round.reasoningDetails = event.reasoningDetails;
+              }
             }
             await usage.record({ userId: input.userId, conversationId: conversation.id, turnId, provider: model.provider, model: model.id, status: 'SUCCEEDED', usage: done?.usage ?? { inputTokens: 0, outputTokens: 0 }, toolCalls: round.calls.length, latencyMs: Date.now() - started });
             break;
@@ -175,7 +179,13 @@ export class AssistantService {
         finishReason = done?.finishReason ?? 'other';
         if (!round.calls.length) break;
 
-        turn.push({ role: 'assistant', content: round.text || null, toolCalls: round.calls });
+        turn.push({
+          role: 'assistant',
+          content: round.text || null,
+          toolCalls: round.calls,
+          ...(round.reasoning && { reasoning: round.reasoning }),
+          ...(round.reasoningDetails && { reasoningDetails: round.reasoningDetails }),
+        });
         for (const [index, call] of round.calls.entries()) {
           if (index >= CONVERSATION_LIMITS.maxToolCallsPerRound) {
             turn.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify({ error: 'Too many tool calls in one step; call fewer at a time.' }) });
