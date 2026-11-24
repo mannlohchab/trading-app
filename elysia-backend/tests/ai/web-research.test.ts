@@ -22,8 +22,8 @@ describe('free Nemotron routing', () => {
       allow_fallbacks: false,
       sort: 'price',
       max_price: { prompt: 0, completion: 0, request: 0, image: 0 },
-      data_collection: 'deny',
     });
+    expect(body.provider).not.toHaveProperty('data_collection');
     expect(body.usage).toEqual({ include: true });
     expect(body).not.toHaveProperty('models');
     expect(body).not.toHaveProperty('plugins');

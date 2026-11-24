@@ -2,6 +2,9 @@
 // The only accepted models are free NVIDIA Nemotron ids (`:free`). The request
 // also sets a $0 price ceiling and disables fallbacks so OpenRouter cannot
 // reroute the call onto a billed provider.
+// provider.data_collection is omitted on purpose. "deny" hides every free
+// Nemotron endpoint, and OpenRouter answers with "No endpoints found matching
+// your data policy" before a model runs.
 
 export const FREE_NEMOTRON_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 
@@ -27,7 +30,6 @@ export type FreeNemotronChatBody = {
     allow_fallbacks: false;
     sort: 'price';
     max_price: { prompt: 0; completion: 0; request: 0; image: 0 };
-    data_collection: 'deny';
   };
   usage: { include: true };
   tools?: { type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }[];
@@ -51,7 +53,6 @@ export function freeNemotronChatBody(input: {
       allow_fallbacks: false,
       sort: 'price',
       max_price: { prompt: 0, completion: 0, request: 0, image: 0 },
-      data_collection: 'deny',
     },
     // Ask OpenRouter to return the billed amount so a non-zero cost can be discarded.
     usage: { include: true },
