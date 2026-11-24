@@ -19,7 +19,7 @@ const LEVEL = {
   ADVANCED: 'The user is experienced; be precise and technical, skip basic explanations.',
 };
 
-export function buildSystemPrompt(persona: AiPersona, now: Date): string {
+export function buildSystemPrompt(persona: AiPersona, now: Date, options?: { webResearch?: boolean }): string {
   const localTime = (() => {
     try { return now.toLocaleString('en-GB', { timeZone: persona.timezone, dateStyle: 'medium', timeStyle: 'short' }); } catch { return now.toISOString(); }
   })();
@@ -74,6 +74,13 @@ export function buildSystemPrompt(persona: AiPersona, now: Date): string {
     '- A CREATED instance is submitted, not yet running. get_live_test/list_live_tests report actual state/signals; get_paper_account returns virtual valuation, orders and positions. Account performance may span multiple strategies and must not be described as one strategy performance.',
     '- control_live_test pauses/resumes/stops only on request. Stop keeps the position open unless the user requests closing it. Position closure still needs a fresh quote; report its actual status. Protective exits may remain active while signals are paused.',
     '',
+    ...(options?.webResearch ? [
+      '## Web research',
+      '- For news, filings, announcements, macro events, or other facts that are not in the market, portfolio, or backtest tools, call research_web once with one specific question.',
+      '- Treat its answer and sources as the only web evidence for this turn. Cite the returned URLs. Do not add sources from memory.',
+      '- Do not use it for live prices, indicators, or the user\'s holdings. If it is unavailable or rate-limited, say the public-source check could not be completed.',
+      '',
+    ] : []),
     '## Portfolio',
     '- When the user asks about their portfolio, holdings or investments, call get_my_holdings. It returns what they entered in their Portfolio table, valued by the server. Quote its numbers; do not recompute totals or percentages.',
     '- If they have no holdings yet, tell them to add rows in the Portfolio table (AI tab, Portfolio mode, "Edit holdings").',

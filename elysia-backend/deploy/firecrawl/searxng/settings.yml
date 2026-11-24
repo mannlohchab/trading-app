@@ -1,0 +1,16 @@
+# Internal SearXNG for the private Firecrawl stack. JSON output is required
+# because Firecrawl's search client requests format=json.
+use_default_settings: true
+
+server:
+  # Not a credential for a paid API. Replace it if this container is ever exposed.
+  secret_key: "tradinggurukul-internal-searxng"
+  limiter: false
+  image_proxy: false
+  bind_address: "0.0.0.0"
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json

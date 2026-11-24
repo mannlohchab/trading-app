@@ -1,0 +1,190 @@
+# Small private Firecrawl for the web-research sub-agent.
+# Dokploy: regular Docker Compose (not Swarm). Do not attach a public domain.
+# The API joins dokploy-network as firecrawl-api:3002. Playwright, Redis,
+# RabbitMQ, Postgres, and SearXNG stay on an internal network.
+#
+# Firecrawl publishes only floating :latest images (no release tags). Upgrade
+# the API and Playwright images together.
+#
+# This stack has no LLM key. Scrape and search only. Synthesis is the backend's
+# free Nemotron call, which is price-capped at zero.
+
+name: trading-firecrawl
+
+services:
+  playwright-service:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      ALLOW_LOCAL_WEBHOOKS: "false"
+      BLOCK_MEDIA: "true"
+      MAX_CONCURRENT_PAGES: "2"
+    networks:
+      - firecrawl
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    tmpfs:
+      - /tmp/.cache:noexec,nosuid,size=256m
+    logging: &log
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    restart: unless-stopped
+    command: ["node", "dist/src/harness.js", "--start-docker"]
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "3002"
+      EXTRACT_WORKER_PORT: "3004"
+      WORKER_PORT: "3005"
+      ENV: local
+      REDIS_URL: redis://redis:6379
+      REDIS_RATE_LIMIT_URL: redis://redis:6379
+      PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000/scrape
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_HOST: nuq-postgres
+      POSTGRES_PORT: "5432"
+      USE_DB_AUTHENTICATION: "false"
+      NUQ_RABBITMQ_URL: amqp://rabbitmq:5672
+      NUM_WORKERS_PER_QUEUE: "1"
+      NUQ_WORKER_COUNT: "1"
+      CRAWL_CONCURRENT_REQUESTS: "2"
+      MAX_CONCURRENT_JOBS: "2"
+      BROWSER_POOL_SIZE: "2"
+      # Empty on purpose. Do not put an OpenAI or other paid model key here.
+      OPENAI_API_KEY: ""
+      OPENAI_BASE_URL: ""
+      MODEL_NAME: ""
+      MODEL_EMBEDDING_NAME: ""
+      OLLAMA_BASE_URL: ""
+      BULL_AUTH_KEY: ${FIRECRAWL_BULL_AUTH_KEY:?Set FIRECRAWL_BULL_AUTH_KEY}
+      SEARXNG_ENDPOINT: http://searxng:8080
+      SEARXNG_ENGINES: duckduckgo,brave,bing,startpage
+      SEARXNG_CATEGORIES: general
+      ALLOW_LOCAL_WEBHOOKS: "false"
+      BLOCK_MEDIA: "true"
+    depends_on:
+      redis:
+        condition: service_started
+      playwright-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      nuq-postgres:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    networks:
+      firecrawl: {}
+      dokploy-network:
+        aliases:
+          - firecrawl-api
+    cpus: 1.5
+    mem_limit: 2g
+    memswap_limit: 2g
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health/readiness').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    logging: *log
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--bind", "0.0.0.0", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    networks:
+      - firecrawl
+    cpus: 0.25
+    mem_limit: 128m
+    memswap_limit: 128m
+    logging: *log
+
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    restart: unless-stopped
+    networks:
+      - firecrawl
+    cpus: 0.5
+    mem_limit: 768m
+    memswap_limit: 768m
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+    logging: *log
+
+  nuq-postgres:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - firecrawl-postgres:/var/lib/postgresql/data
+    networks:
+      - firecrawl
+    cpus: 0.5
+    mem_limit: 384m
+    memswap_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    logging: *log
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+    configs:
+      - source: searxng_settings
+        target: /etc/searxng/settings.yml
+    networks:
+      - firecrawl
+    cpus: 0.5
+    mem_limit: 256m
+    memswap_limit: 256m
+    logging: *log
+
+configs:
+  searxng_settings:
+    content: |
+      use_default_settings: true
+      server:
+        secret_key: "tradinggurukul-internal-searxng"
+        limiter: false
+        image_proxy: false
+        bind_address: "0.0.0.0"
+      search:
+        safe_search: 0
+        formats:
+          - html
+          - json
+
+networks:
+  firecrawl:
+    driver: bridge
+  dokploy-network:
+    external: true
+
+volumes:
+  firecrawl-postgres:

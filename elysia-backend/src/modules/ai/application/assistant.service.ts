@@ -44,6 +44,8 @@ type Deps = {
   tools: (userId: string) => AssistantTool[];
   limits: UsageLimits;
   clock: Clock;
+  /** When set, the system prompt may delegate public-source questions to research_web. */
+  webResearch?: boolean;
   newId?: () => string;
   log?: (message: string, error?: unknown) => void;
 };
@@ -110,7 +112,7 @@ export class AssistantService {
       const persona = await this.deps.persona.forUser(input.userId);
       const tools = this.deps.tools(input.userId);
       const base: ChatMessage[] = [
-        { role: 'system', content: buildSystemPrompt(persona, clock.now()) },
+        { role: 'system', content: buildSystemPrompt(persona, clock.now(), { webResearch: this.deps.webResearch }) },
         ...history.map(m => ({ role: m.role === 'USER' ? 'user' as const : 'assistant' as const, content: m.content })),
         { role: 'user', content },
       ];

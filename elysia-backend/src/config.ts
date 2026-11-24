@@ -1,3 +1,5 @@
+import { assertFreeNemotronModel, FREE_NEMOTRON_MODEL } from './modules/ai/domain/free-nemotron';
+
 const env = process.env;
 const isProduction = env.NODE_ENV === 'production';
 
@@ -80,6 +82,24 @@ export const config = {
               voice: env.OPENROUTER_TTS_VOICE?.trim() || 'af_heart',
             }
           : undefined,
+      };
+    })(),
+    /**
+     * Web research sub-agent. Enabled only when both a private Firecrawl URL and
+     * an OpenRouter key are set. The model is rejected unless it is a free Nemotron id.
+     */
+    webResearch: (() => {
+      const requested = env.RESEARCH_MODEL?.trim();
+      if (requested) assertFreeNemotronModel(requested);
+      const firecrawlBaseUrl = env.FIRECRAWL_API_URL?.trim();
+      const openRouterApiKey = env.OPENROUTER_API_KEY?.trim();
+      if (!firecrawlBaseUrl || !openRouterApiKey) return undefined;
+      return {
+        openRouterApiKey,
+        model: assertFreeNemotronModel(requested || FREE_NEMOTRON_MODEL),
+        openRouterBaseUrl: env.OPENROUTER_BASE_URL?.trim() || undefined,
+        firecrawlBaseUrl: firecrawlBaseUrl.replace(/\/$/, ''),
+        firecrawlApiKey: env.FIRECRAWL_API_KEY?.trim() || undefined,
       };
     })(),
   },

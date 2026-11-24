@@ -19,8 +19,11 @@ import { DrizzleConversationRepository } from './infrastructure/drizzle-conversa
 import { DrizzleUsageRepository } from './infrastructure/drizzle-usage.repository';
 import { GeminiScriptLlm } from './infrastructure/gemini-script';
 import { marketGateway, personaSource, strategyGateway } from './infrastructure/gateways';
+import { OpenRouterResearchModel } from './infrastructure/openrouter-research';
 import { OpenRouterScriptLlm } from './infrastructure/openrouter-script';
 import { OpenRouterTts } from './infrastructure/openrouter-tts';
+import { FirecrawlClient } from './infrastructure/firecrawl-client';
+import { WebResearchAgent } from './application/web-research-agent';
 
 export type { ChatModelProvider, ChatRequest, ChatStreamEvent, ModelProfile } from './application/ports';
 export { AiProviderError } from './application/errors';
@@ -52,6 +55,17 @@ export function createAiModule(deps: {
   liveTesting?: LiveTestingGateway;
   /** Morning Decode script + TTS providers (Gemini / OpenRouter). */
   morningDecode?: MorningDecodeConfig;
+  /**
+   * Web research sub-agent. The model id must already be a free Nemotron `:free` id.
+   * Firecrawl is the self-hosted crawler; it is not given an LLM key.
+   */
+  webResearch?: {
+    openRouterApiKey: string;
+    model: string;
+    openRouterBaseUrl?: string;
+    firecrawlBaseUrl: string;
+    firecrawlApiKey?: string;
+  };
   /** Optional headlines for the shared daily briefing. */
   newsHeadlines?: { latest(limit: number): Promise<NewsHeadline[]> };
   clock?: Clock;
@@ -63,6 +77,19 @@ export function createAiModule(deps: {
   const market = marketGateway(deps.market);
   const log = (message: string, error?: unknown) => console.warn(`[ai] ${message}`, error ?? '');
   const clock = deps.clock ?? { now: () => new Date() };
+  const webResearch = deps.webResearch
+    ? new WebResearchAgent({
+      model: new OpenRouterResearchModel({
+        apiKey: deps.webResearch.openRouterApiKey,
+        model: deps.webResearch.model,
+        ...(deps.webResearch.openRouterBaseUrl && { baseUrl: deps.webResearch.openRouterBaseUrl }),
+      }),
+      crawler: new FirecrawlClient({
+        baseUrl: deps.webResearch.firecrawlBaseUrl,
+        ...(deps.webResearch.firecrawlApiKey && { apiKey: deps.webResearch.firecrawlApiKey }),
+      }),
+    })
+    : undefined;
   const assistant = new AssistantService({
     providers: deps.providers,
     models: deps.models,
@@ -78,9 +105,11 @@ export function createAiModule(deps: {
       deps.backtest && { gateway: deps.backtest, userId },
       deps.research && { gateway: deps.research, userId },
       deps.liveTesting && { gateway: deps.liveTesting, userId },
+      webResearch,
     ),
     limits: deps.limits,
     clock,
+    webResearch: !!webResearch,
     log,
   });
   const conversations = new ConversationService({ conversations: conversationsRepo, strategies });

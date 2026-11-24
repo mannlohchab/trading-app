@@ -81,6 +81,7 @@ export function composeModules() {
     liveTesting: createLiveTestingGateway({ paper: paperTrading.services, strategies: strategies.service }),
     backtest: backtestGateway(backtesting.service),
     morningDecode: md,
+    webResearch: config.ai.webResearch,
     newsHeadlines: {
       latest: async (limit) => {
         const page = await news.service.list({ limit });
@@ -91,6 +92,11 @@ export function composeModules() {
   if (!config.ai.cloudflare) console.warn('[ai] CF_ACCOUNT_ID/CF_API_TOKEN not set: the AI assistant will answer 503 AI_NOT_CONFIGURED');
   if (md.scriptProvider === 'gemini' && !md.gemini) console.warn('[ai] GEMINI_API_KEY not set: Morning Decode will use the factual fallback script');
   if (md.scriptProvider === 'openrouter' && !md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode script provider openrouter is unavailable');
+  if (config.ai.webResearch) {
+    console.log(`[ai] web research enabled: ${config.ai.webResearch.model} via ${config.ai.webResearch.firecrawlBaseUrl}`);
+  } else if (process.env.FIRECRAWL_API_URL?.trim()) {
+    console.warn('[ai] FIRECRAWL_API_URL is set but web research is off: OPENROUTER_API_KEY is required, and RESEARCH_MODEL must be a free Nemotron id');
+  }
   if (!md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode audio (TTS) will be unavailable');
 
   const community = createCommunityModule({

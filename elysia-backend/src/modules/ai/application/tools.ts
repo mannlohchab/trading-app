@@ -9,6 +9,8 @@ import { defineTool, ToolInputError, type AssistantTool } from './tool-definitio
 export { ToolInputError, type AssistantTool, type ToolOutcome } from './tool-definition';
 import { looseDraft, normalizeDraft } from './strategy-tool-schema';
 import { createResearchTools } from './research-tools';
+import { AiProviderError } from './errors';
+import type { WebResearchBrief } from './web-research-agent';
 import type { BacktestResearchGateway } from '../infrastructure/backtest-research.gateway';
 import type { LiveTestingGateway } from '../infrastructure/live-testing.gateway';
 import type { PreviewBacktestRequest } from '../../backtesting/backtesting.schemas';
@@ -76,6 +78,10 @@ const MAX_BACKTEST_TRADES_IN_BLOCK = 25;
 /** One backtest per turn keeps sandbox load and chat cards readable. */
 const MAX_BACKTESTS_PER_TURN = 1;
 
+export type WebResearchGateway = {
+  research(question: string, signal?: AbortSignal): Promise<WebResearchBrief>;
+};
+
 export function createTools(
   market: MarketGateway,
   strategies: StrategyDraftChecker,
@@ -83,10 +89,12 @@ export function createTools(
   backtest?: { gateway: BacktestGateway; userId: string },
   research?: { gateway: BacktestResearchGateway; userId: string },
   liveTesting?: { gateway: LiveTestingGateway; userId: string },
+  webResearch?: WebResearchGateway,
 ): AssistantTool[] {
   let draftCount = 0;
   let chartCount = 0;
   let backtestCount = 0;
+  let webResearchCount = 0;
   /** Drafts produced earlier in this turn, so run_backtest can reference draftId. */
   const drafts = new Map<string, { name: string; definition: unknown; summary: string[] }>();
   return [
@@ -281,6 +289,30 @@ export function createTools(
       },
     )] : []),
     ...createResearchTools({ research, liveTesting, preview: backtest, drafts }),
+    ...(webResearch ? [defineTool(
+      'research_web',
+      'Ask the web research sub-agent one specific question about news, filings, announcements, or other public-source facts that the market and portfolio tools do not have. It searches and reads public pages with the free research model, then returns a short answer and the URLs it actually read. Use at most once. Do not use it for live prices, indicators, or the user\'s holdings.',
+      z.strictObject({ question: z.string().min(3).max(500).describe('One self-contained question, including the asset or event name') }),
+      async ({ question }) => {
+        if (webResearchCount >= 1) throw new ToolInputError('Web research was already used in this answer.');
+        webResearchCount++;
+        try {
+          const brief = await webResearch.research(question);
+          return {
+            result: {
+              ...brief,
+              cost: 0,
+              note: 'Cite only these sources. This is public-web research, not a live market quote.',
+            },
+          };
+        } catch (error) {
+          const message = error instanceof ToolInputError || error instanceof AiProviderError
+            ? error.message
+            : 'Web research is unavailable right now.';
+          throw new ToolInputError(message);
+        }
+      },
+    )] : []),
     ...(portfolio ? [defineTool(
       'get_my_holdings',
       'The holdings this user entered in their Portfolio table (asset, quantity, buy date, buy price), merged per asset and valued by the server at current prices: value, cost, profit/loss, share of the portfolio, days held and concentration. Use for any question about their portfolio, holdings or investments.',

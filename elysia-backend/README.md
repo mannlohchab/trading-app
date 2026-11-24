@@ -715,6 +715,31 @@ succeed, then replaces the row atomically. A missing audio result exits with an 
 To copy the generated briefing into another database, set `TARGET_DATABASE_URL` and add `--publish`;
 publishing atomically inserts or updates that UTC day's row. Neither command restarts the API.
 
+## Web research sub-agent
+
+The assistant can call `research_web` once per answer. That runs a separate agent: it searches and reads public pages through a private Firecrawl, then writes a short cited answer with OpenRouter's free Nemotron. Live prices still come from the market tools.
+
+The agent is off until both `OPENROUTER_API_KEY` and `FIRECRAWL_API_URL` are set. `RESEARCH_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b:free`. Startup refuses any other shape, including the paid Nemotron id and `openrouter/free`. Each completion also sends `provider.max_price` of zero for prompt, completion, request, and image tokens, with `allow_fallbacks: false` and no model fallback list. A response is kept only when OpenRouter reports a cost of exactly zero and the served model is a Nemotron. A 402 or a non-zero cost is discarded. Nothing in this path enables OpenRouter's paid web plugin.
+
+Free `:free` models are rate-limited (about 20 requests per minute and 50 per day on an account that has not purchased credits). One question uses a few of those requests. The limit is shared with Morning Decode's script calls. The agent does not switch to a paid model when the free endpoint is busy.
+
+### Firecrawl on Dokploy
+
+Create a second Compose service from [`deploy/firecrawl/compose.yml`](deploy/firecrawl/compose.yml). Use regular Compose mode and paste that file as the raw Compose. SearXNG settings are inlined, so no extra file is required. Do not give it a public domain. It joins `dokploy-network` as `firecrawl-api` on port 3002; Playwright and the other services stay on an internal network.
+
+Set `POSTGRES_PASSWORD` and `FIRECRAWL_BULL_AUTH_KEY` in that service's environment (`openssl rand -base64 32`). Leave every LLM key empty. The compose file clears `OPENAI_API_KEY` so Firecrawl's extract path cannot call a paid model. Search goes through the bundled SearXNG.
+
+The stack is sized under the upstream defaults: one worker, two browser pages, about 2 GB for the API and 1.5 GB for Playwright. Those are ceilings. The host still needs a few free gigabytes beside the trading API.
+
+On the trading API, set:
+
+```text
+FIRECRAWL_API_URL=http://firecrawl-api:3002
+RESEARCH_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+```
+
+`OPENROUTER_API_KEY` is the same key Morning Decode already uses. After both services are up, `POST http://firecrawl-api:3002/v2/scrape` with `{"url":"https://example.com","formats":["markdown"]}` should return markdown before the assistant is pointed at it.
+
 ## Health checks
 
 - `GET /health`: liveness (process is up).
@@ -736,3 +761,6 @@ publishing atomically inserts or updates that UTC day's row. Neither command res
 | `CRYPTOPANIC_API_KEY` | unset | Enables CryptoPanic. Secret: it is never logged. |
 | `NEWS_CRYPTOPANIC_INTERVAL_MINUTES` / `CRYPTOPANIC_API_URL` | `60` / `https://cryptopanic.com/api/developer/v2` | |
 | `NEWS_RETENTION_DAYS` | `30` | |
+| `FIRECRAWL_API_URL` | unset | Private Firecrawl origin. Unset disables `research_web`. |
+| `FIRECRAWL_API_KEY` | unset | Optional bearer for Firecrawl. The Dokploy stack does not require one. |
+| `RESEARCH_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | Must match `nvidia/nemotron-…:free`. Any other value refuses startup. |
