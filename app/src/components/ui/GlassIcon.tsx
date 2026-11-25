@@ -24,6 +24,10 @@ const ICONS = {
     neutral: require('../../../assets/icons/nucleo-glass/house.png'),
     purple: require('../../../assets/icons/nucleo-glass/house-selected.png'),
   },
+  calendar: {
+    neutral: require('../../../assets/icons/nucleo-glass/calendar.png'),
+    purple: require('../../../assets/icons/nucleo-glass/calendar-selected.png'),
+  },
   community: {
     neutral: require('../../../assets/icons/nucleo-glass/users.png'),
     purple: require('../../../assets/icons/nucleo-glass/users-selected.png'),
@@ -85,6 +89,7 @@ const USE_GLASS_ICONS = true;
 
 const STANDARD_ICONS = {
   home: { ios: 'house', android: 'home', web: 'home' },
+  calendar: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
   community: { ios: 'person.2', android: 'group', web: 'group' },
   analytics: { ios: 'chart.pie', android: 'pie_chart', web: 'pie_chart' },
   profile: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },

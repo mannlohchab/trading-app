@@ -273,6 +273,19 @@ export function createDemoApi() {
           return { items: items.filter(i => i.watchlistId === parts[2]), isDemo: true };
         }
       }
+      if (url.pathname === '/api/v1/calendar' && method === 'GET') {
+        const fetchedAt = new Date().toISOString();
+        const start = new Date();
+        start.setUTCHours(13, 30, 0, 0);
+        const items = ['Sample inflation release', 'Sample rate decision', 'Sample employment report'].map((event, i) => {
+          const date = new Date(start.getTime() + i * 86_400_000).toISOString();
+          return { id: `demo-calendar-${i}`, event, country: ['USD', 'EUR', 'GBP'][i], currency: ['USD', 'EUR', 'GBP'][i],
+            day: date.slice(0, 10), date, estimated: false, actual: null, forecast: ['2.5%', '3.0%', '120K'][i], previous: ['2.4%', '3.0%', '110K'][i],
+            unit: null, reference: null, importance: i === 2 ? 2 : 3, status: null, source: 'Demo preview', url: null, sourceUrl: null, updatedAt: null, dataStale: false };
+        });
+        return { items, source: 'Demo preview', sourceUrl: 'https://www.forexfactory.com/calendar', fetchedAt, stale: false, isDemo: true,
+          notice: 'Fictional sample events for preview only. These are not current economic releases.' };
+      }
       if (parts[1] === 'economics' && method === 'GET') {
         const fetchedAt = new Date().toISOString();
         const metadata = { source: 'Demo preview', sourceUrl: 'https://data.worldbank.org', fetchedAt, stale: false, isDemo: true,

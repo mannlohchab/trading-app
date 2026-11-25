@@ -48,7 +48,35 @@ export async function conversationMessages(id: string, signal?: AbortSignal): Pr
       : { id: m.id, role: 'assistant' as const, content: m.content, blocks: parseAiBlocks(m.metadata?.blocks), steps: stepsFromToolCalls(m.metadata?.toolCalls, m.id) });
 }
 
-/** The assistant has market tools but no access to the paper portfolio, so "Market" mode names the pair in the prompt. */
-export function promptFor(kind: AiKind, text: string, symbol: string) {
-  return kind === 'analysis' && symbol.trim() ? `About ${symbol.trim().toUpperCase()} on Binance: ${text}` : text;
+/** A fact the assistant saved about the user (it can be deleted at any time). */
+export type AiMemory = { id: string; content: string; createdAt: string };
+
+export async function listAiMemories(signal?: AbortSignal): Promise<AiMemory[]> {
+  return (await api<{ memories: AiMemory[] }>('/api/v1/ai/memories', { signal })).memories;
+}
+export async function deleteAiMemory(id: string) {
+  await api(`/api/v1/ai/memories/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+export async function deleteAllAiMemories() {
+  await api('/api/v1/ai/memories', { method: 'DELETE' });
+}
+
+/** Screens the backend accepts as "opened from" (elysia-backend/src/modules/ai/domain/turn-context.ts). */
+export type AiOrigin =
+  | 'home' | 'markets' | 'market' | 'instrument' | 'stock' | 'ai' | 'portfolio_holdings'
+  | 'backtests' | 'backtest_result' | 'research' | 'live_test' | 'community' | 'news' | 'calendar' | 'profile';
+
+export type AiTurnContext = { mode: AiKind; symbol?: string; exchange?: string; from?: AiOrigin };
+
+const ORIGINS: readonly string[] = ['home', 'markets', 'market', 'instrument', 'stock', 'ai', 'portfolio_holdings', 'backtests', 'backtest_result', 'research', 'live_test', 'community', 'news', 'calendar', 'profile'];
+export const asAiOrigin = (value: unknown): AiOrigin | undefined => (typeof value === 'string' && ORIGINS.includes(value) ? value as AiOrigin : undefined);
+
+/** Where the user is, sent with each message so the assistant can resolve "this pair" and suggest next steps. */
+export function turnContextFor(kind: AiKind, symbol: string, from?: AiOrigin): AiTurnContext {
+  const pair = symbol.trim().toUpperCase();
+  return {
+    mode: kind,
+    ...(kind === 'analysis' && pair && { symbol: pair, ...(!pair.includes('/') && { exchange: 'BINANCE' }) }),
+    ...(from && { from }),
+  };
 }

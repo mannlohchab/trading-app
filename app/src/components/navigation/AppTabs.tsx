@@ -41,10 +41,6 @@ export default function AppTabs() {
         sceneStyle: { backgroundColor: '#FFFFFF' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="chart" tone={focused ? 'purple' : 'neutral'} />,
       }} />
-      <Tabs.Screen name="community" options={{
-        title: 'Community',
-        tabBarIcon: ({ focused }) => <GlassIcon size={26} name="community" tone={focused ? 'purple' : 'neutral'} />,
-      }} />
       <Tabs.Screen name="ai" options={{
         title: 'Insights',
         sceneStyle: { backgroundColor: '#FFFFFF' },
@@ -52,10 +48,18 @@ export default function AppTabs() {
         tabBarStyle: { display: 'none' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="analytics" tone={focused ? 'purple' : 'neutral'} />,
       }} />
+      <Tabs.Screen name="calendar" options={{
+        title: 'Calendar',
+        tabBarIcon: ({ focused }) => <GlassIcon size={26} name="calendar" tone={focused ? 'purple' : 'neutral'} />,
+      }} />
+      <Tabs.Screen name="community" options={{
+        title: 'Community',
+        tabBarIcon: ({ focused }) => <GlassIcon size={26} name="community" tone={focused ? 'purple' : 'neutral'} />,
+      }} />
       <Tabs.Screen name="profile" options={{
         title: 'Profile',
+        href: null,
         sceneStyle: { backgroundColor: '#FFFFFF' },
-        tabBarIcon: ({ focused }) => <GlassIcon size={26} name="profile" tone={focused ? 'purple' : 'neutral'} />,
       }} />
     </Tabs>
   );

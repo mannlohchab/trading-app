@@ -1,5 +1,7 @@
 // Parsers for structured AI response blocks (server-built, never from model text).
 import { chartsFromBlocks, parseChartBlock, type AiChart } from '@/lib/aiCharts';
+import { mergeResearchRunRefs, parseResearchRun, type AiResearchRun } from './aiResearchRun';
+import { parseActions, type AiAction } from './aiActions';
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown, max = 80) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : undefined);
@@ -76,6 +78,9 @@ export type AiParsedBlocks = {
   analyses: AiMarketAnalysis[];
   drafts: AiStrategyDraft[];
   backtests: AiBacktestResult[];
+  researchRuns: AiResearchRun[];
+  /** Next-step buttons; the latest `actions` block wins. */
+  actions: AiAction[];
 };
 
 function parseTicker(data: unknown): AiTicker | null {
@@ -155,7 +160,7 @@ function parseBacktest(data: unknown): AiBacktestResult | null {
 
 /** Parse all structured cards from a list of server blocks. */
 export function parseAiBlocks(blocks: unknown): AiParsedBlocks {
-  const empty: AiParsedBlocks = { charts: [], tickers: [], marketLists: [], analyses: [], drafts: [], backtests: [] };
+  const empty: AiParsedBlocks = { charts: [], tickers: [], marketLists: [], analyses: [], drafts: [], backtests: [], researchRuns: [], actions: [] };
   if (!Array.isArray(blocks)) return empty;
   for (const raw of blocks) {
     if (!isObj(raw) || typeof raw.type !== 'string') continue;
@@ -189,6 +194,16 @@ export function parseAiBlocks(blocks: unknown): AiParsedBlocks {
       case 'backtest_result': {
         const b = parseBacktest(raw.data);
         if (b) empty.backtests.push(b);
+        break;
+      }
+      case 'research_run': {
+        const run = parseResearchRun(raw.data);
+        if (run) empty.researchRuns = mergeResearchRunRefs(empty.researchRuns, [run]);
+        break;
+      }
+      case 'actions': {
+        const actions = parseActions(raw.items);
+        if (actions.length) empty.actions = actions;
         break;
       }
       default:

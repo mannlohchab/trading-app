@@ -1,8 +1,10 @@
 import { useState, type ComponentProps } from 'react';
+import { router } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
+import { AiMemorySettings } from '@/components/profile/AiMemorySettings';
 import { Palette } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/authClient';
@@ -113,6 +115,11 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
+        <CardHeading icon="chart" title="Strategy backtesting" subtitle="Run, inspect, and compare saved strategies" />
+        <ActionButton title="Open backtesting" pendingTitle="Open backtesting" pending={false} disabled={busy}
+          secondary onPress={() => router.push('/backtests')} />
+      </View>
+      <View style={styles.card}>
         <CardHeading icon="profile" title="Your account" subtitle="A little more about you" />
         <View style={styles.accountDetails}>
           <Text style={styles.detailLabel}>EMAIL ADDRESS</Text>
@@ -138,6 +145,8 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
         {preferenceMutation.isPending ? <Text style={styles.helper} accessibilityLiveRegion="polite">Saving preference…</Text> : null}
         <Status feedback={preferenceFeedback} />
       </View>
+
+      <AiMemorySettings userId={user.id} />
 
       <View style={styles.card}>
         <CardHeading icon="profile" title="Password & security" subtitle="Keep your account protected" />

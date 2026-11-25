@@ -11,11 +11,14 @@ import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/G
 import { Fonts, InsightPalette } from '@/constants/theme';
 import { streamAiMessage, streamDemoAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
-import { conversationMessages, createConversation, deleteConversation as removeConversation, listConversations, promptFor } from '@/lib/aiApi';
+import { asAiOrigin, conversationMessages, createConversation, deleteConversation as removeConversation, listConversations, turnContextFor, type AiOrigin } from '@/lib/aiApi';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { listHoldings } from '@/lib/portfolioHoldings';
 import { useAuth } from '@/store/auth';
 import { AiBacktestCard } from '@/components/ai/AiBacktestCard';
+import { AiNextSteps } from '@/components/ai/AiNextSteps';
+import { AiResearchRunCard } from '@/components/ai/AiResearchRunCard';
+import { mergeResearchRunRefs } from '@/lib/aiResearchRun';
 import { AiAnalysisCard, AiMarketListCard, AiStrategyDraftCard, AiTickerCard } from '@/components/ai/AiBlockCards';
 import { AiChartCard } from '@/components/ai/AiChartCard';
 import { AiResponse } from '@/components/ai/AiResponse';
@@ -33,7 +36,7 @@ type Message = {
   steps?: ToolStep[];
 };
 
-const emptyBlocks = (): AiParsedBlocks => ({ charts: [], tickers: [], marketLists: [], analyses: [], drafts: [], backtests: [] });
+const emptyBlocks = (): AiParsedBlocks => ({ charts: [], tickers: [], marketLists: [], analyses: [], drafts: [], backtests: [], researchRuns: [], actions: [] });
 
 function mergeBlock(previous: AiParsedBlocks | undefined, raw: unknown): AiParsedBlocks {
   const next = parseAiBlocks([raw]);
@@ -45,6 +48,8 @@ function mergeBlock(previous: AiParsedBlocks | undefined, raw: unknown): AiParse
     analyses: [...base.analyses, ...next.analyses],
     drafts: [...base.drafts, ...next.drafts],
     backtests: [...base.backtests, ...next.backtests],
+    researchRuns: mergeResearchRunRefs(base.researchRuns, next.researchRuns),
+    actions: next.actions.length ? next.actions : base.actions,
   };
 }
 type Conversation = { id: string; title: string; kind: AiKind; updatedAt: string };
@@ -106,7 +111,15 @@ export default function AiScreen() {
   const nearBottom = useRef(true);
   const activeAssistant = useRef<string | undefined>(undefined);
   const historyKey = ['ai-conversations', userId];
-  const { analyze } = useLocalSearchParams<{ analyze?: string }>();
+  const { analyze, from } = useLocalSearchParams<{ analyze?: string; from?: string }>();
+  /** The screen that opened the assistant; sent with turns until the user starts another chat. */
+  const origin = useRef<AiOrigin | undefined>(undefined);
+  useEffect(() => {
+    const next = asAiOrigin(from);
+    if (!next) return;
+    origin.current = next;
+    router.setParams({ from: undefined });
+  }, [from]);
 
   // The user's real holdings (Portfolio mode). The demo preview keeps its sample paper portfolio.
   const holdingsQuery = useQuery({
@@ -180,6 +193,7 @@ export default function AiScreen() {
     setError(undefined);
     setNeedsNewChat(false);
     activeAssistant.current = undefined;
+    origin.current = undefined;
     nearBottom.current = true;
   }
 
@@ -263,7 +277,7 @@ export default function AiScreen() {
         const id = currentId ?? (await createConversation(trimmed)).id;
         if (!gate.isCurrent(request)) return;
         setConversationId(id);
-        await streamAiMessage(id, promptFor(turnKind, trimmed, symbol), (event) => {
+        await streamAiMessage(id, trimmed, (event) => {
           if (!gate.isCurrent(request)) return;
           if (event.type === 'delta' && event.text) append(event.text);
           // Tool calls show as trace lines while they run.
@@ -284,7 +298,7 @@ export default function AiScreen() {
               ? { ...message, content, blocks, steps: message.steps?.length ? settleSteps(message.steps) : stepsFromToolCalls(event.message.metadata?.toolCalls, assistantId) }
               : message));
           }
-        }, request.signal);
+        }, request.signal, turnContextFor(turnKind, symbol, origin.current));
       }
       if (gate.isCurrent(request)) {
         setMessages((previous) => previous.map((message) => message.id === assistantId ? { ...message, status: undefined, steps: settleSteps(message.steps) } : message));
@@ -311,6 +325,7 @@ export default function AiScreen() {
     router.setParams({ analyze: undefined });
     const timer = setTimeout(() => {
       reset('portfolio', symbol || 'BTCUSDT');
+      origin.current = 'portfolio_holdings';
       void send(PORTFOLIO_REVIEW, { kind: 'portfolio' });
     }, 0);
     return () => clearTimeout(timer);
@@ -430,8 +445,11 @@ export default function AiScreen() {
                 {item.blocks?.charts.map((chart, index) => <AiChartCard key={`${chart.symbol}-${chart.timeframe}-${index}`} chart={chart} />)}
                 {item.blocks?.drafts.map((d) => <AiStrategyDraftCard key={d.draftId} draft={d} />)}
                 {item.blocks?.backtests.map((b, i) => <AiBacktestCard key={`bt-${b.market.symbol}-${i}`} result={b} />)}
+                {item.blocks?.researchRuns.map(run => <AiResearchRunCard key={`${run.kind}-${run.id}`} run={run} />)}
+                {!!item.blocks?.actions.length && item.status !== 'streaming' && <AiNextSteps actions={item.blocks.actions} onAsk={(prompt) => void send(prompt)}
+                  canAsk={!streaming && !needsNewChat && item.id === messages.at(-1)?.id} />}
                 {item.status === 'streaming' && !!item.content && <ActivityIndicator size="small" color={MUTED} style={styles.streamingDot} />}
-                {!item.content && !item.blocks?.charts.length && !item.blocks?.backtests.length && item.status !== 'streaming' && <Text style={styles.muted}>{item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
+                {!item.content && !item.blocks?.charts.length && !item.blocks?.backtests.length && !item.blocks?.researchRuns.length && item.status !== 'streaming' && <Text style={styles.muted}>{item.status === 'stopped' ? 'Response stopped.' : 'No response received.'}</Text>}
                 {item.status === 'stopped' && !!item.content && <Text style={styles.responseStatus}>Stopped · partial response</Text>}
                 {item.status === 'error' && !!item.content && <Text style={styles.responseStatus}>Incomplete response</Text>}
               </View>
@@ -586,17 +604,17 @@ const styles = StyleSheet.create({
   instrumentHint: { fontSize: 11, lineHeight: 16, color: MUTED, paddingTop: 7 },
   composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
   // Pill composer: round "+" (modes and tools) · message · round send/stop. Buttons stay at the bottom as the message grows.
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: 30, backgroundColor: '#F6F6F4', borderWidth: 1, borderColor: LINE, boxShadow: '0 2px 10px rgba(31,31,30,0.06)' },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: 30, backgroundColor: '#FFF2F6', borderWidth: 1, borderColor: '#F1CAD8', boxShadow: '0 2px 10px rgba(180,72,112,0.08)' },
   roundButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  plusButton: { backgroundColor: '#E9E9E5' },
-  plusButtonOpen: { backgroundColor: '#DEDED9' },
+  plusButton: { backgroundColor: '#F8DFE8' },
+  plusButtonOpen: { backgroundColor: '#F2CEDC' },
   plus: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
   plusOpen: { transform: [{ rotate: '45deg' }] },
   plusBarH: { position: 'absolute', width: 18, height: 2, borderRadius: 1, backgroundColor: INK },
   plusBarV: { position: 'absolute', width: 2, height: 18, borderRadius: 1, backgroundColor: INK },
   input: { flex: 1, color: INK, fontSize: 16, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 6, paddingTop: 11, paddingBottom: 11 },
   sendButton: { backgroundColor: INK },
-  sendDisabled: { backgroundColor: '#E9E9E5' },
+  sendDisabled: { backgroundColor: '#F4DDE5' },
   arrow: { width: 18, height: 18, alignItems: 'center' },
   arrowHead: { position: 'absolute', top: 2, width: 10, height: 10, borderTopWidth: 2.2, borderLeftWidth: 2.2, borderColor: ON_SOLID, transform: [{ rotate: '45deg' }] },
   arrowStem: { position: 'absolute', top: 2, bottom: 1, width: 2.2, borderRadius: 1.1, backgroundColor: ON_SOLID },

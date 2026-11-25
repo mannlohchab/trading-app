@@ -11,14 +11,15 @@ const LOGO = { uri: 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837c
 type Props = {
   /** Brand tap. Defaults to opening Home; Home itself uses it to leave the market directory. */
   onBrandPress?: () => void;
+  logoBorder?: boolean;
 };
 
 /** The app's top bar (icon, name, Portfolio), shared by every main page. */
-export function AppTopBar({ onBrandPress }: Props) {
+export function AppTopBar({ onBrandPress, logoBorder = false }: Props) {
   return (
     <View style={styles.header}>
       <View style={styles.brand}>
-        <Image source={LOGO} style={styles.logo} contentFit="cover" accessibilityLabel="Gurukul icon" />
+        <Image source={LOGO} style={[styles.logo, logoBorder && styles.logoBorder]} contentFit="cover" accessibilityLabel="Gurukul icon" />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Gurukul home"
@@ -50,6 +51,7 @@ const styles = StyleSheet.create({
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   logo: { width: 36, height: 36, borderRadius: 9, backgroundColor: Palette.card },
+  logoBorder: { borderWidth: 1, borderColor: '#111111' },
   brandName: { color: Palette.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.5 },
   brandHome: { minHeight: 44, justifyContent: 'center' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },

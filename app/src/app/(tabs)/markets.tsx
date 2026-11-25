@@ -14,11 +14,10 @@ import { MorningDecodeCard } from '@/components/ai/MorningDecodeCard';
 import { HomeNews } from '@/components/markets/HomeNews';
 import { WelcomeGift } from '@/components/markets/WelcomeGift';
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
-import SpecularButton from '@/components/ui/SpecularButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { InstrumentRowSkeleton } from '@/components/ui/Skeleton';
-import { Palette, Spacing } from '@/constants/theme';
+import { Fonts, Palette, Spacing } from '@/constants/theme';
 import { formatPct } from '@/lib/format';
 import { marketAssets } from '@/lib/marketAssets';
 import { fetchTickerList, searchPairs } from '@/lib/marketData';
@@ -134,7 +133,7 @@ export default function MarketsScreen() {
 
   const discovery = exploreQuery.data?.crypto ?? [];
   const listed = directory ? listQuery.data?.crypto ?? [] : [];
-  const feedStatus = useLiveMarket([...discovery, ...listed].map(q => `${q.exchange}:${q.symbol}`));
+  useLiveMarket([...discovery, ...listed].map(q => `${q.exchange}:${q.symbol}`));
 
   const avgChange = discovery.slice(0, 10).reduce((sum, q) => sum + q.changePercent, 0) / (Math.min(discovery.length, 10) || 1);
   const marketsUp = avgChange >= 0;
@@ -148,16 +147,16 @@ export default function MarketsScreen() {
   const shortcuts: { label: string; icon?: GlassIconName; art?: number; onPress: () => void }[] = [
     { label: 'Search', icon: 'add', onPress: () => setSearchOpen(true) },
     { label: 'Markets', art: require('@/assets/images/home-markets.png'), onPress: () => router.push('/(tabs)/market') },
+    { label: 'Calendar', art: require('@/assets/images/home-calendar.png'), onPress: () => router.push('/(tabs)/calendar') },
     { label: 'Community', art: require('@/assets/images/home-community.png'), onPress: () => router.push('/(tabs)/community') },
     { label: 'Portfolio', art: require('@/assets/images/home-portfolio.png'), onPress: () => router.push('/(tabs)/profile') },
-    { label: 'AI Insight', art: require('@/assets/images/home-ai.png'), onPress: () => router.push('/(tabs)/ai') },
+    { label: 'AI Insight', art: require('@/assets/images/home-ai.png'), onPress: () => router.push({ pathname: '/(tabs)/ai', params: { from: 'home' } }) },
   ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']} onLayout={(event) => setPageWidth(event.nativeEvent.layout.width)}>
-      <AppTopBar onBrandPress={() => setDirectory(false)} />
+      <AppTopBar onBrandPress={() => setDirectory(false)} logoBorder />
 
-      <Text style={[styles.cardSymbol, {paddingHorizontal: 18, paddingBottom: 8}]}>{feedStatus}</Text>
       {(exploreQuery.isError || listQuery.isError) && (
         <ErrorBanner
           message="Could not load market data. Is the API running?"
@@ -170,7 +169,6 @@ export default function MarketsScreen() {
 
       {!directory ? (
         <ScrollView contentContainerStyle={styles.homePad} showsVerticalScrollIndicator={false}>
-          <MorningDecodeCard />
           <View style={styles.hero}>
             <View style={styles.heroTop}>
               <View style={styles.heroCopy}>
@@ -217,30 +215,16 @@ export default function MarketsScreen() {
                     );
                   })}
             </View>
-            <SpecularButton
-              size="lg"
-              radius={28}
-              tint="#0066FF"
-              tintOpacity={0.06}
-              textColor="#16181D"
-              lineColor="#0066FF"
-              baseColor="#C9CEDB"
-              intensity={1}
-              idleIntensity={0.35}
-              shineSize={10}
-              shineFade={34}
-              thickness={1.2}
-              glow={1}
-              followMouse
-              proximity={250}
+            <Pressable
               accessibilityRole="button"
               accessibilityLabel="Explore markets"
-              onClick={() => router.push('/(tabs)/market')}
               onPress={() => router.push('/(tabs)/market')}
-              style={styles.heroCta}>
-              Explore markets
-            </SpecularButton>
+              style={({ pressed }) => [styles.heroCta, pressed && styles.heroCtaPressed]}>
+              <Text style={styles.heroCtaLabel}>Explore markets</Text>
+            </Pressable>
           </View>
+
+          <MorningDecodeCard />
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.shortcutScroll} contentContainerStyle={styles.shortcuts}>
             {shortcuts.map(item => (
@@ -362,7 +346,14 @@ const styles = StyleSheet.create({
   pillSymbol: { flexShrink: 1, color: Palette.text, fontSize: 13, fontWeight: '600' },
   pillChange: { flexShrink: 0, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   pressed: { opacity: 0.6 },
-  heroCta: { alignSelf: 'stretch', width: '100%', marginTop: 28, height: 56 },
+  heroCta: {
+    alignSelf: 'stretch', width: '100%', marginTop: 28, height: 56,
+    borderRadius: 20, backgroundColor: '#F2F2F5',
+    boxShadow: '0 6px 24px rgba(35, 37, 55, 0.06)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  heroCtaPressed: { opacity: 0.5, transform: [{ scale: 0.96 }] },
+  heroCtaLabel: { fontFamily: Fonts.sans, color: '#24252B', fontSize: 17, fontWeight: '700', letterSpacing: -0.5 },
   shortcutScroll: { marginTop: 26, marginHorizontal: -18 },
   shortcuts: { paddingHorizontal: 10, gap: 2 },
   shortcut: { width: 96, alignItems: 'center', gap: 2, paddingVertical: 4 },

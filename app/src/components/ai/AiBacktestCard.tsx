@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
 import { InsightPalette as P } from '@/constants/theme';
@@ -82,7 +83,7 @@ export const AiBacktestCard = memo(function AiBacktestCard({ result }: { result:
       <View style={styles.metrics}>
         <Metric label="Trades" value={String(m.totalTrades ?? '—')} />
         <Metric label="Win rate" value={m.winRatePercent == null ? '—' : `${fmt(m.winRatePercent)}%`} />
-        <Metric label="Max DD" value={m.maxDrawdownPercent == null ? '—' : `${fmt(m.maxDrawdownPercent)}%`} />
+        <Metric label="DD at close" value={m.maxDrawdownPercent == null ? '—' : `${fmt(m.maxDrawdownPercent)}%`} />
         <Metric label="Net P/L" value={fmt(m.netProfit)} />
         <Metric label="Final eq." value={fmt(m.finalEquity, 0)} />
         <Metric label="vs B&H" value={m.buyAndHoldReturnPercent == null ? '—' : `${fmt(m.buyAndHoldReturnPercent)}%`} />
@@ -110,6 +111,9 @@ export const AiBacktestCard = memo(function AiBacktestCard({ result }: { result:
       ) : null}
 
       <Text style={styles.disclaimer}>Historical engine run on closed candles — not a prediction.</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Open backtesting workspace" onPress={() => router.push('/backtests')} style={styles.workspaceButton}>
+        <Text style={styles.workspaceText}>Configure runs and compare results →</Text>
+      </Pressable>
     </View>
   );
 });
@@ -146,4 +150,6 @@ const styles = StyleSheet.create({
   tradePx: { flex: 1, color: P.body, fontSize: 12 },
   tradePnL: { fontSize: 12, fontWeight: '700' },
   disclaimer: { color: P.textMuted, fontSize: 11, lineHeight: 14 },
+  workspaceButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, backgroundColor: P.soft },
+  workspaceText: { color: P.text, fontSize: 12, fontWeight: '600' },
 });

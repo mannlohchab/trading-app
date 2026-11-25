@@ -1,5 +1,6 @@
 import { fetch as streamingFetch } from 'expo/fetch';
 import { consumeAiStream, type AiEvent } from './aiChat';
+import type { AiTurnContext } from './aiApi';
 import { authHeaders } from './authClient';
 import { API_URL } from './config';
 import { DEMO_MODE } from './demoMode';
@@ -76,6 +77,7 @@ export async function streamAiMessage(
   content: string,
   onEvent: (event: AiEvent) => void,
   signal?: AbortSignal,
+  context?: AiTurnContext,
 ) {
   const auth = await authHeaders();
   const res = await streamingFetch(`${API_URL}/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`, {
@@ -83,7 +85,7 @@ export async function streamAiMessage(
     signal,
     credentials: auth.credentials,
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...auth.headers },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, ...(context && { context }) }),
   });
   if (!res.ok) throw await errorFrom(res as unknown as Response);
   if (!res.body) throw new Error('Streaming is unavailable. Please try again.');

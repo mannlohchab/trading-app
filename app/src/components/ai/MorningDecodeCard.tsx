@@ -1,17 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { Text } from '@/components/ui/AppText';
-import { Palette } from '@/constants/theme';
+import { Fonts, Palette } from '@/constants/theme';
 import {
   fetchMorningDecode,
   fetchMorningDecodeAudioDataUri,
   formatDuration,
 } from '@/lib/morningDecodeApi';
 import { useAuth } from '@/store/auth';
+
+const PLAYER_INK = '#24252B';
+const PLAYER_MUTED = '#747680';
+const PLAYER_DISABLED = '#B2B3BB';
+const WAVEFORM_HEIGHTS = [6, 11, 16, 8, 13, 6];
 
 /** Shared daily audio briefing at the top of Home — no transcript. */
 export function MorningDecodeCard() {
@@ -28,10 +34,16 @@ export function MorningDecodeCard() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioError, setAudioError] = useState<string>();
-  const webRef = useRef<WebView<{}>>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const webRef = useRef<WebView<object>>(null);
 
   const totalSeconds = duration > 0 ? duration : (brief?.durationSeconds ?? 0);
   const progress = totalSeconds > 0 ? Math.min(1, position / totalSeconds) : 0;
+  const remainingSeconds = totalSeconds > 0 ? Math.max(0, totalSeconds - position) : null;
+  const isLoading = audioState === 'loading' || briefQuery.isLoading;
+  const isPlaying = audioState === 'playing';
+  const playDisabled = !brief?.hasAudio || isLoading;
+  const canSkip = !!brief?.hasAudio && !!audioUri && duration > 0 && (isPlaying || audioState === 'paused');
 
   const toggleAudio = useCallback(async () => {
     if (!brief?.hasAudio) return;
@@ -57,62 +69,132 @@ export function MorningDecodeCard() {
     }
   }, [audioState, audioUri, brief?.hasAudio]);
 
+  const skipAudio = (seconds: number) => {
+    if (!canSkip) return;
+    webRef.current?.injectJavaScript(`window.__tgSkip&&window.__tgSkip(${seconds});true;`);
+  };
+
+  const dismissCard = () => {
+    webRef.current?.injectJavaScript('window.__tgPause&&window.__tgPause();true;');
+    setAudioState('paused');
+    setDismissed(true);
+  };
+
+  if (dismissed) return null;
+
   return (
     <View style={styles.wrap}>
       <View style={styles.card}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss Morning Decode"
+          accessibilityHint="Hide this briefing for the current app session"
+          onPress={dismissCard}
+          hitSlop={2}
+          style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+          <View style={[styles.closeLine, styles.closeLineForward]} accessible={false} />
+          <View style={[styles.closeLine, styles.closeLineBackward]} accessible={false} />
+        </Pressable>
         <View style={styles.header}>
-          <Image source={require('@/assets/images/home-ai.png')} style={styles.art} contentFit="contain" accessible={false} />
-          <View style={styles.copy}>
-            <Text style={styles.kicker}>{brief?.sessionLabel ?? 'Daily market briefing'}</Text>
-            <Text style={styles.title}>{brief?.title ?? 'Morning Decode'}</Text>
+          <View style={styles.artwork}>
+            <Image source={require('@/assets/images/morning-decode-cover.jpg')} style={styles.art} contentFit="cover" accessible={false} />
           </View>
+          <View style={styles.copy}>
+            <Text style={styles.title} accessibilityRole="header">{brief?.title ?? 'Morning Decode'}</Text>
+            <Text style={styles.subtitle}>
+              {brief?.sessionLabel ?? 'Daily market briefing'}{brief && !brief.hasAudio ? ' · Audio coming soon' : ''}
+            </Text>
+          </View>
+          <View style={styles.waveform} accessible={false} importantForAccessibility="no-hide-descendants">
+            {WAVEFORM_HEIGHTS.map((height, index) => (
+              <View key={index} style={[styles.waveformBar, { height }, isPlaying && styles.waveformBarActive]} />
+            ))}
+          </View>
+        </View>
+
+        <View
+          style={styles.progressRow}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Morning Decode playback progress"
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}>
+          <Text style={styles.time}>{formatDuration(position)}</Text>
+          <View style={styles.track}>
+            <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+          </View>
+          <Text style={styles.time}>{remainingSeconds === null ? '—:—' : `−${formatDuration(remainingSeconds)}`}</Text>
+        </View>
+
+        <View style={styles.controls}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Rewind 15 seconds"
+            accessibilityState={{ disabled: !canSkip }}
+            disabled={!canSkip}
+            onPress={() => skipAudio(-15)}
+            style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
+            <View style={styles.skipIcon}>
+              <SymbolView
+                name={{ ios: 'gobackward', android: 'replay', web: 'replay' }}
+                size={26}
+                tintColor={canSkip ? PLAYER_INK : PLAYER_DISABLED}
+                type="monochrome"
+                accessible={false}
+              />
+              <Text style={[styles.skipAmount, !canSkip && styles.disabledText]} accessible={false}>15</Text>
+            </View>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
               !brief?.hasAudio
                 ? 'Morning Decode audio not available'
-                : audioState === 'playing'
+                : isPlaying
                   ? 'Pause Morning Decode'
                   : 'Play Morning Decode'
             }
-            disabled={!brief?.hasAudio || audioState === 'loading' || briefQuery.isLoading}
+            accessibilityState={{ disabled: playDisabled, busy: isLoading }}
+            disabled={playDisabled}
             onPress={() => void toggleAudio()}
-            style={({ pressed }) => [
-              styles.play,
-              (!brief?.hasAudio || briefQuery.isLoading) && styles.playDisabled,
-              pressed && brief?.hasAudio && styles.pressed,
-            ]}>
-            {audioState === 'loading' || briefQuery.isLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
+            style={({ pressed }) => [styles.play, pressed && styles.pressed]}>
+            {isLoading ? (
+              <ActivityIndicator color={PLAYER_INK} size="small" />
+            ) : isPlaying ? (
+              <View style={styles.pauseIcon} accessible={false}>
+                <View style={styles.pauseBar} />
+                <View style={styles.pauseBar} />
+              </View>
             ) : (
-              <Text style={styles.playText}>
-                {brief?.hasAudio ? (audioState === 'playing' ? 'Pause' : 'Play') : 'Soon'}
-              </Text>
+              <View style={[styles.playIcon, playDisabled && styles.playIconDisabled]} accessible={false} />
             )}
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Forward 15 seconds"
+            accessibilityState={{ disabled: !canSkip }}
+            disabled={!canSkip}
+            onPress={() => skipAudio(15)}
+            style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
+            <View style={styles.skipIcon}>
+              <SymbolView
+                name={{ ios: 'goforward', android: 'forward_media', web: 'forward_media' }}
+                size={26}
+                tintColor={canSkip ? PLAYER_INK : PLAYER_DISABLED}
+                type="monochrome"
+                accessible={false}
+              />
+              <Text style={[styles.skipAmount, !canSkip && styles.disabledText]} accessible={false}>15</Text>
+            </View>
           </Pressable>
         </View>
 
-        <View style={styles.progressRow} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}>
-          <View style={styles.track}>
-            <View style={[styles.fill, { width: `${progress * 100}%` }]} />
-          </View>
-          <Text style={styles.time}>
-            {formatDuration(position)} / {formatDuration(totalSeconds || brief?.durationSeconds)}
-          </Text>
-        </View>
-
-        {briefQuery.isError ? (
-          <Text style={styles.error}>Couldn’t load Morning Decode. Pull to refresh.</Text>
-        ) : !brief?.hasAudio && !briefQuery.isLoading ? (
-          <Text style={styles.hint}>Today’s briefing audio isn’t ready yet.</Text>
-        ) : null}
+        {briefQuery.isError ? <Text style={styles.error}>Couldn’t load Morning Decode. Pull to refresh.</Text> : null}
 
         {audioError ? <Text style={styles.error}>{audioError}</Text> : null}
-        {brief?.disclaimer ? <Text style={styles.disclaimer}>{brief.disclaimer}</Text> : null}
       </View>
+      {brief?.disclaimer ? <Text style={styles.disclaimer}>{brief.disclaimer}</Text> : null}
 
       {audioUri ? (
-        <WebView<{}>
+        <WebView<object>
           ref={webRef}
           originWhitelist={['*']}
           style={styles.hiddenPlayer}
@@ -151,6 +233,12 @@ export function MorningDecodeCard() {
 <script>
 window.__tgPlay=function(){document.getElementById('a').play()};
 window.__tgPause=function(){document.getElementById('a').pause()};
+window.__tgSkip=function(seconds){
+  var a=document.getElementById('a');
+  if(!Number.isFinite(a.duration)||a.duration<=0)return;
+  a.currentTime=Math.max(0,Math.min(a.duration,a.currentTime+seconds));
+  window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:'time',t:a.currentTime,d:a.duration}));
+};
 </script></body></html>`,
           }}
         />
@@ -160,47 +248,82 @@ window.__tgPause=function(){document.getElementById('a').pause()};
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 18 },
+  wrap: { marginBottom: 11 },
   card: {
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    gap: 12,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  art: { width: 48, height: 48 },
-  copy: { flex: 1, minWidth: 0 },
-  kicker: { color: Palette.textMuted, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  title: { color: Palette.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2, marginTop: 2 },
-  hint: { color: Palette.textSecondary, fontSize: 13 },
-  disclaimer: { color: Palette.textMuted, fontSize: 11, lineHeight: 14 },
-  error: { color: Palette.red, fontSize: 12 },
-  play: {
-    minHeight: 36,
-    minWidth: 72,
+    position: 'relative',
     paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: Palette.accent,
+    paddingTop: 8,
+    paddingBottom: 5,
+    borderRadius: 20,
+    backgroundColor: '#F2F2F5',
+    boxShadow: '0 6px 24px rgba(35, 37, 55, 0.06)',
+  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 30 },
+  closeButton: { position: 'absolute', zIndex: 2, top: 0, right: 0, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  closeLine: { position: 'absolute', width: 12, height: 1.5, borderRadius: 1, backgroundColor: PLAYER_INK },
+  closeLineForward: { transform: [{ rotate: '45deg' }] },
+  closeLineBackward: { transform: [{ rotate: '-45deg' }] },
+  artwork: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    overflow: 'hidden',
+    backgroundColor: '#E1E1F1',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 3px 9px rgba(57, 54, 92, 0.08)',
+  },
+  art: { width: '100%', height: '100%', borderRadius: 11 },
+  copy: { flex: 1, minWidth: 0 },
+  title: { fontFamily: Fonts.sans, color: PLAYER_INK, fontSize: 17, fontWeight: '700', letterSpacing: -0.5, lineHeight: 20 },
+  subtitle: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 10, lineHeight: 13, marginTop: 1 },
+  waveform: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 18 },
+  waveformBar: { width: 3, borderRadius: 2, backgroundColor: '#B2B3BB' },
+  waveformBarActive: { backgroundColor: PLAYER_INK },
+  disclaimer: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 9, lineHeight: 13, textAlign: 'center', marginTop: 6, paddingHorizontal: 10 },
+  error: { fontFamily: Fonts.sans, color: Palette.red, fontSize: 10, lineHeight: 13, textAlign: 'center', marginTop: 1 },
+  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginTop: 2 },
+  play: {
+    width: 48,
+    height: 44,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playDisabled: { backgroundColor: Palette.textMuted },
-  playText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  progressRow: { gap: 6 },
+  playIcon: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 12,
+    borderBottomWidth: 12,
+    borderLeftWidth: 20,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: PLAYER_INK,
+    marginLeft: 5,
+  },
+  playIconDisabled: { borderLeftColor: PLAYER_DISABLED },
+  pauseIcon: { flexDirection: 'row', gap: 6 },
+  pauseBar: { width: 7, height: 24, borderRadius: 3, backgroundColor: PLAYER_INK },
+  skip: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  skipIcon: { width: 27, height: 27, alignItems: 'center', justifyContent: 'center' },
+  skipAmount: { position: 'absolute', top: 10, fontFamily: Fonts.sans, fontSize: 8, lineHeight: 10, fontWeight: '700', color: PLAYER_INK },
+  disabledText: { color: PLAYER_DISABLED },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   track: {
+    flex: 1,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: Palette.borderSubtle,
+    borderRadius: 3,
+    backgroundColor: '#DADBE0',
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: 2,
-    backgroundColor: Palette.accent,
+    borderRadius: 3,
+    backgroundColor: '#7D7F89',
   },
-  time: { color: Palette.textMuted, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  pressed: { opacity: 0.75 },
+  time: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 10, lineHeight: 12, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  pressed: { opacity: 0.5, transform: [{ scale: 0.96 }] },
   hiddenPlayer: { width: 1, height: 1, opacity: 0, position: 'absolute' },
 });

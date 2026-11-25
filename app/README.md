@@ -26,12 +26,22 @@ In development the backend's console SMS adapter prints the code in the backend 
 | `socket.ts` | WebSocket `/api/v1/market/stream` (live tickers and candles) |
 | `paperTrading.ts` | `/api/v1/paper/*`; the app creates one account (100,000 USDT) on first use |
 | `aiApi.ts`, `api.ts` (`streamAiMessage`) | `/api/v1/ai/conversations` and the SSE message stream |
+| `calendarApi.ts`, `financialCalendar.ts` | `/api/v1/calendar` (weekly economic events, cached by the backend) |
 
 Not connected yet, because the backend has no module for them: community, watchlists, economic
-calendar/indicators/news and forex. The Community tab is hidden and Home shows live discovery lists
+indicators/news and forex. The Community tab is hidden and Home shows live discovery lists
 instead of a watchlist.
 
 `EXPO_PUBLIC_DEMO_MODE=true` still previews the screens with local sample data and no network.
+
+The Calendar tab uses the app's normal login and API URL. It shows the published Forex Factory week
+with a compact date strip, an expandable month grid and a bold color-coded event timeline. The purple
+filter button opens currency/event search and impact filters; Full week shows the published schedule.
+Use the selected date to return to a single-day agenda, or pull to refresh. Event times use the profile
+timezone (device timezone when unset). Holidays are all-day entries in the affected market's date;
+date-only announcements retain their supplied date. Unknown actual/forecast/previous values display
+as `—`. Source, retrieval time and stale-cache notices are visible. Demo events are explicitly labeled
+and only served in demo mode. Historical weeks and crypto-specific dates are not part of this feed.
 
 See [../README.md](../README.md) for full setup and [../backend/README.md](../backend/README.md) for the API.
 
