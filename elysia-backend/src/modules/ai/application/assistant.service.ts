@@ -2,6 +2,7 @@
 import { assembleBlocks, type ResponseBlock } from '../domain/blocks';
 import { toolResultContent } from '../domain/tool-context';
 import { CODE_REMOVED_FALLBACK, createCodeFilter } from '../domain/code-filter';
+import { createToolMarkupFilter, stripToolMarkup } from '../domain/tool-markup';
 import { CONVERSATION_LIMITS, selectHistory, titleFromMessage } from '../domain/conversation';
 import { buildSystemPrompt } from '../domain/prompt';
 import { decideQuota, startOfUtcDay, type UsageLimits } from '../domain/usage-policy';
@@ -12,6 +13,7 @@ import type {
 } from './ports';
 import { renderTurnContext, type ClientTurnContext } from '../domain/turn-context';
 import { ToolInputError, type AssistantTool } from './tools';
+import { coerceToSchema } from './tool-arguments';
 
 export type TurnEvent =
   | { type: 'user_message'; message: StoredMessage }
@@ -52,6 +54,10 @@ type Deps = {
   newId?: () => string;
   log?: (message: string, error?: unknown) => void;
 };
+
+/** Sent with the last model call of a turn, when no tools are offered any more. */
+const FINAL_ROUND_NOTE = '[Note from the app, not the user] All tool steps for this reply are used up. Write your final answer now from the tool results above, in plain words. Do not call tools or write tool calls, code or JSON.';
+const UNFINISHED_FALLBACK = 'I ran out of steps before I could finish this. Ask me to continue and I will pick up from the results above.';
 
 const parseArguments = (raw: string): unknown => {
   try { return raw.trim() ? JSON.parse(raw) : {}; } catch { return undefined; }
@@ -104,6 +110,7 @@ export class AssistantService {
     let userMessage: StoredMessage | undefined;
     let text = '';
     let codeRemoved = false;
+    let markupRemoved = false;
     const blocks: ResponseBlock[] = [];
     try {
       const history = selectHistory(await conversations.history(conversation.id, CONVERSATION_LIMITS.historyMaxMessages * 2));
@@ -119,7 +126,7 @@ export class AssistantService {
       const tools = this.deps.tools(input.userId);
       const base: ChatMessage[] = [
         { role: 'system', content: buildSystemPrompt(persona, clock.now(), { webResearch: this.deps.webResearch, userContext: renderTurnContext(snapshot, input.context) }) },
-        ...history.map(m => ({ role: m.role === 'USER' ? 'user' as const : 'assistant' as const, content: m.content })),
+        ...history.map(m => m.role === 'USER' ? { role: 'user' as const, content: m.content } : { role: 'assistant' as const, content: stripToolMarkup(m.content) }),
         { role: 'user', content },
       ];
       const turn: ChatMessage[] = [];
@@ -133,8 +140,13 @@ export class AssistantService {
         yield { type: 'status', stage: 'thinking' };
         const allowTools = model.supportsTools && rounds < CONVERSATION_LIMITS.maxToolRounds;
         const round = { text: '', calls: [] as ToolCall[], reasoning: undefined as string | undefined, reasoningDetails: undefined as unknown[] | undefined };
-        // Raw strategy definitions and code never reach the user (see domain/code-filter).
+        // Tool-call markup written as text is taken out first (and run when tools are allowed);
+        // then raw strategy definitions and code (see domain/tool-markup, domain/code-filter).
+        const markup = createToolMarkupFilter();
         const filter = createCodeFilter();
+        const show = (chunk: string) => (chunk ? filter.push(chunk) : '');
+        // Out of tool steps: say so, or the model writes its next call out as text.
+        const finalNote: ChatMessage[] = model.supportsTools && !allowTools ? [{ role: 'user', content: FINAL_ROUND_NOTE }] : [];
         let done: { finishReason: string; usage: ModelUsage } | undefined;
 
         // Try the chain; a model may be skipped only if it failed before producing any output.
@@ -143,7 +155,7 @@ export class AssistantService {
           try {
             for await (const event of this.provider(model).stream({
               model: model.providerModel,
-              messages: [...base, ...turn],
+              messages: [...base, ...turn, ...finalNote],
               tools: allowTools ? tools.map(t => t.spec) : undefined,
               maxOutputTokens: model.maxOutputTokens,
               temperature: 0.3,
@@ -151,7 +163,7 @@ export class AssistantService {
               signal: input.signal,
             })) {
               if (event.type === 'text') {
-                const safe = filter.push(event.delta);
+                const safe = show(markup.push(event.delta));
                 if (safe) { round.text += safe; text += safe; yield { type: 'delta', text: safe }; }
               }
               else if (event.type === 'tool_call') round.calls.push(event.call);
@@ -177,9 +189,16 @@ export class AssistantService {
           }
         }
 
-        const rest = filter.flush();
+        const rest = show(markup.flush()) + filter.flush();
         if (rest) { round.text += rest; text += rest; yield { type: 'delta', text: rest }; }
         codeRemoved ||= filter.removed;
+        if (markup.removed) {
+          markupRemoved = true;
+          if (allowTools) {
+            for (const [index, call] of markup.calls.entries()) round.calls.push({ id: `text_call_${rounds}_${index}`, ...call });
+          }
+          this.deps.log?.(`Model wrote ${markup.calls.length} tool call(s) as text (${allowTools ? 'ran them' : 'no tools this step; dropped'}) in conversation ${conversation.id}`);
+        }
 
         total = sumUsage(total, done?.usage ?? { inputTokens: 0, outputTokens: 0 });
         finishReason = done?.finishReason ?? 'other';
@@ -197,7 +216,7 @@ export class AssistantService {
             turn.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify({ error: 'Too many tool calls in one step; call fewer at a time.' }) });
             continue;
           }
-          yield { type: 'status', stage: 'tool', tool: call.name, callId: call.id, arguments: parseArguments(call.arguments) };
+          yield { type: 'status', stage: 'tool', tool: call.name, callId: call.id, arguments: this.typedArguments(tools, call.name, parseArguments(call.arguments)) };
           const started = Date.now();
           if (input.signal?.aborted) throw new Error('Assistant turn cancelled before tool execution.');
           const outcome = await this.runTool(tools, call);
@@ -216,6 +235,7 @@ export class AssistantService {
       }
 
       if (codeRemoved && !text.trim()) { text = CODE_REMOVED_FALLBACK; yield { type: 'delta', text }; }
+      else if (markupRemoved && !text.trim()) { text = UNFINISHED_FALLBACK; yield { type: 'delta', text }; }
       if (codeRemoved) this.deps.log?.(`Removed code from an assistant reply (conversation ${conversation.id})`);
       const assistant = await conversations.addMessage({
         id: turnId,
@@ -253,6 +273,12 @@ export class AssistantService {
     return [first, ...rest];
   }
 
+  /** Arguments as the tool will read them (text-written numbers and lists converted), for logs and the live trace. */
+  private typedArguments(tools: AssistantTool[], name: string, args: unknown) {
+    const tool = tools.find(t => t.spec.name === name);
+    return tool && args !== undefined ? coerceToSchema(args, tool.spec.parameters) : args;
+  }
+
   private provider(model: ModelProfile) {
     return this.providers.get(model.provider)!;
   }
@@ -265,6 +291,7 @@ export class AssistantService {
       return { ok: false, args, content: JSON.stringify({ error: 'Arguments were not valid JSON.' }), blocks: [], error: 'Arguments were not valid JSON.' };
     }
     const tool = tools.find(t => t.spec.name === call.name);
+    if (tool) args = coerceToSchema(args, tool.spec.parameters);
     if (!tool) return { ok: false, args, content: JSON.stringify({ error: `Unknown tool "${call.name}".` }), blocks: [], error: 'Unknown tool' };
     try {
       const outcome = await tool.run(args);
