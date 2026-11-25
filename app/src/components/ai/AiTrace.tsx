@@ -5,7 +5,7 @@ import { AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, V
 
 import { Text } from '@/components/ui/AppText';
 import { InsightPalette as P } from '@/constants/theme';
-import { formatDuration, stepDetails, stepTitle, type ToolStep } from '@/lib/aiTrace';
+import { formatDuration, stepDetails, stepTitle, visibleSteps, type ToolStep } from '@/lib/aiTrace';
 
 const ERROR = '#B91C1C';
 
@@ -80,8 +80,9 @@ function Step({ step }: { step: ToolStep }) {
 }
 
 /** Tool steps, then (while nothing has been written yet) a pulsing "Thinking" line. */
-export const AiTrace = memo(function AiTrace({ steps, thinking }: { steps?: ToolStep[]; thinking?: boolean }) {
-  if (!steps?.length && !thinking) return null;
+export const AiTrace = memo(function AiTrace({ steps: all, thinking }: { steps?: ToolStep[]; thinking?: boolean }) {
+  const steps = visibleSteps(all);
+  if (!steps.length && !thinking) return null;
   return (
     <View style={styles.trace} accessibilityLiveRegion="polite">
       {steps?.map((step) => <Step key={step.id} step={step} />)}

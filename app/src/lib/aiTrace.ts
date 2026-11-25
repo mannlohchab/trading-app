@@ -109,3 +109,13 @@ export function applyStepEvent(steps: ToolStep[], event: { type: string; stage?:
  */
 export const settleSteps = (steps: ToolStep[] | undefined, as: 'done' | 'error' = 'done') =>
   steps?.map(s => (s.status === 'running' ? { ...s, status: as } : s));
+
+/**
+ * Steps worth showing: a failed call is hidden once a later call of the same tool is running or
+ * succeeded (the assistant fixed its arguments and retried). Failures that were never recovered stay.
+ */
+export function visibleSteps(steps: ToolStep[] | undefined): ToolStep[] {
+  if (!steps?.length) return [];
+  return steps.filter((step, index) => step.status !== 'error'
+    || !steps.slice(index + 1).some(later => later.tool === step.tool && later.status !== 'error'));
+}

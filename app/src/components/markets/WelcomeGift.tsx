@@ -33,7 +33,7 @@ export function WelcomeGift({ visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: Palette.overlay, justifyContent: 'flex-end' },
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
   card: {
     width: '100%', borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: '#FFFFFF',
     alignItems: 'center', paddingHorizontal: 22, paddingTop: 18, overflow: 'hidden',
