@@ -56,9 +56,58 @@ test('streams free Nemotron with a zero price ceiling and returns reasoning for 
   expect(request).not.toHaveProperty('models');
   expect(request).not.toHaveProperty('plugins');
   expect(request.messages[1].reasoning_details).toEqual([{ index: 0, type: 'reasoning.text', text: 'earlier' }]);
-  expect(seen[0]).toEqual({ type: 'text', delta: 'BTC is up.' });
-  expect(seen[1]).toMatchObject({ type: 'done', reasoning: 'Look up.', usage: { costUnits: 0, costUnit: 'usd' } });
-  expect((seen[1] as { reasoningDetails: { text: string }[] }).reasoningDetails[0]?.text).toBe('Look up.');
+  expect(seen.slice(0, 2)).toEqual([{ type: 'text', delta: 'BTC ' }, { type: 'text', delta: 'is up.' }]);
+  expect(seen[2]).toMatchObject({ type: 'done', reasoning: 'Look up.', usage: { costUnits: 0, costUnit: 'usd' } });
+  expect((seen[2] as { reasoningDetails: { text: string }[] }).reasoningDetails[0]?.text).toBe('Look up.');
+});
+
+test('text reaches the caller while the model is still generating', async () => {
+  const encoder = new TextEncoder();
+  let push!: (chunk: unknown) => void, end!: () => void;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      push = chunk => controller.enqueue(encoder.encode(`data: ${typeof chunk === 'string' ? chunk : JSON.stringify(chunk)}\n\n`));
+      end = () => controller.close();
+    },
+  });
+  const provider = new OpenRouterChatProvider({ apiKey: 'test-key', fetch: async () => new Response(body) });
+  const stream = provider.stream({ model: FREE_NEMOTRON_MODEL, messages: [{ role: 'user', content: 'hi' }], maxOutputTokens: 100 })[Symbol.asyncIterator]();
+
+  push({ model: FREE_NEMOTRON_MODEL, choices: [{ delta: { content: 'First words' } }] });
+  // Nothing after the first chunk has been sent yet, and the caller already has it.
+  expect((await stream.next()).value).toEqual({ type: 'text', delta: 'First words' });
+
+  push({ model: FREE_NEMOTRON_MODEL, choices: [{ delta: { content: ', then more.' }, finish_reason: 'stop' }] });
+  push({ model: FREE_NEMOTRON_MODEL, choices: [], usage });
+  push('[DONE]');
+  end();
+  expect((await stream.next()).value).toEqual({ type: 'text', delta: ', then more.' });
+  expect((await stream.next()).value).toMatchObject({ type: 'done', finishReason: 'stop' });
+});
+
+test('a different model is refused before any of its text is passed on; a late cost still fails the call', async () => {
+  const swapped = new OpenRouterChatProvider({
+    apiKey: 'test-key',
+    fetch: async () => sse({ model: 'openai/gpt-4o-mini', choices: [{ delta: { content: 'from a paid model' } }] }, '[DONE]'),
+  });
+  const seen: ChatStreamEvent[] = [];
+  const error = await (async () => { for await (const e of swapped.stream({ model: FREE_NEMOTRON_MODEL, messages: [{ role: 'user', content: 'hi' }], maxOutputTokens: 20 })) seen.push(e); })().catch(e => e);
+  expect(error).toMatchObject({ code: 'AI_PROVIDER_QUOTA' });
+  expect(seen).toEqual([]);
+
+  const billedLate = new OpenRouterChatProvider({
+    apiKey: 'test-key',
+    fetch: async () => sse(
+      { model: FREE_NEMOTRON_MODEL, choices: [{ delta: { content: 'partial' }, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0.002 } },
+      '[DONE]',
+    ),
+  });
+  const late: ChatStreamEvent[] = [];
+  const lateError = await (async () => { for await (const e of billedLate.stream({ model: FREE_NEMOTRON_MODEL, messages: [{ role: 'user', content: 'hi' }], maxOutputTokens: 20 })) late.push(e); })().catch(e => e);
+  expect(late).toEqual([{ type: 'text', delta: 'partial' }]);
+  expect(lateError).toMatchObject({ code: 'AI_PROVIDER_QUOTA' });
+  expect(late.some(e => e.type === 'done')).toBe(false);
 });
 
 test('refuses a paid model before the request and discards a billed stream', async () => {

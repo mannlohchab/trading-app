@@ -8,8 +8,9 @@ import { decideQuota, startOfUtcDay, type UsageLimits } from '../domain/usage-po
 import { AiProviderError } from './errors';
 import type {
   ChatMessage, ChatModelProvider, Clock, ConversationRepository, MessageMetadata, ModelProfile,
-  ModelUsage, PersonaSource, StoredMessage, ToolCall, UsageRepository,
+  ModelUsage, PersonaSource, StoredMessage, ToolCall, UsageRepository, UserSnapshotSource,
 } from './ports';
+import { renderTurnContext, type ClientTurnContext } from '../domain/turn-context';
 import { ToolInputError, type AssistantTool } from './tools';
 
 export type TurnEvent =
@@ -40,6 +41,8 @@ type Deps = {
   conversations: ConversationRepository;
   usage: UsageRepository;
   persona: PersonaSource;
+  /** What the user has saved and running, summarised into the system prompt each turn. */
+  snapshot?: UserSnapshotSource;
   /** Tools for one turn, scoped to the user who is asking. */
   tools: (userId: string) => AssistantTool[];
   limits: UsageLimits;
@@ -79,7 +82,7 @@ export class AssistantService {
     return { ...totals, limits: this.deps.limits, resetAt: new Date(startOfUtcDay(now).getTime() + 86_400_000), allowed: decision.allowed };
   }
 
-  async *sendMessage(input: { userId: string; conversationId: string; content: string; modelId?: string; signal?: AbortSignal }): AsyncGenerator<TurnEvent> {
+  async *sendMessage(input: { userId: string; conversationId: string; content: string; modelId?: string; context?: ClientTurnContext; signal?: AbortSignal }): AsyncGenerator<TurnEvent> {
     const { conversations, usage, clock } = this.deps;
     const content = input.content.trim();
     if (!content || content.length > CONVERSATION_LIMITS.messageMaxChars) {
@@ -109,10 +112,13 @@ export class AssistantService {
       yield { type: 'user_message', message: userMessage };
 
       const turnId = this.deps.newId ? this.deps.newId() : crypto.randomUUID();
-      const persona = await this.deps.persona.forUser(input.userId);
+      const [persona, snapshot] = await Promise.all([
+        this.deps.persona.forUser(input.userId),
+        this.deps.snapshot?.forUser(input.userId).catch(error => { this.deps.log?.('User snapshot failed', error); return {}; }) ?? {},
+      ]);
       const tools = this.deps.tools(input.userId);
       const base: ChatMessage[] = [
-        { role: 'system', content: buildSystemPrompt(persona, clock.now(), { webResearch: this.deps.webResearch }) },
+        { role: 'system', content: buildSystemPrompt(persona, clock.now(), { webResearch: this.deps.webResearch, userContext: renderTurnContext(snapshot, input.context) }) },
         ...history.map(m => ({ role: m.role === 'USER' ? 'user' as const : 'assistant' as const, content: m.content })),
         { role: 'user', content },
       ];
@@ -200,6 +206,12 @@ export class AssistantService {
           yield { type: 'tool_result', callId: call.id, tool: call.name, ok: outcome.ok, durationMs, ...(outcome.error && { error: outcome.error }) };
           for (const block of outcome.blocks) { blocks.push(block); yield { type: 'block', block }; }
           turn.push({ role: 'tool', toolCallId: call.id, content: outcome.content });
+        }
+        // Answer written and only UI-only tools called (e.g. next-step buttons): another model round
+        // would just repeat the answer, so the turn ends here.
+        if (round.text.trim() && round.calls.every(c => tools.find(t => t.spec.name === c.name)?.terminal)) {
+          finishReason = 'stop';
+          break;
         }
       }
 

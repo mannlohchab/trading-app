@@ -368,7 +368,9 @@ backtests and imported-data research, and manages virtual forward tests on live 
 | POST / GET | `/api/v1/ai/conversations` | Create / list (`?status=ARCHIVED`, `?before=<ISO>` paging) |
 | GET / PATCH / DELETE | `/api/v1/ai/conversations/:id` | Read / rename or archive / delete (soft) |
 | GET | `/api/v1/ai/conversations/:id/messages?before=<messageId>` | Message history, oldest first |
-| POST | `/api/v1/ai/conversations/:id/messages` | `{ content, model?, stream? }`: SSE by default, JSON with `stream: false` |
+| POST | `/api/v1/ai/conversations/:id/messages` | `{ content, model?, stream?, context? }`: SSE by default, JSON with `stream: false`. `context` is `{ mode?, symbol?, exchange?, from? }` (where the user is in the app) |
+| GET / DELETE | `/api/v1/ai/memories` | What the assistant remembers about the caller / forget everything |
+| DELETE | `/api/v1/ai/memories/:id` | Forget one remembered fact |
 | POST | `/api/v1/ai/conversations/:id/messages/:messageId/strategies` | `{ draftId }`: save a strategy draft (idempotent) |
 
 **SSE events.** `user_message`, `status` (`thinking`, or `tool` with the tool name), `delta` (text), `block` (a data card as soon as it exists), `assistant_message` (final saved message), then `done`, or `error` with a code.

@@ -106,6 +106,13 @@
       "when": 1795456736175,
       "tag": "0014_backtest_artifacts",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795574932477,
+      "tag": "0015_ai_user_memories",
+      "breakpoints": true
     }
   ]
 }

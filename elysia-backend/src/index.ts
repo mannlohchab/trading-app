@@ -12,7 +12,7 @@ if (metrics) observeLogs(metrics.observeLogEvent);
 
 const modules = composeModules();
 const app = createApp({ clientOrigin: config.clientOrigin, pingDatabase, ...modules, metrics });
-modules.market.startCatalogSync();
+if (process.env.MARKET_SYNC_ENABLED !== 'false') modules.market.startCatalogSync();
 
 app.listen(config.port);
 const server = app.server!;

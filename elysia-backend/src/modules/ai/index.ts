@@ -24,6 +24,9 @@ import { OpenRouterScriptLlm } from './infrastructure/openrouter-script';
 import { OpenRouterTts } from './infrastructure/openrouter-tts';
 import { FirecrawlClient } from './infrastructure/firecrawl-client';
 import { WebResearchAgent } from './application/web-research-agent';
+import { userSnapshotSource } from './infrastructure/user-snapshot';
+import { DrizzleMemoryRepository } from './infrastructure/drizzle-memory.repository';
+import { createMemoryTools } from './application/memory-tools';
 
 export type { ChatModelProvider, ChatRequest, ChatStreamEvent, ModelProfile } from './application/ports';
 export { AiProviderError } from './application/errors';
@@ -74,6 +77,7 @@ export function createAiModule(deps: {
   events?: Logger;
 }) {
   const conversationsRepo = new DrizzleConversationRepository(deps.db);
+  const memories = new DrizzleMemoryRepository(deps.db);
   const strategies = strategyGateway(deps.strategies);
   const market = marketGateway(deps.market);
   const log = (message: string, error?: unknown) => console.warn(`[ai] ${message}`, error ?? '');
@@ -99,15 +103,26 @@ export function createAiModule(deps: {
     conversations: conversationsRepo,
     usage: withUsageEvents(new DrizzleUsageRepository(deps.db), deps.events),
     persona: personaSource(deps.profiles),
-    tools: userId => createTools(
-      market,
-      strategies,
-      deps.portfolio && { gateway: deps.portfolio, userId },
-      deps.backtest && { gateway: deps.backtest, userId },
-      deps.research && { gateway: deps.research, userId },
-      deps.liveTesting && { gateway: deps.liveTesting, userId },
-      webResearch,
-    ),
+    snapshot: userSnapshotSource({
+      strategies: deps.strategies,
+      backtests: deps.research,
+      liveTests: deps.liveTesting,
+      holdings: deps.portfolio,
+      memories,
+      log,
+    }),
+    tools: userId => [
+      ...createTools(
+        market,
+        strategies,
+        deps.portfolio && { gateway: deps.portfolio, userId },
+        deps.backtest && { gateway: deps.backtest, userId },
+        deps.research && { gateway: deps.research, userId },
+        deps.liveTesting && { gateway: deps.liveTesting, userId },
+        webResearch,
+      ),
+      ...createMemoryTools(memories, userId),
+    ],
     limits: deps.limits,
     clock,
     webResearch: !!webResearch,
@@ -146,10 +161,11 @@ export function createAiModule(deps: {
   return {
     assistant,
     conversations,
+    memories,
     morningDecode,
     /** @deprecated alias */
     dailyBrief: morningDecode,
-    routes: aiRoutes({ assistant, conversations, morningDecode, requireActiveUser: deps.requireActiveUser }),
+    routes: aiRoutes({ assistant, conversations, morningDecode, memories, requireActiveUser: deps.requireActiveUser }),
     async startScheduling(everyMs = 30 * 60_000) {
       await warmMorningDecode();
       warmTimer = setInterval(() => void warmMorningDecode(), everyMs);

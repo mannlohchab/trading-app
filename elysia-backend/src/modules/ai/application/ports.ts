@@ -2,6 +2,8 @@
 import type { ResponseBlock } from '../domain/blocks';
 import type { HistoryMessage } from '../domain/conversation';
 import type { AiPersona } from '../domain/prompt';
+import type { UserSnapshot } from '../domain/turn-context';
+import type { Memory } from '../domain/memory';
 import type { UsageToday } from '../domain/usage-policy';
 
 // ---------------------------------------------------------------------------
@@ -128,6 +130,20 @@ export interface UsageRepository {
 
 export interface PersonaSource {
   forUser(userId: string): Promise<AiPersona>;
+}
+
+export interface MemoryRepository {
+  /** Oldest first. */
+  list(userId: string): Promise<Memory[]>;
+  add(userId: string, content: string): Promise<Memory>;
+  /** False when missing or owned by someone else. */
+  remove(userId: string, id: string): Promise<boolean>;
+  removeAll(userId: string): Promise<number>;
+}
+
+/** What the user has in the app right now, for the start of a turn. Never throws; omits what failed. */
+export interface UserSnapshotSource {
+  forUser(userId: string): Promise<UserSnapshot>;
 }
 
 export interface Clock {

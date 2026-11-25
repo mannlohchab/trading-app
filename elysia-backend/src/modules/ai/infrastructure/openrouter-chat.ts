@@ -1,7 +1,10 @@
 // Streaming chat for the main assistant through OpenRouter's free Nemotron endpoint.
 // Every request is built by freeNemotronChatBody, so a paid id, a fallback list,
-// or a non-zero price ceiling cannot be sent. Text is yielded only after the
-// response reports a cost of exactly zero.
+// or a non-zero price ceiling cannot be sent.
+// Text streams as it arrives. The served model is checked on the first chunk that
+// names it, before any of its text is passed on. The cost is only known at the end
+// of the stream: anything but exactly zero still fails the call, so the turn is saved
+// as interrupted. Holding text back would not prevent a charge, only hide the answer.
 import { AiProviderError } from '../application/errors';
 import type { ChatMessage, ChatModelProvider, ChatRequest, ChatStreamEvent, ModelUsage, ToolCall } from '../application/ports';
 import { assertZeroOpenRouterCost, freeNemotronChatBody } from '../domain/free-nemotron';
@@ -56,7 +59,6 @@ export class OpenRouterChatProvider implements ChatModelProvider {
     if (!response.body) throw new AiProviderError('AI_PROVIDER_ERROR', 'OpenRouter returned an empty response.', true);
 
     const calls: { id: string; name: string; arguments: string }[] = [];
-    let text = '';
     let reasoning = '';
     let reasoningDetails: ReasoningDetail[] = [];
     let usage: unknown;
@@ -68,13 +70,16 @@ export class OpenRouterChatProvider implements ChatModelProvider {
         let chunk: any;
         try { chunk = JSON.parse(data); } catch { continue; }
         if (chunk.error) throw await streamError(chunk.error);
-        if (typeof chunk.model === 'string' && chunk.model) servedModel = chunk.model;
+        if (typeof chunk.model === 'string' && chunk.model && chunk.model !== servedModel) {
+          servedModel = chunk.model;
+          if (!servedModel.toLowerCase().includes('nemotron')) throw otherModel();
+        }
         if (chunk.usage) usage = chunk.usage;
         const choice = chunk.choices?.[0];
         if (choice?.finish_reason) finish = choice.finish_reason;
         const delta = choice?.delta;
         const piece = typeof delta?.content === 'number' ? String(delta.content) : delta?.content;
-        if (typeof piece === 'string' && piece) text += piece;
+        if (typeof piece === 'string' && piece) yield { type: 'text', delta: piece };
         if (typeof delta?.reasoning === 'string') reasoning += delta.reasoning;
         reasoningDetails = mergeDetails(reasoningDetails, delta?.reasoning_details);
         for (const call of delta?.tool_calls ?? []) {
@@ -97,10 +102,6 @@ export class OpenRouterChatProvider implements ChatModelProvider {
     } catch (error) {
       throw new AiProviderError('AI_PROVIDER_QUOTA', error instanceof Error ? error.message : 'OpenRouter reported a cost.', true);
     }
-    if (servedModel && !servedModel.toLowerCase().includes('nemotron')) {
-      throw new AiProviderError('AI_PROVIDER_QUOTA', 'OpenRouter answered with a different model. The result was discarded.', true);
-    }
-    if (text) yield { type: 'text', delta: text };
     for (const [index, call] of calls.entries()) {
       if (call?.name) yield { type: 'tool_call', call: { id: call.id || `call_${index + 1}`, name: call.name, arguments: call.arguments } satisfies ToolCall };
     }
@@ -121,6 +122,8 @@ export class OpenRouterChatProvider implements ChatModelProvider {
     };
   }
 }
+
+const otherModel = () => new AiProviderError('AI_PROVIDER_QUOTA', 'OpenRouter answered with a different model. The result was discarded.', true);
 
 function toWire(message: ChatMessage): Record<string, unknown> {
   if (message.role === 'tool') return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };

@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { aiUsageEvents, conversations, messages } from '../schema/ai';
+import { aiUsageEvents, aiUserMemories, conversations, messages } from '../schema/ai';
 import { users } from '../schema/identity';
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
@@ -9,6 +9,10 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
 
 export const messagesRelations = relations(messages, ({ one }) => ({
   conversation: one(conversations, { fields: [messages.conversationId], references: [conversations.id] }),
+}));
+
+export const aiUserMemoriesRelations = relations(aiUserMemories, ({ one }) => ({
+  user: one(users, { fields: [aiUserMemories.userId], references: [users.id] }),
 }));
 
 export const aiUsageEventsRelations = relations(aiUsageEvents, ({ one }) => ({

@@ -67,7 +67,10 @@ const authConfig = (overrides: Partial<AuthConfig> = {}): AuthConfig => ({
 });
 
 /** The real app (real Better Auth, real migrations) on an in-memory Postgres. */
-export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingDatabase?: () => Promise<boolean>; aiLimits?: { turnsPerDay: number; tokensPerDay: number }; aiConfigured?: boolean; backtestEngine?: import('../../src/modules/backtesting').BacktestEngine; signalEngine?: import('../../src/modules/backtesting').StrategySignalEngine; newsSources?: NewsSource[]; calendarRequest?: CalendarRequest } = {}) {
+export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingDatabase?: () => Promise<boolean>; aiLimits?: { turnsPerDay: number; tokensPerDay: number }; aiConfigured?: boolean; backtestEngine?: import('../../src/modules/backtesting').BacktestEngine; signalEngine?: import('../../src/modules/backtesting').StrategySignalEngine; newsSources?: NewsSource[]; calendarRequest?: CalendarRequest;
+  /** A real model instead of the scripted fake (bench/agent-eval.ts). */
+  chat?: { providers: import('../../src/modules/ai').ChatModelProvider[]; models: import('../../src/modules/ai').ModelProfile[]; defaultModelId: string };
+} = {}) {
   const database = await createTestDb();
   const sms = new FakeSms();
   const clock = new FakeClock();
@@ -95,7 +98,9 @@ export async function createTestApp(options: { auth?: Partial<AuthConfig>; pingD
   });
   const ai = createAiModule({
     db: database.appDb, requireActiveUser: identity.requireActiveUser,
-    providers: options.aiConfigured === false ? [] : [model], models: FAKE_MODELS, defaultModelId: 'fake-main', fallbackModelIds: ['fake-backup'],
+    ...(options.chat
+      ? { providers: options.chat.providers, models: options.chat.models, defaultModelId: options.chat.defaultModelId, fallbackModelIds: [] }
+      : { providers: options.aiConfigured === false ? [] : [model], models: FAKE_MODELS, defaultModelId: 'fake-main', fallbackModelIds: ['fake-backup'] }),
     limits: options.aiLimits ?? { turnsPerDay: 50, tokensPerDay: 1_000_000 },
     market: market.service, strategies: strategies.service, profiles: profiles.service, portfolio: portfolio.service,
     research: backtestResearchGateway({ backtests: backtesting.service, experiments: backtesting.experiments, strategies: strategies.service }),

@@ -5,10 +5,12 @@ import { TIMEFRAMES } from '../../market/domain/market-options';
 import type { MarketSummary } from '../../market/domain/analysis';
 import type { strategyDraftSchema } from '../../strategies';
 import { buildChart, CHART_OVERLAYS, CHART_WARMUP, type ChartCandleInput } from '../domain/chart';
+import { APP_GUIDE, GUIDE_TOPICS, guideIndex } from '../domain/app-guide';
 import { defineTool, ToolInputError, type AssistantTool } from './tool-definition';
 export { ToolInputError, type AssistantTool, type ToolOutcome } from './tool-definition';
 import { looseDraft, normalizeDraft } from './strategy-tool-schema';
 import { createResearchTools } from './research-tools';
+import { createNextStepsTool } from './next-steps-tool';
 import { AiProviderError } from './errors';
 import type { WebResearchBrief } from './web-research-agent';
 import type { BacktestResearchGateway } from '../infrastructure/backtest-research.gateway';
@@ -35,6 +37,8 @@ export interface StrategyDraftChecker {
 /** The user's own holdings, valued by the portfolio module. */
 export interface PortfolioGateway {
   valuation(userId: string): Promise<import('../../portfolio').PortfolioValuation & { updatedAt: Date | null }>;
+  /** The stored rows without prices (cheap; used for the per-turn snapshot). */
+  list(userId: string): Promise<{ holdings: { asset: string }[] }>;
 }
 
 /** Runs a real sandboxed backtest of an unsaved strategy definition (AI draft preview). */
@@ -98,6 +102,18 @@ export function createTools(
   /** Drafts produced earlier in this turn, so run_backtest can reference draftId. */
   const drafts = new Map<string, { name: string; definition: unknown; summary: string[] }>();
   return [
+    defineTool(
+      'get_app_guide',
+      'How the TradingGurukul app works: where each feature is, the exact screen and button names, and what is not available. Call before telling the user how to do something in the app. Pass 1-3 topics; omit topics to list them.',
+      z.strictObject({
+        topics: z.array(z.enum(GUIDE_TOPICS)).max(3).optional().describe('Guide sections to read'),
+      }),
+      async ({ topics }) => ({
+        result: topics?.length
+          ? { topics: Object.fromEntries(topics.map(id => [id, APP_GUIDE[id]])), note: 'Quote labels exactly as written here.' }
+          : { index: guideIndex(), note: 'Call again with the topics you need.' },
+      }),
+    ),
     defineTool(
       'search_symbols',
       'Find tradable crypto pairs by coin name or ticker. Use when unsure of the exact symbol.',
@@ -289,6 +305,13 @@ export function createTools(
       },
     )] : []),
     ...createResearchTools({ research, liveTesting, preview: backtest, drafts }),
+    createNextStepsTool(market, {
+      ...(research && {
+        backtest: (id: string) => research.gateway.get(research.userId, id),
+        experiment: (id: string) => research.gateway.getExperiment(research.userId, id),
+      }),
+      ...(liveTesting && { liveTest: (id: string) => liveTesting.gateway.get(liveTesting.userId, id) }),
+    }),
     ...(webResearch ? [defineTool(
       'research_web',
       'Ask the web research sub-agent one specific question about news, filings, announcements, or other public-source facts that the market and portfolio tools do not have. It searches and reads public pages with the free research model, then returns a short answer and the URLs it actually read. Use at most once. Do not use it for live prices, indicators, or the user\'s holdings.',

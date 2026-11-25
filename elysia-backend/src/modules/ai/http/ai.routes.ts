@@ -7,7 +7,9 @@ import { AssistantError, type AssistantService, type TurnEvent } from '../applic
 import type { ConversationService } from '../application/conversation.service';
 import type { MorningDecodeService } from '../application/morning-decode.service';
 import { AiProviderError } from '../application/errors';
+import type { MemoryRepository } from '../application/ports';
 import { CONVERSATION_LIMITS } from '../domain/conversation';
+import { APP_SCREENS, ASSISTANT_MODES } from '../domain/turn-context';
 
 
 const STATUS: Record<string, 400 | 404 | 409 | 429 | 502 | 503 | 504> = {
@@ -27,10 +29,18 @@ const id = z.uuid();
 const createBody = z.strictObject({ title: z.string().max(200).optional() });
 const updateBody = z.strictObject({ title: z.string().min(1).max(200).optional(), status: z.enum(['ACTIVE', 'ARCHIVED']).optional() })
   .refine(v => Object.keys(v).length > 0, 'Provide title or status.');
+/** Where the user is in the app. Unknown screens are dropped rather than rejected, so older servers and newer apps stay compatible. */
+const turnContext = z.strictObject({
+  mode: z.enum(ASSISTANT_MODES).optional(),
+  symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9][A-Z0-9/._-]{1,29}$/).optional(),
+  exchange: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9_]{1,19}$/).optional(),
+  from: z.enum(APP_SCREENS).optional().catch(undefined),
+});
 const messageBody = z.strictObject({
   content: z.string().min(1).max(CONVERSATION_LIMITS.messageMaxChars),
   model: z.string().max(60).optional(),
   stream: z.boolean().default(true),
+  context: turnContext.optional(),
 });
 const saveDraftBody = z.strictObject({ draftId: z.string().min(1).max(40) });
 
@@ -38,6 +48,7 @@ export function aiRoutes(deps: {
   assistant: AssistantService;
   conversations: ConversationService;
   morningDecode: MorningDecodeService;
+  memories: MemoryRepository;
   requireActiveUser: UserGuard;
 }) {
   const { assistant, conversations, morningDecode } = deps;
@@ -76,6 +87,16 @@ export function aiRoutes(deps: {
   routes.get('/morning-decode/audio', morningDecodeAudio);
   routes.get('/daily-brief', morningDecodeMeta);
   routes.get('/daily-brief/audio', morningDecodeAudio);
+
+  /** What the assistant remembers about the caller. Users can delete one fact or all of them. */
+  routes.get('/memories', async c => ({ memories: await deps.memories.list(c.user.id) }));
+  routes.delete('/memories', async c => ({ deleted: await deps.memories.removeAll(c.user.id) }));
+  routes.delete('/memories/:id', async c => {
+    const memoryId = param(c, 'id');
+    return memoryId && (await deps.memories.remove(c.user.id, memoryId))
+      ? new Response(null, { status: 204 })
+      : Response.json({ error: 'Memory not found.', code: 'NOT_FOUND' }, { status: 404 });
+  });
 
   routes.post('/conversations', async c => {
     const body = await parseJson(c.request, createBody);
@@ -131,7 +152,7 @@ export function aiRoutes(deps: {
 
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, c.request.signal]);
-    const turn = assistant.sendMessage({ userId: c.user.id, conversationId, content: body.data.content, modelId: body.data.model, signal })[Symbol.asyncIterator]();
+    const turn = assistant.sendMessage({ userId: c.user.id, conversationId, content: body.data.content, modelId: body.data.model, context: body.data.context, signal })[Symbol.asyncIterator]();
     // Pull the first event before responding so validation/quota/config errors get real status codes.
     const first = await turn.next();
 
