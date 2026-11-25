@@ -6,28 +6,29 @@ export type ChartDrawing = {
   color?: string;
 };
 
+// Theme colours come from CSS variables the chart page sets; the fallbacks are the light theme.
 export const drawingToolsCss = `
   #chart{position:relative;}
   /* Drawings are painted here. While a tool is armed the layer also takes the taps that place points. */
   #draw-layer{position:absolute;left:0;top:0;z-index:6;pointer-events:none;overflow:hidden;}
   #draw-layer.active{pointer-events:auto;touch-action:none;cursor:crosshair;}
-  #drawing-ui{position:absolute;left:10px;top:78px;z-index:8;color:#131722;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
-  #drawing-ui button{font:inherit;color:inherit;cursor:pointer;border:1px solid #E0E3EB;border-radius:10px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:8px;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-  #drawing-ui button:active{background:#F0F3FA;}
-  #drawing-ui button:focus-visible{outline:2px solid #2962FF;outline-offset:2px;}
-  #drawing-ui button[aria-pressed=true]{background:#E3ECFF;border-color:#2962FF;color:#2962FF;}
+  #drawing-ui{position:absolute;left:10px;top:78px;z-index:8;color:var(--chart-text,#131722);font-size:13px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+  #drawing-ui button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--chart-grid,#E0E3EB);border-radius:10px;background:var(--chart-bg,#FFFFFF);display:flex;align-items:center;justify-content:center;gap:8px;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  #drawing-ui button:active{background:var(--draw-active,#F0F3FA);}
+  #drawing-ui button:focus-visible{outline:2px solid var(--chart-line,#2962FF);outline-offset:2px;}
+  #drawing-ui button[aria-pressed=true]{background:var(--draw-pressed,#E3ECFF);border-color:var(--chart-line,#2962FF);color:var(--chart-line,#2962FF);}
   #drawing-ui button:disabled{opacity:.35;cursor:default;}
   #drawing-ui svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
   /* The in-chart pencil: always there, so drawing never depends on the app's toolbar. */
   #tools-toggle{width:40px;height:40px;border-radius:20px!important;box-shadow:0 2px 8px rgba(19,23,34,.12);}
-  #tools-toggle[aria-expanded=true],#tools-toggle.armed{background:#2962FF!important;border-color:#2962FF!important;color:#FFFFFF!important;}
-  #drawing-menu{margin-top:8px;display:flex;flex-direction:column;gap:6px;padding:6px;width:max-content;background:rgba(255,255,255,.96);border:1px solid #E0E3EB;border-radius:14px;box-shadow:0 6px 20px rgba(19,23,34,.14);max-height:calc(100vh - 140px);overflow-y:auto;}
+  #tools-toggle[aria-expanded=true],#tools-toggle.armed{background:var(--chart-line,#2962FF)!important;border-color:var(--chart-line,#2962FF)!important;color:#FFFFFF!important;}
+  #drawing-menu{margin-top:8px;display:flex;flex-direction:column;gap:6px;padding:6px;width:max-content;background:var(--draw-menu-bg,rgba(255,255,255,.96));border:1px solid var(--chart-grid,#E0E3EB);border-radius:14px;box-shadow:0 6px 20px rgba(19,23,34,.14);max-height:calc(100vh - 140px);overflow-y:auto;}
   #drawing-menu button{width:40px;height:40px;}
-  .draw-divider{height:1px;background:#E0E3EB;margin:2px 4px;}
+  .draw-divider{height:1px;background:var(--chart-grid,#E0E3EB);margin:2px 4px;}
   #drawing-menu[hidden],#drawing-hint[hidden],#clear-confirm[hidden],#drawing-editor[hidden]{display:none!important;}
-  .draw-section{font-size:11px;color:#787B86;margin:2px 0 8px;letter-spacing:.3px;}
+  .draw-section{font-size:11px;color:var(--chart-muted,#787B86);margin:2px 0 8px;letter-spacing:.3px;}
   /* Popovers sit beside the column, never on top of it. */
-  #drawing-hint,#clear-confirm,#drawing-editor{position:absolute;left:52px;top:0;background:#FFFFFF;border:1px solid #E0E3EB;border-radius:12px;box-shadow:0 6px 20px rgba(19,23,34,.14);}
+  #drawing-hint,#clear-confirm,#drawing-editor{position:absolute;left:52px;top:0;background:var(--chart-bg,#FFFFFF);border:1px solid var(--chart-grid,#E0E3EB);border-radius:12px;box-shadow:0 6px 20px rgba(19,23,34,.14);}
   #drawing-hint{padding:10px 12px;width:max-content;max-width:min(230px,calc(100vw - 150px));line-height:1.4;}
   #drawing-hint strong{display:block;margin-bottom:2px;}
   #drawing-hint button,#clear-confirm button,#drawing-editor-done{margin-top:8px;min-height:36px;padding:0 12px!important;}
@@ -39,9 +40,9 @@ export const drawingToolsCss = `
   .drawing-editor-heading #drawing-editor-done{margin-top:0;}
   .draw-colors{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;}
   #drawing-ui .draw-color{min-width:0;height:40px;border-color:transparent;}
-  #drawing-ui .draw-color[aria-pressed=true]{background:#F0F3FA;border-color:#2962FF;}
+  #drawing-ui .draw-color[aria-pressed=true]{background:var(--draw-active,#F0F3FA);border-color:var(--chart-line,#2962FF);}
   .draw-color span{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.08);}
-  #drawing-ui #draw-delete{color:#F23645;width:100%;margin-top:10px;min-height:40px;background:#FFF1F3;border-color:#FECDD3;}
+  #drawing-ui #draw-delete{color:var(--chart-down,#F23645);width:100%;margin-top:10px;min-height:40px;background:var(--draw-danger-bg,#FFF1F3);border-color:var(--draw-danger-border,#FECDD3);}
   #draw-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
 `;
 
@@ -91,6 +92,8 @@ export const drawingToolsHtml = `
 `;
 
 export const drawingToolsScript = `
+  // The chart page defines CHART_BG; label halos and point handles match it.
+  const drawingSurface = typeof CHART_BG === 'string' ? CHART_BG : '#FFFFFF';
   const drawingLayer = document.getElementById('draw-layer');
   const drawingEditor = document.getElementById('drawing-editor');
   const drawingColors = ${JSON.stringify(drawingColors)};
@@ -213,7 +216,7 @@ export const drawingToolsScript = `
     svg('line', { x1, y1, x2, y2, stroke: color, 'stroke-width': strokeWidth, 'stroke-dasharray': dashed ? '5 4' : 'none' });
   }
   function label(x, y, text, color = '#0052D6') {
-    svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': '-apple-system, Segoe UI, Roboto, Arial, sans-serif', stroke: '#FFFFFF', 'stroke-width': 3, 'paint-order': 'stroke' }, text);
+    svg('text', { x: Math.max(4, Math.min(chart.timeScale().width() - 130, x)), y: Math.max(14, y), fill: color, 'font-size': 11, 'font-family': '-apple-system, Segoe UI, Roboto, Arial, sans-serif', stroke: drawingSurface, 'stroke-width': 3, 'paint-order': 'stroke' }, text);
   }
   function renderDrawing(drawing, width, height) {
     const color = drawingColor(drawing);
@@ -247,7 +250,7 @@ export const drawingToolsScript = `
     }
     drawing.points.forEach(point => {
       const p = toScreen(point);
-      if (p) svg('circle', { cx: p.x, cy: p.y, r: selected ? 5 : 3, fill: '#FFFFFF', stroke: color, 'stroke-width': 1.5 });
+      if (p) svg('circle', { cx: p.x, cy: p.y, r: selected ? 5 : 3, fill: drawingSurface, stroke: color, 'stroke-width': 1.5 });
     });
   }
   function renderDrawings() {

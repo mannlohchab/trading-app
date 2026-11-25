@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Action, Card, EquityChart, Field, Heading, Help, Metric, RiskStatisticsView, Status, backtestStyles as S } from '@/components/backtesting/BacktestUi';
+import { Action, Card, EquityChart, Field, Heading, Help, Metric, RiskStatisticsView, Status, useBacktestStyles } from '@/components/backtesting/BacktestUi';
 import { dateBoundary, defaultBacktestDraft, isActiveBacktest, metricText, prepareBacktest, prepareRiskStatistics, type BacktestTimeframe } from '@/lib/backtesting';
 import { getBacktestStrategy, listBacktestStrategies } from '@/lib/backtestingApi';
 import { parseDatasetDocument, researchInteger, researchObjectiveInfo, researchObjectiveValue, type ResearchInput, type ResearchMetrics, type ResearchResult } from '@/lib/backtestResearch';
@@ -14,6 +14,7 @@ import { useAuth } from '@/store/auth';
 import { isRunId } from '@/lib/aiResearchRun';
 
 export default function BacktestResearchScreen() {
+  const S = useBacktestStyles();
   const { experimentId } = useLocalSearchParams<{ experimentId?: string }>();
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const userId = useAuth(state => state.user?.id), enabled = !!userId && !DEMO_MODE;
@@ -162,6 +163,7 @@ export default function BacktestResearchScreen() {
 }
 
 function ResearchMetricsView({ metrics }: { metrics: ResearchMetrics }) {
+  const S = useBacktestStyles();
   const [showModel, setShowModel] = useState(false);
   return <><View style={S.wrap}><Metric label="Return" value={metrics.totalReturnPercent} suffix="%" tone /><Metric label="Drawdown at close" value={metrics.maxDrawdownPercent} suffix="%" />
     <Metric label="Trades" value={metrics.totalTrades} /><Metric label="Win rate" value={metrics.winRatePercent} suffix="%" /><Metric label="Profit factor" value={metrics.profitFactor} /></View>
@@ -173,6 +175,7 @@ function ResearchMetricsView({ metrics }: { metrics: ResearchMetrics }) {
 }
 
 function ResearchResults({ result }: { result: ResearchResult }) {
+  const S = useBacktestStyles();
   const assumptions = Array.isArray(result.assumptions) ? result.assumptions : Object.values(result.assumptions ?? {});
   const objective = researchObjectiveInfo(result.objective);
   return <>

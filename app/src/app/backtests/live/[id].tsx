@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Action, Card, Heading, Help, Metric, backtestStyles as S } from '@/components/backtesting/BacktestUi';
+import { Action, Card, Heading, Help, Metric, useBacktestStyles } from '@/components/backtesting/BacktestUi';
 import { isRunId, liveTerminationDescription, shouldPollResearchRun } from '@/lib/aiResearchRun';
 import { controlLiveTest, getLiveTest, getLiveTestPortfolio } from '@/lib/liveTestingApi';
 import { closePosition } from '@/lib/paperTrading';
@@ -12,6 +12,7 @@ import { DEMO_MODE } from '@/lib/demoMode';
 import { useAuth } from '@/store/auth';
 
 export default function LiveTestScreen() {
+  const S = useBacktestStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = useAuth(state => state.user?.id), qc = useQueryClient();
   const [focused, setFocused] = useState(false);

@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { GlassIcon } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { deleteAiMemory, deleteAllAiMemories, listAiMemories, type AiMemory } from '@/lib/aiApi';
 import { DEMO_MODE } from '@/lib/demoMode';
 
 /** Settings card: everything the AI assistant has saved about the user, each deletable. */
 export function AiMemorySettings({ userId }: { userId: string }) {
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const key = ['ai-memories', userId];
   const memories = useQuery({ queryKey: key, queryFn: ({ signal }) => listAiMemories(signal), enabled: !DEMO_MODE });
@@ -48,10 +49,10 @@ export function AiMemorySettings({ userId }: { userId: string }) {
   </View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   card: { padding: 18, borderRadius: 22, backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#F3EEFF', alignItems: 'center', justifyContent: 'center' },
+  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: Palette.purpleMuted, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
   title: { color: Palette.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
   subtitle: { color: Palette.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 17 },
@@ -60,7 +61,7 @@ const styles = StyleSheet.create({
   memory: { color: Palette.text, fontSize: 13, lineHeight: 19 },
   forget: { paddingHorizontal: 10, paddingVertical: 6 },
   forgetAll: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 6 },
-  forgetText: { color: '#E11D48', fontSize: 12, fontWeight: '600' },
-  error: { color: '#E11D48', fontSize: 12, lineHeight: 18, marginTop: 8 },
+  forgetText: { color: Palette.red, fontSize: 12, fontWeight: '600' },
+  error: { color: Palette.red, fontSize: 12, lineHeight: 18, marginTop: 8 },
   dim: { opacity: 0.55 },
-});
+}));

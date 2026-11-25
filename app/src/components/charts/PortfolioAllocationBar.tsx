@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { formatUsd } from '@/lib/format';
 import { buildPortfolioBreakdown, type PortfolioAllocationInput } from '@/lib/portfolioAllocation';
 
@@ -12,6 +12,7 @@ const percent = (share: number) => `${(share * 100).toFixed(share > 0 && share <
 
 /** Portfolio split as one segmented bar: each holding, then cash. Tap a segment or legend item to focus it. */
 export function PortfolioAllocationBar({ portfolio, loading }: Props) {
+  const styles = useStyles();
   const breakdown = useMemo(() => buildPortfolioBreakdown(portfolio), [portfolio]);
   const [selectedKey, setSelectedKey] = useState<string>();
   const selected = breakdown?.segments.find(segment => segment.key === selectedKey);
@@ -76,7 +77,7 @@ export function PortfolioAllocationBar({ portfolio, loading }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   card: { backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border, borderRadius: 18, padding: 18 },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: Palette.textSecondary, fontSize: 15 },
@@ -98,4 +99,4 @@ const styles = StyleSheet.create({
   legendShare: { color: Palette.textSecondary, fontSize: 13, fontVariant: ['tabular-nums'] },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Palette.border, marginTop: 18, marginBottom: 12 },
   footnote: { color: Palette.textMuted, fontSize: 12, lineHeight: 18 },
-});
+}));

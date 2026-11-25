@@ -3,14 +3,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import type { AiMarketAnalysis, AiMarketList, AiStrategyDraft, AiTicker } from '@/lib/aiBlocks';
 import { formatMarketPrice } from '@/lib/format';
 import { pairName } from '@/lib/marketData';
 
-const UP = '#089981', DOWN = '#F23645';
-
 export const AiTickerCard = memo(function AiTickerCard({ ticker }: { ticker: AiTicker }) {
+  const styles = useStyles();
+  const { chartUp: UP, chartDown: DOWN } = usePalette();
   const change = Number(ticker.priceChangePercent);
   const up = Number.isFinite(change) ? change >= 0 : true;
   const name = pairName(ticker.symbol);
@@ -35,6 +35,8 @@ export const AiTickerCard = memo(function AiTickerCard({ ticker }: { ticker: AiT
 });
 
 export const AiMarketListCard = memo(function AiMarketListCard({ list }: { list: AiMarketList }) {
+  const styles = useStyles();
+  const { chartUp: UP, chartDown: DOWN } = usePalette();
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{list.title}</Text>
@@ -55,6 +57,8 @@ export const AiMarketListCard = memo(function AiMarketListCard({ list }: { list:
 });
 
 export const AiAnalysisCard = memo(function AiAnalysisCard({ analysis }: { analysis: AiMarketAnalysis }) {
+  const styles = useStyles();
+  const { chartUp: UP, chartDown: DOWN } = usePalette();
   const meta = { exchange: analysis.exchange, symbol: analysis.symbol, pricePrecision: 2 };
   const price = (v?: number) => (v == null ? '—' : formatMarketPrice(v, meta, false));
   const up = (analysis.changePercent ?? 0) >= 0;
@@ -75,6 +79,7 @@ export const AiAnalysisCard = memo(function AiAnalysisCard({ analysis }: { analy
 });
 
 export const AiStrategyDraftCard = memo(function AiStrategyDraftCard({ draft }: { draft: AiStrategyDraft }) {
+  const styles = useStyles();
   return (
     <View style={styles.card} accessibilityRole="summary">
       <Text style={styles.title}>{draft.name ?? 'Strategy draft'}</Text>
@@ -87,6 +92,7 @@ export const AiStrategyDraftCard = memo(function AiStrategyDraftCard({ draft }: 
 });
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -95,7 +101,7 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_Palette, P) => ({
   card: {
     marginTop: 10, padding: 14, borderRadius: 16, gap: 6,
     backgroundColor: P.card, borderWidth: 1, borderColor: P.border,
@@ -114,4 +120,4 @@ const styles = StyleSheet.create({
   statLabel: { color: P.textMuted, fontSize: 11, fontWeight: '600' },
   statValue: { color: P.text, fontSize: 13, fontWeight: '600', marginTop: 2 },
   rule: { color: P.body, fontSize: 13, lineHeight: 18, marginTop: 2 },
-});
+}));

@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-theme';
 import { formatPct } from '@/lib/format';
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export function PriceChange({ change, changePercent, compact }: Props) {
+  const Palette = usePalette();
   const positive = changePercent >= 0;
   const color = positive ? Palette.green : Palette.red;
   return (

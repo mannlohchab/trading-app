@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
-import { Palette } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { formatMarketPrice, formatUsd, marketMetadata } from '@/lib/format';
 import { fetchQuote } from '@/lib/marketData';
@@ -13,6 +13,8 @@ type Submission = { symbol: string; side: 'BUY' | 'SELL'; orderType: 'MARKET' | 
 export function PaperOrderTicket({ symbol, exchange, initialSide, onBusyChange }: {
   symbol: string; exchange: string; initialSide: 'BUY' | 'SELL'; onBusyChange: (busy: boolean) => void;
 }) {
+  const styles = useStyles();
+  const Palette = usePalette();
   const userId = useAuth(s => s.user?.id);
   const qc = useQueryClient();
   const [draft, setDraft] = useState<OrderDraft>({ symbol, exchange, side: initialSide, orderType: 'MARKET', quantity: '', limitPrice: '' });
@@ -53,7 +55,7 @@ export function PaperOrderTicket({ symbol, exchange, initialSide, onBusyChange }
   return <View style={styles.ticket}>
     <View style={styles.switcher}>{(['BUY', 'SELL'] as const).map(side => <Pressable key={side} accessibilityRole="button"
       accessibilityState={{ selected: draft.side === side }} disabled={mutation.isPending} onPress={() => edit({ side })}
-      style={[styles.option, draft.side === side && { backgroundColor: side === 'BUY' ? '#089981' : '#F23645' }]}>
+      style={[styles.option, draft.side === side && { backgroundColor: side === 'BUY' ? Palette.chartUp : Palette.chartDown }]}>
       <Text style={[styles.optionText, draft.side === side && styles.selected]}>{side === 'BUY' ? 'Buy' : 'Sell'}</Text>
     </Pressable>)}</View>
     <View style={styles.row}><Text>Available cash</Text><Text style={styles.value}>{portfolio.data ? formatUsd(portfolio.data.availableCash) : '—'}</Text></View>
@@ -79,18 +81,18 @@ export function PaperOrderTicket({ symbol, exchange, initialSide, onBusyChange }
     {mutation.isError && <Text accessibilityRole="alert" style={styles.error}>{mutation.error.message}</Text>}
     <Pressable accessibilityRole="button" accessibilityLabel={draft.side === 'BUY' ? 'Place buy order' : 'Place sell order'}
       disabled={Boolean(problem) || mutation.isPending || mutation.isSuccess} onPress={submit}
-      style={[styles.submit, { backgroundColor: draft.side === 'BUY' ? '#089981' : '#F23645' }, (Boolean(problem) || mutation.isPending || mutation.isSuccess) && styles.disabled]}>
-      {mutation.isPending ? <ActivityIndicator color="white" /> : <Text style={styles.submitText}>{mutation.isSuccess ? 'Order submitted' : draft.side === 'BUY' ? 'Place buy order' : 'Place sell order'}</Text>}
+      style={[styles.submit, { backgroundColor: draft.side === 'BUY' ? Palette.chartUp : Palette.chartDown }, (Boolean(problem) || mutation.isPending || mutation.isSuccess) && styles.disabled]}>
+      {mutation.isPending ? <ActivityIndicator color={Palette.onAccent} /> : <Text style={styles.submitText}>{mutation.isSuccess ? 'Order submitted' : draft.side === 'BUY' ? 'Place buy order' : 'Place sell order'}</Text>}
     </Pressable>
     <Pressable accessibilityRole="button" disabled={mutation.isPending} onPress={() => { void portfolio.refetch(); void quote.refetch(); }}><Text style={styles.link}>Refresh balance and quote</Text></Pressable>
     <Text style={styles.note}>Virtual USDT on live Binance prices, no leverage or short selling. Market orders fill at the bid/ask with 0.1% commission; limit orders fill when the live price reaches them. The server checks your balance and holdings again before filling.</Text>
   </View>;
 }
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   ticket: { gap: 14 }, row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 }, value: { fontWeight: '600' },
   switcher: { flexDirection: 'row', gap: 6, backgroundColor: Palette.pill, borderRadius: 12, padding: 4 },
-  option: { flex: 1, padding: 12, alignItems: 'center', borderRadius: 8 }, optionText: { fontWeight: '600', color: Palette.text }, selected: { color: 'white' }, activeType: { backgroundColor: Palette.cardHover },
+  option: { flex: 1, padding: 12, alignItems: 'center', borderRadius: 8 }, optionText: { fontWeight: '600', color: Palette.text }, selected: { color: Palette.onAccent }, activeType: { backgroundColor: Palette.cardHover },
   input: { borderWidth: 1, borderColor: Palette.border, borderRadius: 12, padding: 14, fontSize: 20, color: Palette.text, backgroundColor: Palette.bg },
-  submit: { padding: 16, alignItems: 'center', borderRadius: 12 }, submitText: { color: 'white', fontWeight: '700', fontSize: 16 },
-  disabled: { opacity: 0.45 }, error: { color: '#E11D48' }, success: { color: '#059669' }, note: { color: Palette.textSecondary, lineHeight: 20, fontSize: 13 }, link: { color: '#0052D6', fontWeight: '600' },
-});
+  submit: { padding: 16, alignItems: 'center', borderRadius: 12 }, submitText: { color: Palette.onAccent, fontWeight: '700', fontSize: 16 },
+  disabled: { opacity: 0.45 }, error: { color: Palette.red }, success: { color: Palette.success }, note: { color: Palette.textSecondary, lineHeight: 20, fontSize: 13 }, link: { color: Palette.accentText, fontWeight: '600' },
+}));

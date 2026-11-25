@@ -1,9 +1,10 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 
 export function DemoBadge({ visible }: { visible?: boolean }) {
+  const styles = useStyles();
   if (!visible) return null;
   return (
     <View style={styles.badge}>
@@ -12,7 +13,7 @@ export function DemoBadge({ visible }: { visible?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   badge: {
     backgroundColor: Palette.accentMuted,
     paddingHorizontal: 8,
@@ -20,4 +21,4 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   text: { color: Palette.accent, fontSize: 11, fontWeight: '700' },
-});
+}));

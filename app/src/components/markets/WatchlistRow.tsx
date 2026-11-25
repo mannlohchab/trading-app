@@ -1,9 +1,9 @@
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
-import { Palette } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { formatPct, formatMarketPrice } from '@/lib/format';
 import type { QuoteLike } from '@/components/markets/InstrumentRow';
 
@@ -14,6 +14,8 @@ type Props = {
 };
 
 export function WatchlistRow({ quote, delayed, onLongPress }: Props) {
+  const styles = useStyles();
+  const Palette = usePalette();
   const up = quote.changePercent >= 0;
   const color = up ? Palette.green : Palette.red;
   const href = {
@@ -51,7 +53,7 @@ export function WatchlistRow({ quote, delayed, onLongPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -84,4 +86,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
-});
+}));

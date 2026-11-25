@@ -1,14 +1,17 @@
 import { Redirect, Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassIcon } from '@/components/ui/GlassIcon';
-import { AppFont, Palette } from '@/constants/theme';
+import { AppFont } from '@/constants/theme';
+import { makeStyles, useInsightPalette, usePalette } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth';
 
 export default function AppTabs() {
   const user = useAuth((state) => state.user);
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
+  const Palette = usePalette();
+  const InsightPalette = useInsightPalette();
   const bottomPadding = Math.max(insets.bottom, 12);
 
   if (!user) return <Redirect href="/(auth)/login" />;
@@ -26,8 +29,8 @@ export default function AppTabs() {
         tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: Palette.text,
         tabBarInactiveTintColor: Palette.textSecondary,
-        tabBarActiveBackgroundColor: '#FFFFFF',
-        tabBarInactiveBackgroundColor: '#FFFFFF',
+        tabBarActiveBackgroundColor: Palette.bgElevated,
+        tabBarInactiveBackgroundColor: Palette.bgElevated,
         tabBarHideOnKeyboard: true,
         // Hidden tabs keep receiving live prices; freezing skips their re-renders until refocused.
         freezeOnBlur: true,
@@ -38,12 +41,12 @@ export default function AppTabs() {
       }} />
       <Tabs.Screen name="market" options={{
         title: 'Market',
-        sceneStyle: { backgroundColor: '#FFFFFF' },
+        sceneStyle: { backgroundColor: InsightPalette.card },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="chart" tone={focused ? 'purple' : 'neutral'} />,
       }} />
       <Tabs.Screen name="ai" options={{
         title: 'Insights',
-        sceneStyle: { backgroundColor: '#FFFFFF' },
+        sceneStyle: { backgroundColor: InsightPalette.card },
         // Full-screen chat: the header's home button replaces the dock.
         tabBarStyle: { display: 'none' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="analytics" tone={focused ? 'purple' : 'neutral'} />,
@@ -63,19 +66,19 @@ export default function AppTabs() {
         tabBarButton: () => null,
         // The tab bar still wraps each button in a `flex: 1` slot; hide it so the dock has no gap.
         tabBarItemStyle: { display: 'none' },
-        sceneStyle: { backgroundColor: '#FFFFFF' },
+        sceneStyle: { backgroundColor: InsightPalette.card },
       }} />
     </Tabs>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   bar: {
-    width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#FFFFFF',
+    width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: Palette.bgElevated,
     borderTopWidth: 0,
     paddingTop: 10, paddingHorizontal: 8, elevation: 0, boxShadow: 'none',
   },
   item: { paddingVertical: 0, minHeight: 44 },
   iconSlot: { width: 28, height: 28, marginBottom: 2 },
   label: { fontFamily: AppFont, fontSize: 11, lineHeight: 15, fontWeight: '400', marginTop: 2 },
-});
+}));

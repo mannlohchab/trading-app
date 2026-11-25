@@ -2,9 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, Share, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { COMMUNITY_API, refreshCommunity, type CommunityPost } from '@/lib/community';
 import { timeAgo } from '@/lib/format';
@@ -14,6 +14,7 @@ type Action = 'like' | 'bookmark' | 'follow' | 'report';
 const REASONS = ['Spam', 'Harassment', 'Misleading content', 'Other inappropriate content'];
 
 export function PostCard({ post, onOpen }: { post: CommunityPost; onOpen?: () => void }) {
+  const styles = useStyles();
   const viewerId = useAuth(s => s.user?.id);
   const client = useQueryClient();
   const [reporting, setReporting] = useState(false);
@@ -99,7 +100,7 @@ export function PostCard({ post, onOpen }: { post: CommunityPost; onOpen?: () =>
   </View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_palette, P) => ({
   card: { marginHorizontal: 16, marginBottom: 16, padding: 16, backgroundColor: P.card, borderRadius: 16, borderWidth: 1, borderColor: P.border, boxShadow: '0 1px 2px rgba(31,31,30,0.04)' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   avatar: { width: 36, height: 36, borderRadius: 10, backgroundColor: P.soft, alignItems: 'center', justifyContent: 'center' },
@@ -116,4 +117,4 @@ const styles = StyleSheet.create({
   actionText: { color: P.textSecondary, fontSize: 13 }, selected: { color: P.text, fontWeight: '600' }, liked: { color: P.red },
   report: { padding: 12, backgroundColor: P.bg, borderRadius: 12, marginTop: 8 },
   error: { color: P.red, fontSize: 13, lineHeight: 18, marginTop: 8 },
-});
+}));

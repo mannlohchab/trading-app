@@ -7,9 +7,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 
 export function Skeleton({ style }: { style?: ViewStyle }) {
+  const styles = useStyles();
   const opacity = useSharedValue(0.35);
   useEffect(() => {
     opacity.value = withRepeat(withTiming(0.8, { duration: 800 }), -1, true);
@@ -19,6 +20,7 @@ export function Skeleton({ style }: { style?: ViewStyle }) {
 }
 
 export function InstrumentRowSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <View style={{ flex: 1, gap: 8 }}>
@@ -34,7 +36,7 @@ export function InstrumentRowSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   base: { backgroundColor: Palette.cardHover },
   row: {
     flexDirection: 'row',
@@ -44,4 +46,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Palette.borderSubtle,
   },
-});
+}));

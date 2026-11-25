@@ -4,15 +4,17 @@ import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Action, Card, Field, Heading, Help, backtestStyles as S } from '@/components/backtesting/BacktestUi';
+import { Action, Card, Field, Heading, Help, useBacktestStyles } from '@/components/backtesting/BacktestUi';
 import { RunTicket } from '@/components/backtesting/RunTicket';
 import { bandTone, signedPercent, statusPill, ticketDate, ticketMarket } from '@/lib/runTicket';
 import { BACKTEST_TIMEFRAMES, comparisonNotes, defaultBacktestDraft, isActiveBacktest, metricText, prepareBacktest, type BacktestDraft, type BacktestRun } from '@/lib/backtesting';
 import { createBacktest, getBacktest, getBacktestStrategy, listBacktests, listBacktestStrategies } from '@/lib/backtestingApi';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { useAuth } from '@/store/auth';
+import { useInsightPalette } from '@/hooks/use-theme';
 
 export default function BacktestsScreen() {
+  const S = useBacktestStyles();
   const userId = useAuth(state => state.user?.id);
   const enabled = !!userId && !DEMO_MODE;
   const qc = useQueryClient();
@@ -116,6 +118,7 @@ export default function BacktestsScreen() {
 
 /** One saved run as a ticket card (see components/backtesting/RunTicket). */
 function BacktestTicket({ run, comparing, canCompare, onToggleCompare }: { run: BacktestRun; comparing: boolean; canCompare: boolean; onToggleCompare: () => void }) {
+  const S = useBacktestStyles();
   const name = run.strategy.name ?? 'Backtest';
   const open = () => router.push({ pathname: '/backtests/[id]', params: { id: run.id } });
   const result = run.status === 'COMPLETED' ? signedPercent(run.summary?.totalReturnPercent) : null;
@@ -144,6 +147,8 @@ function BacktestTicket({ run, comparing, canCompare, onToggleCompare }: { run: 
 }
 
 function Comparison({ ids, userId, onClear }: { ids: string[]; userId?: string; onClear: () => void }) {
+  const S = useBacktestStyles();
+  const P = useInsightPalette();
   const results = useQueries({ queries: ids.map(id => ({ queryKey: ['backtest', userId, id], queryFn: ({ signal }: { signal: AbortSignal }) => getBacktest(id, signal) })) });
   const runs = results.flatMap(result => result.data ? [result.data] : []);
   const fields: { label: string; value: (run: BacktestRun) => string }[] = [
@@ -162,7 +167,7 @@ function Comparison({ ids, userId, onClear }: { ids: string[]; userId?: string; 
     {results.some(r => r.isError) ? <Help>Some results could not load. Open those runs to retry.</Help> : null}
     {comparisonNotes(runs).map(note => <Help key={note}>{note}</Help>)}
     <ScrollView horizontal><View><View style={S.row}><Text style={{ width: 120 }}>Measure</Text>{runs.map(run => <View key={run.id} style={{ width: 150 }}><Text style={{ fontWeight: '600' }}>{run.strategy.name}</Text><Help>{run.market.symbol} · {run.market.timeframe}</Help><Help>{new Date(run.range.start).toISOString().slice(0, 10)} → {new Date(run.range.end).toISOString().slice(0, 10)}</Help></View>)}</View>
-      {fields.map(field => <View key={field.label} style={[S.row, { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E6E6E2' }]}><Text style={{ width: 120 }}>{field.label}</Text>{runs.map(run => <Text key={run.id} style={{ width: 150 }}>{field.value(run)}</Text>)}</View>)}
+      {fields.map(field => <View key={field.label} style={[S.row, { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: P.border }]}><Text style={{ width: 120 }}>{field.label}</Text>{runs.map(run => <Text key={run.id} style={{ width: 150 }}>{field.value(run)}</Text>)}</View>)}
     </View></ScrollView><Action secondary title="Clear comparison" onPress={onClear} />
   </Card>;
 }

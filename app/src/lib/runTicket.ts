@@ -6,20 +6,42 @@ export type BandTone = 'progress' | 'gain' | 'loss' | 'attention' | 'neutral';
 /** Status pill. */
 export type PillTone = 'progress' | 'live' | 'done' | 'failed' | 'muted';
 
-export const BAND: Record<BandTone, { background: string; text: string }> = {
-  progress: { background: '#7387F9', text: '#FFFFFF' },
-  gain: { background: '#8BF0C6', text: '#0B1B14' },
-  loss: { background: '#F5B6E3', text: '#2A0F22' },
-  attention: { background: '#F2F884', text: '#1F1F0A' },
-  neutral: { background: '#DDE1EA', text: '#1F2430' },
+type Scheme = 'light' | 'dark';
+type Tone = { background: string; text: string };
+
+export const BAND: Record<Scheme, Record<BandTone, Tone>> = {
+  light: {
+    progress: { background: '#7387F9', text: '#FFFFFF' },
+    gain: { background: '#8BF0C6', text: '#0B1B14' },
+    loss: { background: '#F5B6E3', text: '#2A0F22' },
+    attention: { background: '#F2F884', text: '#1F1F0A' },
+    neutral: { background: '#DDE1EA', text: '#1F2430' },
+  },
+  // Same hues, deepened so the band doesn't glare against dark surfaces.
+  dark: {
+    progress: { background: '#5B6EE6', text: '#FFFFFF' },
+    gain: { background: '#1F6B50', text: '#D7FBEA' },
+    loss: { background: '#7A3466', text: '#FCE4F5' },
+    attention: { background: '#6B6E1F', text: '#FAFCD2' },
+    neutral: { background: '#2A303D', text: '#D5DAE5' },
+  },
 };
 
-export const PILL: Record<PillTone, { background: string; text: string }> = {
-  progress: { background: '#E7ECFF', text: '#5468E8' },
-  live: { background: '#E1F7EE', text: '#0A8A63' },
-  done: { background: '#FFF4E0', text: '#E59A12' },
-  failed: { background: '#FDECEC', text: '#D12C2C' },
-  muted: { background: '#EEF0F4', text: '#5F6675' },
+export const PILL: Record<Scheme, Record<PillTone, Tone>> = {
+  light: {
+    progress: { background: '#E7ECFF', text: '#5468E8' },
+    live: { background: '#E1F7EE', text: '#0A8A63' },
+    done: { background: '#FFF4E0', text: '#E59A12' },
+    failed: { background: '#FDECEC', text: '#D12C2C' },
+    muted: { background: '#EEF0F4', text: '#5F6675' },
+  },
+  dark: {
+    progress: { background: '#1E2550', text: '#9AA8FF' },
+    live: { background: '#0F2E24', text: '#4ADE9F' },
+    done: { background: '#33260C', text: '#F5B942' },
+    failed: { background: '#3A1616', text: '#F87171' },
+    muted: { background: '#232833', text: '#A0A6B8' },
+  },
 };
 
 const STATUS: Record<string, { label: string; pill: PillTone }> = {

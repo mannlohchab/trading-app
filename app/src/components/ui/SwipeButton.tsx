@@ -1,8 +1,9 @@
 import { type Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, PanResponder, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, PanResponder, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppFont } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 
 import { getSwipeOffset, isSwipeComplete } from './swipe-gesture';
 import { SwipeConfetti } from './SwipeConfetti';
@@ -21,6 +22,7 @@ const HANDLE_WIDTH = 48;
 const TRACK_INSET = 4;
 
 export function SwipeButton({ loading = false, onSwipeComplete, onSuccess, ref }: SwipeButtonProps) {
+  const styles = useStyles();
   const [travel, setTravel] = useState(0);
   const [busy, setBusy] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -152,14 +154,15 @@ export function SwipeButton({ loading = false, onSwipeComplete, onSuccess, ref }
   );
 }
 
-const styles = StyleSheet.create({
+// A dark control in both themes; dark mode only lifts the track off the near-black page.
+const useStyles = makeStyles((Palette, _InsightPalette, scheme) => ({
   container: { width: '100%', alignSelf: 'center', marginTop: 16, paddingVertical: 4 },
   celebrating: { zIndex: 1 },
   track: {
     height: 56,
-    backgroundColor: '#171717',
+    backgroundColor: scheme === 'dark' ? Palette.card : '#171717',
     borderWidth: 1,
-    borderColor: '#292929',
+    borderColor: scheme === 'dark' ? Palette.border : '#292929',
     borderRadius: 12,
     justifyContent: 'center',
     overflow: 'hidden',
@@ -178,4 +181,4 @@ const styles = StyleSheet.create({
   },
   chevron: { width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: '#262626', transform: [{ rotate: '45deg' }], marginLeft: -4 },
   checkmark: { width: 8, height: 14, borderBottomWidth: 2, borderRightWidth: 2, borderColor: '#164e3e', transform: [{ rotate: '45deg' }], marginTop: -4 },
-});
+}));

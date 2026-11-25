@@ -1,12 +1,12 @@
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
 import type { QuoteLike } from './InstrumentRow';
 import { SymbolIcon } from './SymbolIcon';
 import { WatchlistMiniChart } from '@/components/charts/WatchlistMiniChart';
 import { GlassDirectionIcon, GlassPressable } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { formatMarketPrice, formatPct, marketSourceLabel } from '@/lib/format';
 import { ApiError } from '@/lib/api';
 import { buildWatchlistChart } from '@/lib/marketHistory';
@@ -21,6 +21,7 @@ type Props = {
 };
 
 export const HomeQuoteCard = memo(function HomeQuoteCard({ quote, width, onPress, onRemove }: Props) {
+  const styles = useStyles();
   const historyQuery = useMarketHistory(quote.symbol, quote.exchange);
   const chart = buildWatchlistChart(historyQuery.data, DEMO_MODE);
   const unavailable = historyQuery.error instanceof ApiError && historyQuery.error.status === 503
@@ -62,7 +63,7 @@ export const HomeQuoteCard = memo(function HomeQuoteCard({ quote, width, onPress
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette, _insight, scheme) => ({
   card: { minHeight: 258, padding: 18, borderRadius: 18, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.card },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nameWrap: { flex: 1 },
@@ -74,5 +75,5 @@ const styles = StyleSheet.create({
   price: { color: Palette.text, fontSize: 27, fontWeight: '600', letterSpacing: -1.2 },
   change: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   percent: { fontSize: 12, fontWeight: '500' },
-  source: { color: '#8b651f', fontSize: 10, marginTop: 7 },
-});
+  source: { color: scheme === 'dark' ? '#D4A657' : '#8b651f', fontSize: 10, marginTop: 7 },
+}));

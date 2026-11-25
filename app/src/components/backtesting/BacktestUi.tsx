@@ -1,14 +1,19 @@
 import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette, usePalette } from '@/hooks/use-theme';
 import { equitySegments, metricText, type BacktestStatus, type EquityPoint, type RiskStatistics } from '@/lib/backtesting';
 
-export const UP = '#089981', DOWN = '#DC2626';
-export function Card({ children }: { children: ReactNode }) { return <View style={backtestStyles.card}>{children}</View>; }
-export function Heading({ children }: { children: ReactNode }) { return <Text accessibilityRole="header" style={backtestStyles.title}>{children}</Text>; }
-export function Help({ children }: { children: ReactNode }) { return <Text style={backtestStyles.help}>{children}</Text>; }
+/** Gain/loss colours for backtest figures: chart green and the warm palette's red. */
+export function useBacktestTones() {
+  return { up: usePalette().chartUp, down: useInsightPalette().red };
+}
+export function Card({ children }: { children: ReactNode }) { const backtestStyles = useBacktestStyles(); return <View style={backtestStyles.card}>{children}</View>; }
+export function Heading({ children }: { children: ReactNode }) { const backtestStyles = useBacktestStyles(); return <Text accessibilityRole="header" style={backtestStyles.title}>{children}</Text>; }
+export function Help({ children }: { children: ReactNode }) { const backtestStyles = useBacktestStyles(); return <Text style={backtestStyles.help}>{children}</Text>; }
 export function Action({ title, onPress, disabled, pending, secondary = false }: { title: string; onPress: () => void; disabled?: boolean; pending?: boolean; secondary?: boolean }) {
+  const backtestStyles = useBacktestStyles();
+  const P = useInsightPalette();
   return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: disabled || pending, busy: pending }}
     disabled={disabled || pending} onPress={onPress} style={({ pressed }) => [backtestStyles.button, secondary && backtestStyles.secondary, (disabled || pending) && backtestStyles.disabled, pressed && { opacity: 0.75 }]}>
     {pending ? <ActivityIndicator size="small" color={secondary ? P.text : P.onSolid} /> : null}
@@ -16,17 +21,25 @@ export function Action({ title, onPress, disabled, pending, secondary = false }:
   </Pressable>;
 }
 export function Field({ label, ...props }: ComponentProps<typeof TextInput> & { label: string }) {
+  const backtestStyles = useBacktestStyles();
+  const P = useInsightPalette();
   return <View style={backtestStyles.field}><Text style={backtestStyles.label}>{label}</Text><TextInput {...props} accessibilityLabel={label}
     autoCorrect={false} autoCapitalize="none" placeholderTextColor={P.textMuted} style={backtestStyles.input} /></View>;
 }
 export function Status({ status }: { status: BacktestStatus }) {
+  const backtestStyles = useBacktestStyles();
+  const P = useInsightPalette();
+  const { up: UP, down: DOWN } = useBacktestTones();
   const text = { PENDING: 'Queued', RUNNING: 'Running', COMPLETED: 'Completed', FAILED: 'Failed', CANCELLED: 'Cancelled' }[status];
   return <Text accessibilityLiveRegion="polite" style={[backtestStyles.status, { color: status === 'FAILED' ? DOWN : status === 'COMPLETED' ? UP : P.textSecondary }]}>{text}</Text>;
 }
 export function Metric({ label, value, suffix = '', tone = false }: { label: string; value: string | number | null | undefined; suffix?: string; tone?: boolean }) {
+  const backtestStyles = useBacktestStyles();
+  const { up: UP, down: DOWN } = useBacktestTones();
   return <View style={backtestStyles.metric}><Text style={backtestStyles.label}>{label}</Text><Text style={[backtestStyles.metricValue, tone && value != null && { color: Number(value) >= 0 ? UP : DOWN }]}>{metricText(value, suffix)}</Text></View>;
 }
 export function RiskStatisticsView({ statistics }: { statistics: RiskStatistics }) {
+  const backtestStyles = useBacktestStyles();
   return <View style={{ gap: 10 }}><Heading>Risk statistics</Heading><View style={backtestStyles.wrap}>
     <Metric label="Sharpe ratio" value={statistics.sharpe} /><Metric label="Sortino ratio" value={statistics.sortino} />
     <Metric label="Annualized growth" value={statistics.cagrPercent} suffix="%" /><Metric label="Annualized volatility" value={statistics.annualizedVolatilityPercent} suffix="%" />
@@ -37,6 +50,8 @@ export function RiskStatisticsView({ statistics }: { statistics: RiskStatistics 
   </View>;
 }
 export function EquityChart({ points, currency }: { points: EquityPoint[]; currency?: string }) {
+  const backtestStyles = useBacktestStyles();
+  const { up: UP, down: DOWN } = useBacktestTones();
   const [width, setWidth] = useState(0);
   const segments = useMemo(() => equitySegments(points, width), [points, width]);
   if (points.length < 2) return <Help>Equity history will appear after the run completes.</Help>;
@@ -49,7 +64,8 @@ export function EquityChart({ points, currency }: { points: EquityPoint[]; curre
   </View><View style={backtestStyles.row}><Help>{new Date(first.time).toISOString().slice(0, 10)}</Help><Help>{new Date(last.time).toISOString().slice(0, 10)}</Help></View></View>;
 }
 
-export const backtestStyles = StyleSheet.create({
+/** Shared backtesting screen styles for the active theme: `const S = useBacktestStyles();`. */
+export const useBacktestStyles = makeStyles((_Palette, P) => ({
   screen: { flex: 1, backgroundColor: P.bg },
   content: { padding: 20, paddingBottom: 44, gap: 16, width: '100%', maxWidth: 900, alignSelf: 'center' },
   card: { backgroundColor: P.card, padding: 18, borderRadius: 18, borderWidth: 1, borderColor: P.border, gap: 12 },
@@ -71,5 +87,5 @@ export const backtestStyles = StyleSheet.create({
   metricValue: { color: P.text, fontSize: 19, fontWeight: '600' },
   chart: { height: 140, backgroundColor: P.bg, borderRadius: 10, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: P.border },
-  error: { color: DOWN, fontSize: 13, lineHeight: 20 },
-});
+  error: { color: P.red, fontSize: 13, lineHeight: 20 },
+}));

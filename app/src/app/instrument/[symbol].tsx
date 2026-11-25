@@ -17,7 +17,8 @@ import { PaperOrderTicket } from '@/components/trading/PaperOrderTicket';
 import { marketMetadata, marketSourceLabel } from '@/lib/format';
 import { fetchChartTrades } from '@/lib/paperTrading';
 import { useAuth } from '@/store/auth';
-import { Fonts } from '@/constants/theme';
+import { Fonts, Palettes, type ColorScheme, type PaletteColors } from '@/constants/theme';
+import { makeStyles, useColorScheme } from '@/hooks/use-theme';
 
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
@@ -42,21 +43,30 @@ const INDICATORS = [
 const SETTLEMENT = new Set(['USD', 'USDT']);
 const NO_TRADES: { time: number; price: number; side: 'BUY' | 'SELL' }[] = [];
 
-// Light chart theme.
-const BG = '#FFFFFF';
-const SURFACE = '#F0F3FA';
-const BORDER = '#E0E3EB';
-const TEXT = '#131722';
-/** Strongest text: selected options and titles. */
-const STRONG = '#131722';
-/** Text and icons on coloured buttons. */
-const ON_COLOR = '#FFFFFF';
-const MUTED = '#787B86';
-const ACCENT = '#2962FF';
-const UP = '#089981';
+/** Chart-terminal colours for the active theme. */
+function chartColors(Palette: PaletteColors, scheme: ColorScheme) {
+  const dark = scheme === 'dark';
+  return {
+    BG: Palette.chartBg,
+    SURFACE: dark ? '#1E222D' : '#F0F3FA',
+    BORDER: Palette.chartGrid,
+    TEXT: Palette.chartText,
+    /** Strongest text: selected options and titles. */
+    STRONG: Palette.chartText,
+    /** Text and icons on coloured buttons. */
+    ON_COLOR: Palette.onAccent,
+    MUTED: Palette.chartMuted,
+    ACCENT: Palette.chartLine,
+    UP: Palette.chartUp,
+    DOWN: Palette.chartDown,
+  };
+}
+function useChartColors() {
+  const scheme = useColorScheme();
+  return chartColors(Palettes[scheme], scheme);
+}
 /** This screen follows trading-terminal typography (sans) rather than the app's serif default. */
 const SANS = Fonts.sans;
-const DOWN = '#F23645';
 
 /** Full names for the quote side of a pair, as in "XRP / U.S. Dollar". */
 const QUOTE_NAMES: Record<string, string> = {
@@ -78,11 +88,13 @@ type Sheet = 'symbol' | 'timeframe' | 'indicators' | 'more' | 'order' | null;
 const NO_DRAWINGS: DrawingState = { activeTool: 'cursor', canUndo: false, canRedo: false, hidden: false, count: 0 };
 type Instrument = { symbol: string; exchange: string; name: string };
 
-function Glyph({ name, size = 24, color = TEXT }: { name: SymbolName; size?: number; color?: string }) {
-  return <SymbolView name={name} size={size} tintColor={color} type="monochrome" accessible={false} />;
+function Glyph({ name, size = 24, color }: { name: SymbolName; size?: number; color?: string }) {
+  const { TEXT } = useChartColors();
+  return <SymbolView name={name} size={size} tintColor={color ?? TEXT} type="monochrome" accessible={false} />;
 }
 
 function IconButton({ label, onPress, children, disabled }: { label: string; onPress: () => void; children: ReactNode; disabled?: boolean }) {
+  const styles = useStyles();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }} disabled={disabled}
       onPress={onPress} hitSlop={4} style={({ pressed }) => [styles.iconButton, disabled && styles.disabled, pressed && styles.pressed]}>
@@ -94,6 +106,9 @@ function IconButton({ label, onPress, children, disabled }: { label: string; onP
 const check: SymbolName = { ios: 'checkmark', android: 'check', web: 'check' };
 
 export default function InstrumentScreen() {
+  const styles = useStyles();
+  const scheme = useColorScheme();
+  const { TEXT, STRONG, ON_COLOR, MUTED, ACCENT, UP, DOWN } = chartColors(Palettes[scheme], scheme);
   const params = useLocalSearchParams<{ symbol: string; exchange?: string; name?: string; timeframe?: string }>();
   const symbol = String(params.symbol ?? 'BTCUSDT').toUpperCase();
   const exchange = String(params.exchange ?? 'BINANCE').toUpperCase();
@@ -210,7 +225,7 @@ export default function InstrumentScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={fullscreen ? ['top'] : ['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="dark" />
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
 
       <View style={styles.chart} onLayout={event => setChartHeight(event.nativeEvent.layout.height)}>
         {candles.length ? chartHeight > 0 ? (
@@ -330,51 +345,55 @@ export default function InstrumentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  pressed: { opacity: 0.55 },
-  disabled: { opacity: 0.35 },
-  safe: { flex: 1, backgroundColor: BG },
-  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
-  chart: { flex: 1, minHeight: 0, backgroundColor: BG },
-  closeButton: { position: 'absolute', left: 10, top: 10, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(240,243,250,0.95)' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  muted: { fontFamily: SANS, fontSize: 13, color: MUTED },
-  link: { fontFamily: SANS, fontSize: 14, fontWeight: '600', color: TEXT, padding: 12, textDecorationLine: 'underline' },
-  exitFullscreen: { position: 'absolute', right: 70, bottom: 36, width: 44, height: 44, borderRadius: 22, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-  toolbar: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 4, minHeight: 56, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER, backgroundColor: BG },
-  toolPair: { minHeight: 44, justifyContent: 'center', paddingRight: 14, flexShrink: 1 },
-  toolTimeframe: { minHeight: 44, minWidth: 44, justifyContent: 'center', paddingHorizontal: 6 },
-  toolSymbol: { fontFamily: SANS, fontSize: 18, color: TEXT, fontWeight: '500', letterSpacing: 0.2 },
-  divider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: BORDER, marginHorizontal: 4 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8 },
-  tradeButton: { flex: 1, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  tradeDisabled: { opacity: 0.35 },
-  tradeText: { fontFamily: SANS, color: ON_COLOR, fontSize: 16, fontWeight: '600' },
-  account: { minWidth: 64, height: 44, borderRadius: 8, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
-  accountTop: { fontFamily: SANS, fontSize: 13, color: TEXT },
-  accountBottom: { fontFamily: SANS, fontSize: 10, color: MUTED, marginTop: 1 },
-  tradeNote: { fontFamily: SANS, fontSize: 11, color: MUTED, textAlign: 'center', paddingHorizontal: 20, paddingBottom: 6 },
-  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(19,23,34,0.35)' },
-  sheetWrap: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: BG, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '82%', width: '100%', maxWidth: 520, alignSelf: 'center' },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: '#C9CEDB', marginTop: 8 },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 20, paddingRight: 8 },
-  sheetTitle: { fontFamily: SANS, fontSize: 18, fontWeight: '600', color: STRONG },
-  sheetBody: { flexGrow: 0 },
-  sheetContent: { paddingHorizontal: 20, paddingBottom: 20, gap: 4 },
-  section: { fontFamily: SANS, fontSize: 12, fontWeight: '600', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 14, marginBottom: 6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minWidth: 56, minHeight: 44, paddingHorizontal: 12, borderRadius: 8, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
-  chipActive: { backgroundColor: ACCENT },
-  chipText: { fontFamily: SANS, fontSize: 14, color: TEXT, fontWeight: '500' },
-  chipTextActive: { color: ON_COLOR },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
-  optionLast: { borderBottomWidth: 0, marginTop: 8 },
-  optionText: { fontFamily: SANS, flex: 1, fontSize: 15, color: TEXT },
-  optionTextActive: { fontFamily: SANS, flex: 1, fontSize: 15, color: STRONG, fontWeight: '600' },
-  optionHint: { fontFamily: SANS, fontSize: 12, color: MUTED, marginTop: 2 },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#B2B5BE', alignItems: 'center', justifyContent: 'center' },
-  checkboxOn: { backgroundColor: ACCENT, borderColor: ACCENT },
-  sourceNote: { fontFamily: SANS, fontSize: 12, color: MUTED, marginTop: 14, lineHeight: 17 },
+const useStyles = makeStyles((Palette, _, scheme) => {
+  const dark = scheme === 'dark';
+  const { BG, SURFACE, BORDER, TEXT, STRONG, ON_COLOR, MUTED, ACCENT } = chartColors(Palette, scheme);
+  return {
+    flex: { flex: 1 },
+    pressed: { opacity: 0.55 },
+    disabled: { opacity: 0.35 },
+    safe: { flex: 1, backgroundColor: BG },
+    iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+    chart: { flex: 1, minHeight: 0, backgroundColor: BG },
+    closeButton: { position: 'absolute', left: 10, top: 10, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: dark ? 'rgba(30,34,45,0.95)' : 'rgba(240,243,250,0.95)' },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    muted: { fontFamily: SANS, fontSize: 13, color: MUTED },
+    link: { fontFamily: SANS, fontSize: 14, fontWeight: '600', color: TEXT, padding: 12, textDecorationLine: 'underline' },
+    exitFullscreen: { position: 'absolute', right: 70, bottom: 36, width: 44, height: 44, borderRadius: 22, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
+    toolbar: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 4, minHeight: 56, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER, backgroundColor: BG },
+    toolPair: { minHeight: 44, justifyContent: 'center', paddingRight: 14, flexShrink: 1 },
+    toolTimeframe: { minHeight: 44, minWidth: 44, justifyContent: 'center', paddingHorizontal: 6 },
+    toolSymbol: { fontFamily: SANS, fontSize: 18, color: TEXT, fontWeight: '500', letterSpacing: 0.2 },
+    divider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: BORDER, marginHorizontal: 4 },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8 },
+    tradeButton: { flex: 1, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    tradeDisabled: { opacity: 0.35 },
+    tradeText: { fontFamily: SANS, color: ON_COLOR, fontSize: 16, fontWeight: '600' },
+    account: { minWidth: 64, height: 44, borderRadius: 8, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+    accountTop: { fontFamily: SANS, fontSize: 13, color: TEXT },
+    accountBottom: { fontFamily: SANS, fontSize: 10, color: MUTED, marginTop: 1 },
+    tradeNote: { fontFamily: SANS, fontSize: 11, color: MUTED, textAlign: 'center', paddingHorizontal: 20, paddingBottom: 6 },
+    backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: dark ? Palette.overlay : 'rgba(19,23,34,0.35)' },
+    sheetWrap: { flex: 1, justifyContent: 'flex-end' },
+    sheet: { backgroundColor: BG, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '82%', width: '100%', maxWidth: 520, alignSelf: 'center' },
+    grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: dark ? Palette.chartCrosshair : '#C9CEDB', marginTop: 8 },
+    sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 20, paddingRight: 8 },
+    sheetTitle: { fontFamily: SANS, fontSize: 18, fontWeight: '600', color: STRONG },
+    sheetBody: { flexGrow: 0 },
+    sheetContent: { paddingHorizontal: 20, paddingBottom: 20, gap: 4 },
+    section: { fontFamily: SANS, fontSize: 12, fontWeight: '600', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 14, marginBottom: 6 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { minWidth: 56, minHeight: 44, paddingHorizontal: 12, borderRadius: 8, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+    chipActive: { backgroundColor: ACCENT },
+    chipText: { fontFamily: SANS, fontSize: 14, color: TEXT, fontWeight: '500' },
+    chipTextActive: { color: ON_COLOR },
+    option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
+    optionLast: { borderBottomWidth: 0, marginTop: 8 },
+    optionText: { fontFamily: SANS, flex: 1, fontSize: 15, color: TEXT },
+    optionTextActive: { fontFamily: SANS, flex: 1, fontSize: 15, color: STRONG, fontWeight: '600' },
+    optionHint: { fontFamily: SANS, fontSize: 12, color: MUTED, marginTop: 2 },
+    checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: dark ? Palette.chartCrosshair : '#B2B5BE', alignItems: 'center', justifyContent: 'center' },
+    checkboxOn: { backgroundColor: ACCENT, borderColor: ACCENT },
+    sourceNote: { fontFamily: SANS, fontSize: 12, color: MUTED, marginTop: 14, lineHeight: 17 },
+  };
 });

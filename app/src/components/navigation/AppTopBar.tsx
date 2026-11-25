@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
 import { GlassIcon } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 
 const LOGO = { uri: 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837cb6f4498b.jpg' };
 
@@ -16,6 +16,7 @@ type Props = {
 
 /** The app's top bar (icon, name, Portfolio), shared by every main page. */
 export function AppTopBar({ onBrandPress, logoBorder = false }: Props) {
+  const styles = useStyles();
   return (
     <View style={styles.header}>
       <View style={styles.brand}>
@@ -44,14 +45,14 @@ export function AppTopBar({ onBrandPress, logoBorder = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette, _InsightPalette, scheme) => ({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingTop: 16, paddingBottom: 24,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   logo: { width: 36, height: 36, borderRadius: 9, backgroundColor: Palette.card },
-  logoBorder: { borderWidth: 1, borderColor: '#111111' },
+  logoBorder: { borderWidth: 1, borderColor: scheme === 'dark' ? Palette.border : '#111111' },
   brandName: { color: Palette.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.5 },
   brandHome: { minHeight: 44, justifyContent: 'center' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -60,8 +61,8 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border,
   },
   portfolioPill: {
-    borderWidth: 1, borderColor: '#0066FF', backgroundColor: Palette.card,
+    borderWidth: 1, borderColor: Palette.accent, backgroundColor: Palette.card,
     borderRadius: 20, paddingHorizontal: 16, minHeight: 36, justifyContent: 'center',
   },
   portfolioText: { color: Palette.text, fontWeight: '500', fontSize: 11 },
-});
+}));

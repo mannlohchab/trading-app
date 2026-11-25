@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppTopBar } from '@/components/navigation/AppTopBar';
 import { Text, TextInput } from '@/components/ui/AppText';
@@ -10,7 +10,7 @@ import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { InstrumentRowSkeleton } from '@/components/ui/Skeleton';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette } from '@/hooks/use-theme';
 import { useLiveMarket } from '@/hooks/use-live-market';
 import { fetchTickerList } from '@/lib/marketData';
 
@@ -19,6 +19,7 @@ const LISTS = ['Most active', 'Gainers', 'Losers'] as const;
 const SORT = { 'Most active': 'volume', Gainers: 'gainers', Losers: 'losers' } as const;
 
 export default function MarketScreen() {
+  const styles = useStyles();
   const [list, setList] = useState<(typeof LISTS)[number]>('Most active');
   return <SafeAreaView style={styles.safe} edges={['top']}>
     <AppTopBar />
@@ -29,6 +30,8 @@ export default function MarketScreen() {
 }
 
 function MarketPrices({ sort }: { sort: 'volume' | 'gainers' | 'losers' }) {
+  const styles = useStyles();
+  const P = useInsightPalette();
   const [search, setSearch] = useState('');
   const market = useQuery({
     // 'explore' prefix: live quotes patch every cached list (see liveMarket.updateMarketCaches).
@@ -57,8 +60,8 @@ function MarketPrices({ sort }: { sort: 'volume' | 'gainers' | 'losers' }) {
   </View>;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#FFFFFF' },
+const useStyles = makeStyles((_, P) => ({
+  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: P.card },
   header: { paddingHorizontal: 16, paddingBottom: 14 },
   title: { color: P.text, fontSize: 26, lineHeight: 34, letterSpacing: -0.3 },
   subtitle: { color: P.textSecondary, fontSize: 14, marginTop: 4 },
@@ -67,4 +70,4 @@ const styles = StyleSheet.create({
   search: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: P.border, backgroundColor: P.card, paddingHorizontal: 12, paddingVertical: 10, color: P.text, fontSize: 14 },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   notice: { color: P.textSecondary, fontSize: 11, lineHeight: 16, marginBottom: 8 },
-});
+}));

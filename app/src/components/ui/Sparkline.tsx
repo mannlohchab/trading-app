@@ -1,7 +1,7 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { Palette } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { buildSparkline } from '@/lib/sparkline';
 
 type Props = {
@@ -15,6 +15,8 @@ type Props = {
 };
 
 export function Sparkline({ data = [], times, label = 'Recent price history', width = 64, height = 36, positive = true, color }: Props) {
+  const styles = useStyles();
+  const Palette = usePalette();
   const chart = buildSparkline(data, width, height, times);
   const stroke = color ?? (positive ? Palette.green : Palette.red);
   return (
@@ -32,9 +34,9 @@ export function Sparkline({ data = [], times, label = 'Recent price history', wi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   baseline: { position: 'absolute', left: 3, right: 3, borderTopWidth: 1, borderColor: Palette.border, borderStyle: 'dashed' },
   line: { position: 'absolute', height: 1.8, borderRadius: 1 },
   dot: { position: 'absolute', width: 5, height: 5, borderRadius: 3 },
   empty: { color: Palette.textMuted, textAlign: 'center', lineHeight: 36 },
-});
+}));

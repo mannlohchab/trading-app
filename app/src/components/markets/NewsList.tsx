@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { timeAgo } from '@/lib/format';
 import { isOpenable, type NewsArticle } from '@/lib/newsApi';
 
@@ -20,6 +20,7 @@ const ago = (iso: string) => {
 };
 
 export const NewsRow = memo(function NewsRow({ article, last }: { article: NewsArticle; last?: boolean }) {
+  const styles = useStyles();
   const openable = isOpenable(article);
   return (
     <Pressable
@@ -63,6 +64,7 @@ export const NewsRow = memo(function NewsRow({ article, last }: { article: NewsA
 });
 
 export function NewsRowSkeleton({ last }: { last?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.row, !last && styles.divider]}>
       <View style={[styles.copy, { gap: 8 }]}>
@@ -75,19 +77,19 @@ export function NewsRowSkeleton({ last }: { last?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette, _insight, scheme) => ({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 14 },
   divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Palette.border },
   pressed: { opacity: 0.6 },
   copy: { flex: 1, minWidth: 0 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
-  breaking: { color: '#fff', backgroundColor: Palette.red, fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  breaking: { color: Palette.onAccent, backgroundColor: Palette.red, fontSize: 9, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   publisher: { flexShrink: 1, color: Palette.textSecondary, fontSize: 11, fontWeight: '600' },
   time: { flexShrink: 0, color: Palette.textMuted, fontSize: 11 },
   title: { color: Palette.text, fontSize: 15, fontWeight: '600', lineHeight: 20, letterSpacing: -0.3 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 7 },
   tag: { color: Palette.accent, backgroundColor: Palette.accentMuted, fontSize: 10, fontWeight: '600', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
-  tagFx: { color: '#0F766E', backgroundColor: '#CCFBF1' },
-  tagCommodity: { color: '#92400E', backgroundColor: '#FEF3C7' },
+  tagFx: scheme === 'dark' ? { color: '#5EEAD4', backgroundColor: '#0F2A28' } : { color: '#0F766E', backgroundColor: '#CCFBF1' },
+  tagCommodity: scheme === 'dark' ? { color: '#FCD34D', backgroundColor: '#2E2410' } : { color: '#92400E', backgroundColor: '#FEF3C7' },
   thumb: { width: 76, height: 76, borderRadius: 12, backgroundColor: Palette.pill },
-});
+}));

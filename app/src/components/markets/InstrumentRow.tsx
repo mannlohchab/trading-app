@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
 import { PriceChange } from '@/components/ui/PriceChange';
 import { Sparkline } from '@/components/ui/Sparkline';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { useMarketHistory } from '@/hooks/use-market-history';
 import { buildHistoryChart } from '@/lib/marketHistory';
 import { formatMarketPrice, marketSourceLabel } from '@/lib/format';
@@ -34,6 +34,7 @@ type Props = {
 };
 
 export const InstrumentRow = memo(function InstrumentRow({ quote, onRemove }: Props) {
+  const styles = useStyles();
   const [rowWidth, setRowWidth] = useState(324);
   const compact = rowWidth < 320;
   const historyQuery = useMarketHistory(quote.symbol, quote.exchange);
@@ -77,7 +78,7 @@ export const InstrumentRow = memo(function InstrumentRow({ quote, onRemove }: Pr
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   wrap: { position: 'relative', marginBottom: 10 },
   button: { borderRadius: 16, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.card, overflow: 'hidden' },
   pressed: { backgroundColor: Palette.cardHover },
@@ -92,4 +93,4 @@ const styles = StyleSheet.create({
   ltp: { color: Palette.text, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
   removeBtn: { position: 'absolute', right: 6, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 6, zIndex: 2 },
   removeText: { color: Palette.textMuted, fontSize: 22, fontWeight: '400', lineHeight: 24 },
-});
+}));

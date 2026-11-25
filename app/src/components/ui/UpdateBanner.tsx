@@ -1,9 +1,10 @@
 import * as Updates from 'expo-updates';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/AppText';
+import { makeStyles } from '@/hooks/use-theme';
 
 /** Foreground checks are rate limited by EAS; once per 15 minutes is plenty. */
 const FOREGROUND_CHECK_MS = 15 * 60_000;
@@ -26,6 +27,7 @@ function UpdateBannerInner() {
   const [restarting, setRestarting] = useState(false);
   const lastCheck = useRef(0);
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
 
   useEffect(() => {
     lastCheck.current = Date.now(); // expo-updates has just checked on launch.
@@ -71,13 +73,14 @@ function UpdateBannerInner() {
   );
 }
 
-const styles = StyleSheet.create({
+// Light keeps the dark floating pill; dark mode lifts it off the near-black page instead.
+const useStyles = makeStyles((Palette, _InsightPalette, scheme) => ({
   wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 100 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 8, paddingVertical: 6, borderRadius: 24, backgroundColor: '#131722', boxShadow: '0 6px 20px rgba(19,23,34,0.25)' },
-  text: { color: '#FFFFFF', fontSize: 14 },
-  restart: { backgroundColor: '#2962FF', borderRadius: 16, paddingHorizontal: 12, minHeight: 32, justifyContent: 'center' },
-  restartText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 8, paddingVertical: 6, borderRadius: 24, backgroundColor: scheme === 'dark' ? '#262B37' : '#131722', boxShadow: scheme === 'dark' ? '0 6px 20px rgba(0,0,0,0.5)' : '0 6px 20px rgba(19,23,34,0.25)' },
+  text: { color: scheme === 'dark' ? Palette.text : '#FFFFFF', fontSize: 14 },
+  restart: { backgroundColor: scheme === 'dark' ? Palette.accent : '#2962FF', borderRadius: 16, paddingHorizontal: 12, minHeight: 32, justifyContent: 'center' },
+  restartText: { color: Palette.onAccent, fontSize: 13, fontWeight: '600' },
   later: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 4 },
-  laterText: { color: '#B2B5BE', fontSize: 13 },
+  laterText: { color: scheme === 'dark' ? Palette.textSecondary : '#B2B5BE', fontSize: 13 },
   pressed: { opacity: 0.7 },
-});
+}));

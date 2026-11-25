@@ -3,19 +3,21 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { IndicatorHero } from '@/components/economics/IndicatorHero';
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useColorScheme, useInsightPalette } from '@/hooks/use-theme';
 import type { EconomicIndicator } from '@/lib/economics';
 import { formatIndicatorValue, indicatorChange, indicatorNumber, indicatorSummary, isAggregateEconomy, sortIndicators, type IndicatorSort } from '@/lib/indicatorFormat';
 
 const SORTS: IndicatorSort[] = ['Highest', 'Lowest', 'Biggest move', 'A–Z'];
 const SCOPES = ['Countries', 'Regions & groups'] as const;
-const BAR = '#3D3D3A';
-const BAR_NEGATIVE = '#C2410C';
+const BAR_NEGATIVE = { light: '#C2410C', dark: '#F97316' } as const;
 
 type Props = { items: EconomicIndicator[]; onOpen: (url: string) => void; source?: string };
 
 /** Ranked, scannable view of one indicator across economies. */
 export function IndicatorTable({ items: allItems, onOpen, source = 'World Bank' }: Props) {
+  const styles = useStyles();
+  const P = useInsightPalette();
+  const scheme = useColorScheme();
   const [sort, setSort] = useState<IndicatorSort>('Highest');
   const [scope, setScope] = useState<(typeof SCOPES)[number]>('Countries');
   // Rank countries separately from regions/income groups ("World" would otherwise top every GDP list).
@@ -79,7 +81,7 @@ export function IndicatorTable({ items: allItems, onOpen, source = 'World Bank' 
               </View>
               <View style={styles.line}>
                 <View style={styles.track}>
-                  {width ? <View style={[styles.bar, { width: `${width}%`, backgroundColor: value !== null && value < 0 ? BAR_NEGATIVE : BAR }]} /> : null}
+                  {width ? <View style={[styles.bar, { width: `${width}%`, backgroundColor: value !== null && value < 0 ? BAR_NEGATIVE[scheme] : P.body }]} /> : null}
                 </View>
                 <Text style={styles.change} numberOfLines={1}>
                   {change ? change.label : 'No prior year'}{item.period !== years.at(-1) ? ` · ${item.period}` : ''}
@@ -93,7 +95,7 @@ export function IndicatorTable({ items: allItems, onOpen, source = 'World Bank' 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_palette, P) => ({
   wrap: { paddingHorizontal: 16, paddingBottom: 8 },
   scopes: { flexDirection: 'row', backgroundColor: P.soft, borderRadius: 12, padding: 3, marginBottom: 12 },
   scope: { flex: 1, minHeight: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
@@ -119,4 +121,4 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: P.soft, overflow: 'hidden' },
   bar: { height: 4, borderRadius: 2 },
   change: { color: P.textSecondary, fontSize: 12, fontVariant: ['tabular-nums'], minWidth: 72, textAlign: 'right' },
-});
+}));

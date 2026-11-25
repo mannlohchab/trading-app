@@ -3,6 +3,9 @@ import { SymbolView } from 'expo-symbols';
 import { createContext, useContext, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, type PressableProps } from 'react-native';
 
+import type { PaletteColors } from '@/constants/theme';
+import { useColorScheme, usePalette } from '@/hooks/use-theme';
+
 const GlassPressedContext = createContext(false);
 
 // Share the button's native press state with its icons, including nested ones.
@@ -105,7 +108,10 @@ const STANDARD_ICONS = {
   coin: { ios: 'dollarsign.circle', android: 'monetization_on', web: 'monetization_on' },
 } as const satisfies Record<GlassIconName, ComponentProps<typeof SymbolView>['name']>;
 
-const STANDARD_COLORS = { neutral: '#3A4050', purple: '#0066FF', blue: '#0066FF', orange: '#F28C28' };
+// Symbol tints for the non-glass fallback; orange is the brand accent in both themes.
+function standardColors(Palette: PaletteColors, dark: boolean) {
+  return { neutral: dark ? '#C4C9D6' : '#3A4050', purple: Palette.accent, blue: Palette.accent, orange: '#F28C28' };
+}
 
 const ACCENT_ICONS: Partial<Record<GlassIconName, Partial<Record<'orange' | 'blue', number>>>> = {
   send: {
@@ -125,12 +131,14 @@ type Props = {
 
 export function GlassIcon({ name, size = 24, tone, rotation = 0 }: Props) {
   const pressed = useContext(GlassPressedContext);
+  const Palette = usePalette();
+  const dark = useColorScheme() === 'dark';
   const resolvedTone = tone ?? (pressed ? 'purple' : 'neutral');
   if (!USE_GLASS_ICONS) {
     return <SymbolView
       name={STANDARD_ICONS[name]}
       size={size}
-      tintColor={STANDARD_COLORS[resolvedTone]}
+      tintColor={standardColors(Palette, dark)[resolvedTone]}
       type="monochrome"
       style={{ width: size, height: size, transform: [{ rotate: `${rotation}deg` }] }}
       accessible={false}

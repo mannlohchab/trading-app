@@ -3,17 +3,17 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette, usePalette } from '@/hooks/use-theme';
 import { layoutChart, lineSegments, type AiChart, type ChartPoint } from '@/lib/aiCharts';
 import { formatMarketPrice } from '@/lib/format';
 import { pairName } from '@/lib/marketData';
 
 const PLOT_HEIGHT = 170;
-const UP = '#089981', DOWN = '#F23645';
+// Indicator series colours read on both themes.
 const LINE_COLORS: Record<string, string> = { SMA20: '#F7A21B', SMA50: '#8E24AA', EMA20: '#2962FF' };
-const LEVEL_COLORS = { resistance: DOWN, support: UP };
 
 function Polyline({ points, color, thickness = 1.5 }: { points: ChartPoint[]; color: string; thickness?: number }) {
+  const styles = useStyles();
   return <>{lineSegments(points).map((s, i) => (
     <View key={i} style={[styles.segment, { left: s.left, top: s.top, width: s.width, height: thickness, backgroundColor: color, transform: [{ rotate: `${s.angle}rad` }] }]} />
   ))}</>;
@@ -25,6 +25,10 @@ const timeLabel = (ms: number, timeframe: string) => new Date(ms).toLocaleString
 
 /** A chart the assistant drew from real candles. Tap to open the full interactive chart. */
 export const AiChartCard = memo(function AiChartCard({ chart }: { chart: AiChart }) {
+  const styles = useStyles();
+  const P = useInsightPalette();
+  const { chartUp: UP, chartDown: DOWN } = usePalette();
+  const LEVEL_COLORS = { resistance: DOWN, support: UP };
   const [width, setWidth] = useState(0);
   const layout = useMemo(() => (width > 0 ? layoutChart(chart, width, PLOT_HEIGHT) : null), [chart, width]);
   const meta = { exchange: chart.exchange, symbol: chart.symbol, pricePrecision: chart.pricePrecision };
@@ -107,7 +111,7 @@ export const AiChartCard = memo(function AiChartCard({ chart }: { chart: AiChart
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_Palette, P) => ({
   flex: { flex: 1 },
   pressed: { opacity: 0.85 },
   card: { marginTop: 6, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: P.border, backgroundColor: P.card, gap: 8 },
@@ -124,7 +128,7 @@ const styles = StyleSheet.create({
   body: { position: 'absolute', borderRadius: 1 },
   segment: { position: 'absolute', borderRadius: 1 },
   level: { position: 'absolute', left: 0, right: 0, height: 0, borderTopWidth: 1, borderStyle: 'dashed' },
-  marker: { position: 'absolute', width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#fff' },
+  marker: { position: 'absolute', width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: P.card },
   dot: { width: 8, height: 8, borderRadius: 4 },
   axis: { width: 62, marginLeft: 6 },
   axisText: { position: 'absolute', right: 0, color: P.textMuted, fontSize: 10, fontVariant: ['tabular-nums'] },
@@ -136,4 +140,4 @@ const styles = StyleSheet.create({
   dashed: { height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', backgroundColor: 'transparent' },
   legendText: { color: P.body, fontSize: 11 },
   open: { color: P.textSecondary, fontSize: 12, fontWeight: '500' },
-});
+}));

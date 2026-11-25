@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
+import { makeStyles } from '@/hooks/use-theme';
 import { marketAssets } from '@/lib/marketAssets';
 
 /** Bundled logos: cryptocurrency-icons (CC0) and flag-icons 1x1 (MIT). See assets/icons/markets. */
@@ -36,6 +37,7 @@ function hashColor(symbol: string): string {
 type Props = { symbol: string; exchange?: string; size?: number };
 
 export function SymbolIcon({ symbol, exchange, size = 40 }: Props) {
+  const styles = useStyles();
   const upper = symbol.toUpperCase();
   const assets = marketAssets(upper, exchange);
   const forex = exchange?.toUpperCase() === 'FOREX' || upper.includes('/');
@@ -84,9 +86,9 @@ export function SymbolIcon({ symbol, exchange, size = 40 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  flag: { position: 'absolute', borderWidth: 1.5, borderColor: '#FFFFFF', overflow: 'hidden' },
-  badge: { position: 'absolute', borderWidth: 1.5, borderColor: '#FFFFFF', backgroundColor: '#FFFFFF' },
+const useStyles = makeStyles((Palette) => ({
+  flag: { position: 'absolute', borderWidth: 1.5, borderColor: Palette.card, overflow: 'hidden' },
+  badge: { position: 'absolute', borderWidth: 1.5, borderColor: Palette.card, backgroundColor: Palette.card },
   letter: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -94,5 +96,5 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.6)',
   },
-  label: { color: '#FFFFFF', fontWeight: '800' },
-});
+  label: { color: Palette.onAccent, fontWeight: '800' },
+}));

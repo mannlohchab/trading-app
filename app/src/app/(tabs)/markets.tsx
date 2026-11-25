@@ -17,7 +17,8 @@ import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/G
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { InstrumentRowSkeleton } from '@/components/ui/Skeleton';
-import { Fonts, Palette, Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { formatPct } from '@/lib/format';
 import { marketAssets } from '@/lib/marketAssets';
 import { fetchTickerList, searchPairs } from '@/lib/marketData';
@@ -91,6 +92,8 @@ function openQuote(q: { symbol: string; exchange: string; name: string }) {
 }
 
 export default function MarketsScreen() {
+  const styles = useStyles();
+  const Palette = usePalette();
   const [tab, setTab] = useState<(typeof TABS)[number]>('Most active');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -330,83 +333,85 @@ export default function MarketsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
-  homePad: { paddingHorizontal: 18, paddingBottom: 28 },
-  hero: { paddingTop: 4, paddingBottom: 8 },
-  heroTop: { minHeight: 168, justifyContent: 'center' },
-  heroCopy: { maxWidth: 196 },
-  heroArt: { position: 'absolute', width: 196, height: 196, right: -28, top: -12 },
-  heroTitle: { color: Palette.text, fontSize: 40, fontWeight: '700', lineHeight: 44, letterSpacing: -1.4, textAlign: 'left' },
-  heroSubtitle: { color: Palette.text, fontSize: 16, lineHeight: 22, textAlign: 'left', marginTop: 14 },
-  heroHighlight: { color: Palette.accent, fontWeight: '700' },
-  heroPills: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20 },
-  pill: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Palette.pill, borderRadius: 8, paddingLeft: 4, paddingRight: 8, paddingVertical: 2 },
-  pillCoin: { width: 26, height: 26 },
-  pillSkeleton: { flex: 1, height: 32, borderRadius: 8, backgroundColor: Palette.pill },
-  pillSymbol: { flexShrink: 1, color: Palette.text, fontSize: 13, fontWeight: '600' },
-  pillChange: { flexShrink: 0, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  pressed: { opacity: 0.6 },
-  heroCta: {
-    alignSelf: 'stretch', width: '100%', marginTop: 28, height: 56,
-    borderRadius: 20, backgroundColor: '#F2F2F5',
-    boxShadow: '0 6px 24px rgba(35, 37, 55, 0.06)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  heroCtaPressed: { opacity: 0.5, transform: [{ scale: 0.96 }] },
-  heroCtaLabel: { fontFamily: Fonts.sans, color: '#24252B', fontSize: 17, fontWeight: '700', letterSpacing: -0.5 },
-  shortcutScroll: { marginTop: 26, marginHorizontal: -18 },
-  shortcuts: { paddingHorizontal: 10, gap: 2 },
-  shortcut: { width: 96, alignItems: 'center', gap: 2, paddingVertical: 4 },
-  shortcutArt: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
-  shortcutImage: { width: 84, height: 84 },
-  shortcutLabel: { color: Palette.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 17 },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 16 },
-  sectionTitle: { color: Palette.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.7 },
-  seeAllButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: Palette.border, borderRadius: 7, paddingHorizontal: 10, minHeight: 30 },
-  seeAll: { color: Palette.text, fontSize: 11, fontWeight: '400' },
-  cardScroll: { marginHorizontal: -18 },
-  cardRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 18, paddingBottom: 10 },
-  cardName: { color: Palette.text, fontWeight: '600', fontSize: 16 },
-  cardSymbol: { color: Palette.textSecondary, fontSize: 12, marginTop: 2 },
-  dirTab: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: Palette.card,
-    borderWidth: 1, borderColor: Palette.border, overflow: 'hidden', minHeight: 42,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  dirTabOn: { backgroundColor: Palette.accentMuted, borderColor: '#0066FF' },
-  dirTabText: { color: Palette.textSecondary, fontSize: 13, fontWeight: '500' },
-  dirTabTextOn: { color: '#0052D6', fontWeight: '600' },
-  overviewCard: {
-    backgroundColor: Palette.card,
-    borderRadius: 20,
-    padding: 16,
-    gap: 8,
-  },
-  news: { color: Palette.textSecondary, fontSize: 14, lineHeight: 20 },
-  searchHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: Spacing.three,
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: Palette.card,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: Palette.text,
-  },
-  cancel: { color: Palette.accent, fontWeight: '700' },
-  searchRow: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Palette.border,
-  },
+const useStyles = makeStyles((Palette, _, scheme) => {
+  const dark = scheme === 'dark';
+  return {
+    safe: { flex: 1, backgroundColor: Palette.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
+    homePad: { paddingHorizontal: 18, paddingBottom: 28 },
+    hero: { paddingTop: 4, paddingBottom: 8 },
+    heroTop: { minHeight: 168, justifyContent: 'center' },
+    heroCopy: { maxWidth: 196 },
+    heroArt: { position: 'absolute', width: 196, height: 196, right: -28, top: -12 },
+    heroTitle: { color: Palette.text, fontSize: 40, fontWeight: '700', lineHeight: 44, letterSpacing: -1.4, textAlign: 'left' },
+    heroSubtitle: { color: Palette.text, fontSize: 16, lineHeight: 22, textAlign: 'left', marginTop: 14 },
+    heroHighlight: { color: Palette.accent, fontWeight: '700' },
+    heroPills: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20 },
+    pill: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Palette.pill, borderRadius: 8, paddingLeft: 4, paddingRight: 8, paddingVertical: 2 },
+    pillCoin: { width: 26, height: 26 },
+    pillSkeleton: { flex: 1, height: 32, borderRadius: 8, backgroundColor: Palette.pill },
+    pillSymbol: { flexShrink: 1, color: Palette.text, fontSize: 13, fontWeight: '600' },
+    pillChange: { flexShrink: 0, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+    pressed: { opacity: 0.6 },
+    heroCta: {
+      alignSelf: 'stretch', width: '100%', marginTop: 28, height: 56,
+      borderRadius: 20, backgroundColor: dark ? Palette.pill : '#F2F2F5',
+      boxShadow: '0 6px 24px rgba(35, 37, 55, 0.06)',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    heroCtaPressed: { opacity: 0.5, transform: [{ scale: 0.96 }] },
+    heroCtaLabel: { fontFamily: Fonts.sans, color: dark ? Palette.text : '#24252B', fontSize: 17, fontWeight: '700', letterSpacing: -0.5 },
+    shortcutScroll: { marginTop: 26, marginHorizontal: -18 },
+    shortcuts: { paddingHorizontal: 10, gap: 2 },
+    shortcut: { width: 96, alignItems: 'center', gap: 2, paddingVertical: 4 },
+    shortcutArt: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+    shortcutImage: { width: 84, height: 84 },
+    shortcutLabel: { color: Palette.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 17 },
+    sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 16 },
+    sectionTitle: { color: Palette.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.7 },
+    seeAllButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: Palette.border, borderRadius: 7, paddingHorizontal: 10, minHeight: 30 },
+    seeAll: { color: Palette.text, fontSize: 11, fontWeight: '400' },
+    cardScroll: { marginHorizontal: -18 },
+    cardRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 18, paddingBottom: 10 },
+    cardName: { color: Palette.text, fontWeight: '600', fontSize: 16 },
+    cardSymbol: { color: Palette.textSecondary, fontSize: 12, marginTop: 2 },
+    dirTab: {
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      backgroundColor: Palette.card,
+      borderWidth: 1, borderColor: Palette.border, overflow: 'hidden', minHeight: 42,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    dirTabOn: { backgroundColor: Palette.accentMuted, borderColor: Palette.accent },
+    dirTabText: { color: Palette.textSecondary, fontSize: 13, fontWeight: '500' },
+    dirTabTextOn: { color: Palette.accentText, fontWeight: '600' },
+    overviewCard: {
+      backgroundColor: Palette.card,
+      borderRadius: 20,
+      padding: 16,
+      gap: 8,
+    },
+    news: { color: Palette.textSecondary, fontSize: 14, lineHeight: 20 },
+    searchHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: Spacing.three,
+    },
+    searchInput: {
+      flex: 1,
+      backgroundColor: Palette.card,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      color: Palette.text,
+    },
+    cancel: { color: Palette.accent, fontWeight: '700' },
+    searchRow: {
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: Palette.border,
+    },
+  };
 });
-

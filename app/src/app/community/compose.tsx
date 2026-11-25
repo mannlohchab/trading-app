@@ -2,16 +2,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { InsightPalette as Palette, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
+import { makeStyles, useInsightPalette } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { COMMUNITY_API, refreshCommunity } from '@/lib/community';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 
 export default function ComposeScreen() {
+  const styles = useStyles();
+  const Palette = useInsightPalette();
   const client = useQueryClient();
   const [imageError, setImageError] = useState('');
   const [content, setContent] = useState('');
@@ -103,7 +106,7 @@ export default function ComposeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_, Palette) => ({
   counter: { color: Palette.textMuted, fontSize: 12, textAlign: 'right', marginTop: 6 },
   removeImage: { minHeight: 44, justifyContent: 'center' },
   safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: Palette.bg, padding: Spacing.three },
@@ -141,4 +144,4 @@ const styles = StyleSheet.create({
   imgBtnText: { color: Palette.accent, fontWeight: '700' },
   preview: { marginTop: 12, width: '100%', height: 180, borderRadius: 12 },
   postBtn: { color: Palette.accent, fontWeight: '800', marginRight: 4 },
-});
+}));

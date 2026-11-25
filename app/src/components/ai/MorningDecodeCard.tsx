@@ -6,7 +6,8 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { Text } from '@/components/ui/AppText';
-import { Fonts, Palette } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
+import { makeStyles, useColorScheme } from '@/hooks/use-theme';
 import {
   fetchMorningDecode,
   fetchMorningDecodeAudioDataUri,
@@ -14,13 +15,17 @@ import {
 } from '@/lib/morningDecodeApi';
 import { useAuth } from '@/store/auth';
 
-const PLAYER_INK = '#24252B';
-const PLAYER_MUTED = '#747680';
-const PLAYER_DISABLED = '#B2B3BB';
+/** The player's own greys: a soft light card in light mode, a raised cool card in dark mode. */
+const PLAYER = {
+  light: { card: '#F2F2F5', ink: '#24252B', muted: '#747680', disabled: '#B2B3BB', track: '#DADBE0', fill: '#7D7F89', artwork: '#E1E1F1' },
+  dark: { card: '#1B202B', ink: '#ECEEF4', muted: '#A0A6B8', disabled: '#4A4F5C', track: '#2E3340', fill: '#A0A6B8', artwork: '#262B37' },
+} as const;
 const WAVEFORM_HEIGHTS = [6, 11, 16, 8, 13, 6];
 
 /** Shared daily audio briefing at the top of Home — no transcript. */
 export function MorningDecodeCard() {
+  const styles = useStyles();
+  const { ink: PLAYER_INK, disabled: PLAYER_DISABLED } = PLAYER[useColorScheme()];
   const userId = useAuth(s => s.user?.id);
   const briefQuery = useQuery({
     queryKey: ['morning-decode', userId],
@@ -247,83 +252,86 @@ window.__tgSkip=function(seconds){
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { marginBottom: 11 },
-  card: {
-    position: 'relative',
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 5,
-    borderRadius: 20,
-    backgroundColor: '#F2F2F5',
-    boxShadow: '0 6px 24px rgba(35, 37, 55, 0.06)',
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 30 },
-  closeButton: { position: 'absolute', zIndex: 2, top: 0, right: 0, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  closeLine: { position: 'absolute', width: 12, height: 1.5, borderRadius: 1, backgroundColor: PLAYER_INK },
-  closeLineForward: { transform: [{ rotate: '45deg' }] },
-  closeLineBackward: { transform: [{ rotate: '-45deg' }] },
-  artwork: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    overflow: 'hidden',
-    backgroundColor: '#E1E1F1',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 3px 9px rgba(57, 54, 92, 0.08)',
-  },
-  art: { width: '100%', height: '100%', borderRadius: 11 },
-  copy: { flex: 1, minWidth: 0 },
-  title: { fontFamily: Fonts.sans, color: PLAYER_INK, fontSize: 17, fontWeight: '700', letterSpacing: -0.5, lineHeight: 20 },
-  subtitle: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 10, lineHeight: 13, marginTop: 1 },
-  waveform: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 18 },
-  waveformBar: { width: 3, borderRadius: 2, backgroundColor: '#B2B3BB' },
-  waveformBarActive: { backgroundColor: PLAYER_INK },
-  disclaimer: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 9, lineHeight: 13, textAlign: 'center', marginTop: 6, paddingHorizontal: 10 },
-  error: { fontFamily: Fonts.sans, color: Palette.red, fontSize: 10, lineHeight: 13, textAlign: 'center', marginTop: 1 },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginTop: 2 },
-  play: {
-    width: 48,
-    height: 44,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playIcon: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 12,
-    borderBottomWidth: 12,
-    borderLeftWidth: 20,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: PLAYER_INK,
-    marginLeft: 5,
-  },
-  playIconDisabled: { borderLeftColor: PLAYER_DISABLED },
-  pauseIcon: { flexDirection: 'row', gap: 6 },
-  pauseBar: { width: 7, height: 24, borderRadius: 3, backgroundColor: PLAYER_INK },
-  skip: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  skipIcon: { width: 27, height: 27, alignItems: 'center', justifyContent: 'center' },
-  skipAmount: { position: 'absolute', top: 10, fontFamily: Fonts.sans, fontSize: 8, lineHeight: 10, fontWeight: '700', color: PLAYER_INK },
-  disabledText: { color: PLAYER_DISABLED },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  track: {
-    flex: 1,
-    height: 4,
-    borderRadius: 3,
-    backgroundColor: '#DADBE0',
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#7D7F89',
-  },
-  time: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 10, lineHeight: 12, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  pressed: { opacity: 0.5, transform: [{ scale: 0.96 }] },
-  hiddenPlayer: { width: 1, height: 1, opacity: 0, position: 'absolute' },
+const useStyles = makeStyles((Palette, _InsightPalette, scheme) => {
+  const { card, ink: PLAYER_INK, muted: PLAYER_MUTED, disabled: PLAYER_DISABLED, track, fill, artwork } = PLAYER[scheme];
+  return {
+    wrap: { marginBottom: 11 },
+    card: {
+      position: 'relative',
+      paddingHorizontal: 14,
+      paddingTop: 8,
+      paddingBottom: 5,
+      borderRadius: 20,
+      backgroundColor: card,
+      boxShadow: '0 6px 24px rgba(35, 37, 55, 0.06)',
+    },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 30 },
+    closeButton: { position: 'absolute', zIndex: 2, top: 0, right: 0, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    closeLine: { position: 'absolute', width: 12, height: 1.5, borderRadius: 1, backgroundColor: PLAYER_INK },
+    closeLineForward: { transform: [{ rotate: '45deg' }] },
+    closeLineBackward: { transform: [{ rotate: '-45deg' }] },
+    artwork: {
+      width: 38,
+      height: 38,
+      borderRadius: 11,
+      overflow: 'hidden',
+      backgroundColor: artwork,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: '#000000',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 3px 9px rgba(57, 54, 92, 0.08)',
+    },
+    art: { width: '100%', height: '100%', borderRadius: 11 },
+    copy: { flex: 1, minWidth: 0 },
+    title: { fontFamily: Fonts.sans, color: PLAYER_INK, fontSize: 17, fontWeight: '700', letterSpacing: -0.5, lineHeight: 20 },
+    subtitle: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 10, lineHeight: 13, marginTop: 1 },
+    waveform: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 18 },
+    waveformBar: { width: 3, borderRadius: 2, backgroundColor: PLAYER_DISABLED },
+    waveformBarActive: { backgroundColor: PLAYER_INK },
+    disclaimer: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 9, lineHeight: 13, textAlign: 'center', marginTop: 6, paddingHorizontal: 10 },
+    error: { fontFamily: Fonts.sans, color: Palette.red, fontSize: 10, lineHeight: 13, textAlign: 'center', marginTop: 1 },
+    controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginTop: 2 },
+    play: {
+      width: 48,
+      height: 44,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    playIcon: {
+      width: 0,
+      height: 0,
+      borderTopWidth: 12,
+      borderBottomWidth: 12,
+      borderLeftWidth: 20,
+      borderTopColor: 'transparent',
+      borderBottomColor: 'transparent',
+      borderLeftColor: PLAYER_INK,
+      marginLeft: 5,
+    },
+    playIconDisabled: { borderLeftColor: PLAYER_DISABLED },
+    pauseIcon: { flexDirection: 'row', gap: 6 },
+    pauseBar: { width: 7, height: 24, borderRadius: 3, backgroundColor: PLAYER_INK },
+    skip: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    skipIcon: { width: 27, height: 27, alignItems: 'center', justifyContent: 'center' },
+    skipAmount: { position: 'absolute', top: 10, fontFamily: Fonts.sans, fontSize: 8, lineHeight: 10, fontWeight: '700', color: PLAYER_INK },
+    disabledText: { color: PLAYER_DISABLED },
+    progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+    track: {
+      flex: 1,
+      height: 4,
+      borderRadius: 3,
+      backgroundColor: track,
+      overflow: 'hidden',
+    },
+    fill: {
+      height: '100%',
+      borderRadius: 3,
+      backgroundColor: fill,
+    },
+    time: { fontFamily: Fonts.sans, color: PLAYER_MUTED, fontSize: 10, lineHeight: 12, fontWeight: '500', fontVariant: ['tabular-nums'] },
+    pressed: { opacity: 0.5, transform: [{ scale: 0.96 }] },
+    hiddenPlayer: { width: 1, height: 1, opacity: 0, position: 'absolute' },
+  };
 });

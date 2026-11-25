@@ -30,6 +30,29 @@ const movingCandleRangeSource = `function(count, width) {
   return { from: last - (slots - 1), to: last + 1 };
 }`;
 
+/**
+ * Theme colours for the chart page. Keys match the app palette's chart tokens, so the active
+ * palette can be passed straight in. Defaults are the light theme.
+ */
+export type ChartColors = {
+  chartBg: string; chartText: string; chartMuted: string; chartGrid: string;
+  chartCrosshair: string; chartUp: string; chartDown: string; chartLine: string;
+  /** Dark theme: picks dark variants of the few page colours that have no palette token. */
+  dark?: boolean;
+};
+
+export const LIGHT_CHART_COLORS: ChartColors = {
+  chartBg: '#FFFFFF', chartText: '#131722', chartMuted: '#787B86', chartGrid: '#E0E3EB',
+  chartCrosshair: '#9598A1', chartUp: '#089981', chartDown: '#F23645', chartLine: '#2962FF', dark: false,
+};
+
+/** "#RRGGBB" plus an alpha as an rgba() string; other formats pass through unchanged. */
+function withAlpha(hex: string, alpha: number) {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!match) return hex;
+  return `rgba(${parseInt(match[1], 16)},${parseInt(match[2], 16)},${parseInt(match[3], 16)},${alpha})`;
+}
+
 export function buildChartHtml(
   candles: ChartCandle[],
   chartType: string,
@@ -43,8 +66,18 @@ export function buildChartHtml(
     exchange?: string; timeframe?: string; /** Pair name shown top-left, e.g. "XRP / U.S. Dollar". */ title?: string;
     /** Filled paper trades, unix seconds and fill price. The page snaps each one onto a candle. */
     trades?: { time: number; price: number; side: 'BUY' | 'SELL' }[];
+    /** Theme colours; omitted keys fall back to the light theme. */
+    colors?: Partial<ChartColors>;
   } = {},
 ) {
+  const theme = { ...LIGHT_CHART_COLORS, ...options.colors };
+  const dark = theme.dark === true;
+  // No palette tokens for these: the light values are the originals, the dark ones suit chartBg.
+  const gridLine = dark ? theme.chartGrid : 'rgba(42,46,57,0.08)';
+  const drawActive = dark ? '#1E222D' : '#F0F3FA';
+  const drawPressed = dark ? '#1A2747' : '#E3ECFF';
+  const drawDangerBg = dark ? '#2A1418' : '#FFF1F3';
+  const drawDangerBorder = dark ? '#5C2630' : '#FECDD3';
   const timeframe = options.timeframe ?? '';
   const timeframeSeconds = ({ '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800 } as Record<string, number>)[timeframe] ?? 0;
   const legendTitle = options.title || [symbol, timeframe, options.exchange].filter(Boolean).join(' · ');
@@ -59,25 +92,26 @@ export function buildChartHtml(
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <style>
-  html,body,#wrap{margin:0;padding:0;height:100%;background:#FFFFFF;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  :root{color-scheme:${dark ? 'dark' : 'light'};--chart-bg:${theme.chartBg};--chart-text:${theme.chartText};--chart-muted:${theme.chartMuted};--chart-grid:${theme.chartGrid};--chart-line:${theme.chartLine};--chart-down:${theme.chartDown};--draw-menu-bg:${withAlpha(theme.chartBg, 0.96)};--draw-active:${drawActive};--draw-pressed:${drawPressed};--draw-danger-bg:${drawDangerBg};--draw-danger-border:${drawDangerBorder};}
+  html,body,#wrap{margin:0;padding:0;height:100%;background:var(--chart-bg);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;}
   #chart{height:100%;}
   /* The app overlays its close button at the top-left, so the title row starts after it. */
   #legend{position:absolute;left:12px;top:10px;z-index:6;pointer-events:none;line-height:1.3;max-width:calc(100% - 110px);}
-  #legend .title{display:flex;align-items:center;gap:10px;padding-left:42px;min-height:30px;font-size:20px;color:#131722;letter-spacing:-.2px;white-space:nowrap;}
+  #legend .title{display:flex;align-items:center;gap:10px;padding-left:42px;min-height:30px;font-size:20px;color:var(--chart-text);letter-spacing:-.2px;white-space:nowrap;}
   #legend .title span{overflow:hidden;text-overflow:ellipsis;}
   #legend .dot{flex:none;width:10px;height:10px;border-radius:50%;background:#22AB94;box-shadow:0 0 0 5px rgba(34,171,148,.16);}
   #legend .quote{font-size:17px;margin-top:4px;font-variant-numeric:tabular-nums;white-space:nowrap;}
   #legend .quote span{margin-right:7px;}
-  #legend .time{font-size:12px;color:#787B86;}
+  #legend .time{font-size:12px;color:var(--chart-muted);}
   #study-legend{position:absolute;left:54px;top:68px;z-index:5;pointer-events:none;display:flex;flex-direction:column;gap:3px;max-width:calc(100% - 70px);}
-  #study-legend .study-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:11px;line-height:1.35;color:#131722;font-variant-numeric:tabular-nums;}
+  #study-legend .study-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:11px;line-height:1.35;color:var(--chart-text);font-variant-numeric:tabular-nums;}
   #study-legend .study-row span{display:inline-flex;align-items:center;}
   #study-legend .study-row i{width:8px;height:8px;border-radius:2px;margin-right:4px;}
   #study-legend .off{opacity:.35;}
   #session-layer{position:absolute;left:0;top:0;z-index:1;pointer-events:none;overflow:hidden;}
   #pane-readout{position:absolute;left:0;top:0;right:0;z-index:4;pointer-events:none;}
-  .pane-readout{position:absolute;left:8px;right:72px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;font-size:11px;line-height:1.35;font-variant-numeric:tabular-nums;color:#131722;}
-  .pane-readout b{font-weight:600;color:#787B86;}
+  .pane-readout{position:absolute;left:8px;right:72px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;font-size:11px;line-height:1.35;font-variant-numeric:tabular-nums;color:var(--chart-text);}
+  .pane-readout b{font-weight:600;color:var(--chart-muted);}
 ${drawingToolsCss}
 </style>
 <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
@@ -113,23 +147,25 @@ ${drawingToolsCss}
   const intradaySessions = ${timeframeSeconds > 0 && timeframeSeconds < 86400 ? 'true' : 'false'};
   const initialDrawings = ${JSON.stringify(initialDrawings)};
   const drawingKey = ${JSON.stringify(drawingKey).replace(/</g, '\\u003c')};
-  const grid = 'rgba(42,46,57,0.08)';
-  const TEXT = '#131722';
-  const UP = '#089981', DOWN = '#F23645';
+  const grid = ${JSON.stringify(gridLine)};
+  const TEXT = ${JSON.stringify(theme.chartText)};
+  const MUTED = ${JSON.stringify(theme.chartMuted)};
+  const CHART_BG = ${JSON.stringify(theme.chartBg)};
+  const UP = ${JSON.stringify(theme.chartUp)}, DOWN = ${JSON.stringify(theme.chartDown)};
   // Dimmed so volume reads as a backdrop under the candles.
-  const UP_VOL = 'rgba(8,153,129,0.35)', DOWN_VOL = 'rgba(242,54,69,0.35)';
+  const UP_VOL = ${JSON.stringify(withAlpha(theme.chartUp, 0.35))}, DOWN_VOL = ${JSON.stringify(withAlpha(theme.chartDown, 0.35))};
   const legendTitle = ${JSON.stringify(legendTitle).replace(/</g, '\\u003c')};
   const timeframeSeconds = ${timeframeSeconds};
   const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-    layout: { background: { color: '#FFFFFF' }, textColor: TEXT, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif', fontSize: 13 },
+    layout: { background: { color: CHART_BG }, textColor: TEXT, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif', fontSize: 13 },
     grid: { vertLines: { color: grid, style: LightweightCharts.LineStyle.Dotted }, horzLines: { color: grid, style: LightweightCharts.LineStyle.Dotted } },
     // Room at the top for the title, and below the candles for volume and oscillator panes.
     rightPriceScale: { borderVisible: false, scaleMargins: { top: ${layout.priceTop}, bottom: ${layout.priceBottom} } },
     timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 6 },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#9598A1', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#131722' },
-      horzLine: { color: '#9598A1', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#131722' },
+      vertLine: { color: ${JSON.stringify(theme.chartCrosshair)}, width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: TEXT },
+      horzLine: { color: ${JSON.stringify(theme.chartCrosshair)}, width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: TEXT },
     },
     localization: { priceFormatter: p => Number(p).toLocaleString('en-US', { minimumFractionDigits: pricePrecision, maximumFractionDigits: pricePrecision }) },
     handleScroll: true,
@@ -138,11 +174,11 @@ ${drawingToolsCss}
 
   let series;
   if (chartType === 'line') {
-    series = chart.addLineSeries({ color: '#2962FF', lineWidth: 2, priceLineVisible: false });
+    series = chart.addLineSeries({ color: ${JSON.stringify(theme.chartLine)}, lineWidth: 2, priceLineVisible: false });
     series.setData(candles.map(c => ({ time: c.time, value: c.close })));
   } else if (chartType === 'area') {
     series = chart.addAreaSeries({
-      lineColor: '#2962FF', topColor: 'rgba(41,98,255,0.24)', bottomColor: 'rgba(41,98,255,0.02)',
+      lineColor: ${JSON.stringify(theme.chartLine)}, topColor: ${JSON.stringify(withAlpha(theme.chartLine, 0.24))}, bottomColor: ${JSON.stringify(withAlpha(theme.chartLine, 0.02))},
       priceLineVisible: false,
     });
     series.setData(candles.map(c => ({ time: c.time, value: c.close })));
@@ -305,8 +341,8 @@ ${drawingToolsCss}
     const rsiSeries = addStudyLine('rsi', '#7E57C2', () => studyPoints(studies().rsi), rsiFormat, () => ({ priceRange: { minValue: 0, maxValue: 100 } }));
     useStudyScale('rsi');
     const rsiLevel = (price, color) => rsiSeries.createPriceLine({ price, color, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title: '' });
-    rsiLevel(70, 'rgba(242,54,69,0.55)');
-    rsiLevel(30, 'rgba(8,153,129,0.55)');
+    rsiLevel(70, ${JSON.stringify(withAlpha(theme.chartDown, 0.55))});
+    rsiLevel(30, ${JSON.stringify(withAlpha(theme.chartUp, 0.55))});
   }
   if (indicators.includes('MACD')) {
     const histValues = () => {
@@ -316,7 +352,7 @@ ${drawingToolsCss}
       for (let i = 0; i < candles.length; i++) {
         const v = macd.histogram[i];
         if (v == null || !Number.isFinite(v)) continue;
-        out.push({ time: candles[i].time, value: v, color: v >= 0 ? 'rgba(8,153,129,0.8)' : 'rgba(242,54,69,0.8)' });
+        out.push({ time: candles[i].time, value: v, color: v >= 0 ? ${JSON.stringify(withAlpha(theme.chartUp, 0.8))} : ${JSON.stringify(withAlpha(theme.chartDown, 0.8))} });
       }
       return out;
     };
@@ -326,7 +362,7 @@ ${drawingToolsCss}
     useStudyScale('macd');
     const macdLine = addStudyLine('macd', '#2962FF', () => { const macd = studies().macd; return studyPoints(macd && macd.macd); });
     addStudyLine('macd', '#F7A21B', () => { const macd = studies().macd; return studyPoints(macd && macd.signal); });
-    macdLine.createPriceLine({ price: 0, color: 'rgba(120,123,134,0.7)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title: '' });
+    macdLine.createPriceLine({ price: 0, color: ${JSON.stringify(withAlpha(theme.chartMuted, 0.7))}, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title: '' });
   }
   if (indicators.includes('ATR')) {
     addStudyLine('atr', '#00897B', () => studyPoints(studies().atr));
@@ -383,11 +419,11 @@ ${drawingToolsCss}
     row.className = 'study-row';
     row.id = 'study-sessions';
     if (!intradaySessions) {
-      row.style.color = '#787B86';
+      row.style.color = MUTED;
       row.textContent = 'Trading sessions show on intraday charts';
     } else {
       const utc = document.createElement('span');
-      utc.style.color = '#787B86';
+      utc.style.color = MUTED;
       utc.textContent = 'UTC';
       row.appendChild(utc);
       for (let i = 0; i < TRADING_SESSIONS.length; i++) {
@@ -428,7 +464,7 @@ ${drawingToolsCss}
     if (stEl && data.st) {
       const v = time == null ? null : data.stValue.get(time);
       const direction = time == null ? null : data.stTrend.get(time);
-      if (v == null) { stEl.style.color = '#131722'; stEl.textContent = 'Supertrend (10, 3)'; }
+      if (v == null) { stEl.style.color = TEXT; stEl.textContent = 'Supertrend (10, 3)'; }
       else { stEl.style.color = direction === 1 ? UP : DOWN; stEl.textContent = 'Supertrend ' + fmt(v); }
     }
     if (intradaySessions && indicators.includes('SESSION')) {
@@ -517,7 +553,7 @@ ${drawingToolsCss}
       separator.setAttribute('x2', String(width));
       separator.setAttribute('y1', String(y));
       separator.setAttribute('y2', String(y));
-      separator.setAttribute('stroke', '#E0E3EB');
+      separator.setAttribute('stroke', ${JSON.stringify(theme.chartGrid)});
       separator.setAttribute('stroke-width', '1');
       sessionLayer.appendChild(separator);
       const row = studyRows[id + 'Row'];

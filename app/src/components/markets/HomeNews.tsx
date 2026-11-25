@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { fetchNews } from '@/lib/newsApi';
 import { NewsRow, NewsRowSkeleton } from './NewsList';
 
@@ -12,6 +12,7 @@ const COUNT = 4;
 
 /** "Latest news" on Home: the newest stories, refreshed every few minutes (the backend polls sources every 10). */
 export function HomeNews() {
+  const styles = useStyles();
   const news = useQuery({
     queryKey: ['news', 'home'],
     queryFn: ({ signal }) => fetchNews({ limit: COUNT, signal }),
@@ -44,10 +45,10 @@ export function HomeNews() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 12 },
   title: { color: Palette.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.7 },
   seeAllButton: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: Palette.border, borderRadius: 7, paddingHorizontal: 10, minHeight: 30 },
   seeAll: { color: Palette.text, fontSize: 11, fontWeight: '400' },
   card: { backgroundColor: Palette.card, borderRadius: 18, borderWidth: 1, borderColor: Palette.border, paddingHorizontal: 16, paddingVertical: 2 },
-});
+}));

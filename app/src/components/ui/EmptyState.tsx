@@ -1,7 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { InsightPalette, Palette, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
+import { makeStyles, useInsightPalette } from '@/hooks/use-theme';
 
 type Props = {
   title: string;
@@ -10,6 +11,8 @@ type Props = {
 };
 
 export function EmptyState({ title, subtitle, variant = 'default' }: Props) {
+  const styles = useStyles();
+  const InsightPalette = useInsightPalette();
   return (
     <View style={styles.wrap}>
       <Text style={[styles.title, variant === 'insight' && { color: InsightPalette.text }]}>{title}</Text>
@@ -18,7 +21,7 @@ export function EmptyState({ title, subtitle, variant = 'default' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   wrap: {
     padding: Spacing.five,
     alignItems: 'center',
@@ -26,4 +29,4 @@ const styles = StyleSheet.create({
   },
   title: { color: Palette.text, fontSize: 16, fontWeight: '600', textAlign: 'center' },
   subtitle: { color: Palette.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 18 },
-});
+}));

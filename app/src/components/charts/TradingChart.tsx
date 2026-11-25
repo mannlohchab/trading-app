@@ -1,10 +1,10 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { buildChartHtml, type ChartCandle } from '@/components/charts/chartHtml';
 import type { ChartDrawing } from '@/components/charts/chartDrawingTools';
-import { Palette } from '@/constants/theme';
+import { makeStyles, useColorScheme, usePalette } from '@/hooks/use-theme';
 
 type Props = {
   candles: ChartCandle[];
@@ -42,6 +42,9 @@ export type DrawingCommand = DrawingAction & { id: number };
 export type DrawingState = { activeTool: DrawingTool | 'cursor'; canUndo: boolean; canRedo: boolean; hidden: boolean; count: number };
 
 export function TradingChart({ candles, chartType, indicators, height = 360, symbol = '', pricePrecision = 2, currency = 'USD', drawingKey, drawingStore, exchange, timeframe, drawingCommand, onDrawingState, title, trades = [] }: Props) {
+  const styles = useStyles();
+  const Palette = usePalette();
+  const scheme = useColorScheme();
   const iframe = useRef<HTMLIFrameElement>(null);
   const webview = useRef<WebView<{}>>(null);
   const initialCandles = useRef(candles);
@@ -107,9 +110,12 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
     return () => window.removeEventListener('message', receive);
   }, [saveDrawings]);
 
+  // A theme switch rebuilds the page too; the reload then receives the latest candles and trades.
   const html = useMemo(
-    () => buildChartHtml(initialCandles.current, chartType, indicators, symbol, drawingStore.current[drawingKey] ?? [], drawingKey, precision, currency, { exchange, timeframe, title, trades: latestTrades.current }),
-    [chartType, indicators, symbol, drawingKey, drawingStore, precision, currency, exchange, timeframe, title],
+    () => buildChartHtml(initialCandles.current, chartType, indicators, symbol, drawingStore.current[drawingKey] ?? [], drawingKey, precision, currency, {
+      exchange, timeframe, title, trades: latestTrades.current, colors: { ...Palette, dark: scheme === 'dark' },
+    }),
+    [chartType, indicators, symbol, drawingKey, drawingStore, precision, currency, exchange, timeframe, title, Palette, scheme],
   );
 
   if (!candles.length) {
@@ -128,7 +134,7 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
           ref: iframe,
           srcDoc: html,
           onLoad: () => { sendCandles(); sendTrades(); },
-          style: { width: '100%', height: '100%', border: 'none', background: '#FFFFFF', display: 'block' },
+          style: { width: '100%', height: '100%', border: 'none', background: Palette.chartBg, display: 'block' },
           sandbox: 'allow-scripts',
         })}
       </View>
@@ -154,7 +160,7 @@ export function TradingChart({ candles, chartType, indicators, height = 360, sym
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { backgroundColor: '#FFFFFF', overflow: 'hidden', justifyContent: 'center' },
-  webview: { flex: 1, backgroundColor: '#FFFFFF' },
-});
+const useStyles = makeStyles((Palette) => ({
+  wrap: { backgroundColor: Palette.chartBg, overflow: 'hidden', justifyContent: 'center' },
+  webview: { flex: 1, backgroundColor: Palette.chartBg },
+}));

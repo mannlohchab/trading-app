@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
-import { InsightPalette, Palette, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 
 type Props = {
   tabs: string[];
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function SegmentedTabs({ tabs, value, onChange, variant = 'default' }: Props) {
+  const styles = useStyles();
   const warm = variant === 'insight';
   return (
     <View style={[styles.row, warm && styles.warmRow]}>
@@ -31,7 +33,7 @@ export function SegmentedTabs({ tabs, value, onChange, variant = 'default' }: Pr
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette, InsightPalette) => ({
   warmRow: { backgroundColor: InsightPalette.soft },
   warmLabel: { color: InsightPalette.textSecondary, fontWeight: '500' },
   warmSelected: { color: InsightPalette.text, fontWeight: '600' },
@@ -59,4 +61,4 @@ const styles = StyleSheet.create({
     color: Palette.accent,
     fontWeight: '700',
   },
-});
+}));

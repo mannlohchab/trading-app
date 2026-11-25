@@ -8,7 +8,8 @@ import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-ro
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassIcon, GlassPressable, type GlassIconName } from '@/components/ui/GlassIcon';
-import { Fonts, InsightPalette } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
+import { makeStyles, useInsightPalette, usePalette } from '@/hooks/use-theme';
 import { streamAiMessage, streamDemoAiChat } from '@/lib/api';
 import { createAiRequestGate, type AiKind } from '@/lib/aiChat';
 import { asAiOrigin, conversationMessages, createConversation, deleteConversation as removeConversation, listConversations, turnContextFor, type AiOrigin } from '@/lib/aiApi';
@@ -71,9 +72,6 @@ const PORTFOLIO_STARTERS = [
   { title: 'Where am I concentrated?', prompt: 'How concentrated is my portfolio? Which positions dominate it and what does that mean for my risk?' },
   { title: 'Which positions are losing?', prompt: 'Which of my holdings are in a loss, by how much, and how long have I held them?' },
 ];
-// Warm, monochrome chat palette.
-const { text: INK, body: BODY, textMuted: MUTED, bg: PAGE, soft: SOFT, border: LINE, card: CARD, onSolid: ON_SOLID } = InsightPalette;
-
 let messageSeq = 0;
 /** Client-side id for a message until the server's saved copy arrives. */
 const localMessageId = (role: 'user' | 'assistant') => `${role}-${Date.now()}-${++messageSeq}`;
@@ -84,6 +82,9 @@ function greeting(date = new Date()) {
 }
 
 export default function AiScreen() {
+  const styles = useStyles();
+  const { textMuted: MUTED } = useInsightPalette();
+  const Palette = usePalette();
   const userId = useAuth((state) => state.user?.id);
   const firstName = useAuth((state) => (state.user?.displayName || state.user?.username || '').trim().split(/\s+/)[0]);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
@@ -545,7 +546,7 @@ export default function AiScreen() {
                   </Pressable>
                   <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${conversation.title}`} disabled={deleting} onPress={() => deleteConversation(conversation.id)}
                     style={({ pressed }) => [styles.confirmButton, styles.deleteButton, (pressed || deleting) && styles.pressed]}>
-                    {deleting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.deleteText}>Delete</Text>}
+                    {deleting ? <ActivityIndicator size="small" color={Palette.onAccent} /> : <Text style={styles.deleteText}>Delete</Text>}
                   </Pressable>
                 </View>
               ) : <GlassPressable key={conversation.id} accessibilityRole="button" accessibilityHint="Long press to delete"
@@ -566,85 +567,90 @@ export default function AiScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  pressed: { opacity: 0.6 },
-  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#FFFFFF' },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  headerStart: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: SOFT },
-  newChatIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerPill: { flexShrink: 1, maxWidth: '62%', paddingHorizontal: 12, height: 32, borderRadius: 8, backgroundColor: SOFT, justifyContent: 'center' },
-  headerPillText: { color: INK, fontSize: 13, fontWeight: '500' },
-  headerPillMuted: { color: MUTED, fontWeight: '400' },
-  panel: { flex: 1 },
-  messages: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, gap: 22 },
-  emptyList: { flexGrow: 1, justifyContent: 'center' },
-  welcome: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12 },
-  welcomeArt: { width: 148, height: 148, marginBottom: 4 },
-  welcomeTitle: { fontFamily: Fonts?.serif, fontSize: 26, lineHeight: 34, color: INK, textAlign: 'center', letterSpacing: -0.3 },
-  welcomeSubtitle: { fontSize: 14, lineHeight: 21, color: MUTED, marginTop: 8, maxWidth: 270, textAlign: 'center' },
-  starterChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 26, maxWidth: 340 },
-  starterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
-  starterTitle: { color: BODY, fontSize: 13, fontWeight: '500' },
-  holdingsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 22, width: '100%', maxWidth: 340, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
-  holdingsTitle: { color: INK, fontSize: 14, fontWeight: '600' },
-  holdingsHint: { color: MUTED, fontSize: 12, lineHeight: 17, marginTop: 2 },
-  holdingsAction: { color: INK, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
-  promptLabel: { fontSize: 12, color: MUTED, fontWeight: '500' },
-  userMessage: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 14, backgroundColor: '#EFE8FF', paddingHorizontal: 14, paddingVertical: 10 },
-  messageText: { color: INK, fontSize: 14, lineHeight: 21 },
-  assistantMessage: { gap: 6, paddingRight: 8 },
-  streamingDot: { alignSelf: 'flex-start' },
-  responseStatus: { fontSize: 11, color: MUTED, fontStyle: 'italic', marginTop: 3 },
-  loading: { paddingVertical: 50, alignItems: 'center', gap: 15 }, muted: { color: MUTED, fontSize: 13 },
-  instrumentSection: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }, instrumentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: CARD, paddingLeft: 12, paddingRight: 5, paddingVertical: 4 },
-  exchange: { color: MUTED, fontSize: 10, fontWeight: '600', letterSpacing: 0.4 }, symbolInput: { flex: 1, minWidth: 50, fontSize: 13, color: INK, paddingVertical: 10, paddingHorizontal: 6, minHeight: 40 },
-  analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, backgroundColor: INK, borderRadius: 8 }, analyzeText: { color: ON_SOLID, fontSize: 12, fontWeight: '600' },
-  instrumentHint: { fontSize: 11, lineHeight: 16, color: MUTED, paddingTop: 7 },
-  composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
-  // Pill composer: round "+" (modes and tools) · message · round send/stop. Buttons stay at the bottom as the message grows.
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: 30, backgroundColor: '#FFF2F6', borderWidth: 1, borderColor: '#F1CAD8', boxShadow: '0 2px 10px rgba(180,72,112,0.08)' },
-  roundButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  plusButton: { backgroundColor: '#F8DFE8' },
-  plusButtonOpen: { backgroundColor: '#F2CEDC' },
-  plus: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
-  plusOpen: { transform: [{ rotate: '45deg' }] },
-  plusBarH: { position: 'absolute', width: 18, height: 2, borderRadius: 1, backgroundColor: INK },
-  plusBarV: { position: 'absolute', width: 2, height: 18, borderRadius: 1, backgroundColor: INK },
-  input: { flex: 1, color: INK, fontSize: 16, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 6, paddingTop: 11, paddingBottom: 11 },
-  sendButton: { backgroundColor: INK },
-  sendDisabled: { backgroundColor: '#F4DDE5' },
-  arrow: { width: 18, height: 18, alignItems: 'center' },
-  arrowHead: { position: 'absolute', top: 2, width: 10, height: 10, borderTopWidth: 2.2, borderLeftWidth: 2.2, borderColor: ON_SOLID, transform: [{ rotate: '45deg' }] },
-  arrowStem: { position: 'absolute', top: 2, bottom: 1, width: 2.2, borderRadius: 1.1, backgroundColor: ON_SOLID },
-  arrowMuted: { borderColor: MUTED },
-  arrowStemMuted: { backgroundColor: MUTED },
-  stopGlyph: { height: 12, width: 12, borderRadius: 3, backgroundColor: ON_SOLID },
-  disabled: { opacity: 0.4 },
-  modeTagRow: { flexDirection: 'row', paddingHorizontal: 6, paddingBottom: 6 },
-  modeTag: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 10, paddingRight: 8, height: 26, borderRadius: 13, backgroundColor: '#EFE8FF' },
-  modeTagText: { color: '#4C3DB8', fontSize: 12, fontWeight: '600' },
-  modeTagClose: { color: '#4C3DB8', fontSize: 16, lineHeight: 18 },
-  modeMenu: { position: 'absolute', left: 12, bottom: '100%', width: 268, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
-  modeOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 12, minHeight: 44 },
-  modeOptionPressed: { backgroundColor: PAGE },
-  modeOptionLabel: { color: INK, fontSize: 14, fontWeight: '500' },
-  modeOptionHint: { color: MUTED, fontSize: 12, marginTop: 2 },
-  modeCheck: { color: INK, fontSize: 14, fontWeight: '600' },
-  menuDivider: { height: StyleSheet.hairlineWidth, backgroundColor: LINE, marginVertical: 4, marginHorizontal: 8 },
-  disclaimer: { textAlign: 'center', color: MUTED, fontSize: 10, lineHeight: 15, paddingTop: 8, paddingBottom: 2 },
-  errorBox: { padding: 10, backgroundColor: '#FEF2F2', borderRadius: 9, marginHorizontal: 16, marginTop: 6 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 },
-  restart: { minHeight: 44, flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center', marginHorizontal: 16 }, restartText: { color: INK, fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
-  modalBackdrop: { backgroundColor: 'rgba(17,18,28,0.4)' },
-  drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: PAGE, boxShadow: '8px 0 32px rgba(31,31,30,0.12)' },
-  drawerContent: { flex: 1, paddingHorizontal: 18 },
-  drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 20, gap: 8 }, drawerTitle: { fontFamily: Fonts?.serif, fontSize: 20, color: INK, flex: 1 }, closeGlyph: { fontSize: 22, color: INK },
-  newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, borderRadius: 10, paddingHorizontal: 13, backgroundColor: SOFT }, newChatText: { color: INK, fontSize: 13, fontWeight: '500' },
-  historySearch: { paddingHorizontal: 13, paddingVertical: 12, minHeight: 44, marginTop: 12, borderWidth: 1, borderColor: LINE, backgroundColor: CARD, borderRadius: 10, color: INK, fontSize: 13 },
-  historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: MUTED, fontSize: 12 }, historyList: { gap: 4, paddingTop: 5, paddingBottom: 20 },
-  historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, confirmItem: { backgroundColor: CARD, borderWidth: 1, borderColor: LINE, gap: 8 }, confirmTitle: { color: INK, fontSize: 14, fontWeight: '600' },
-  confirmButton: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }, confirmCancel: { color: BODY, fontSize: 13, fontWeight: '500' },
-  deleteButton: { backgroundColor: '#DC2626' }, deleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
+// Warm, monochrome chat palette.
+const useStyles = makeStyles((Palette, InsightPalette, scheme) => {
+  const dark = scheme === 'dark';
+  const { text: INK, body: BODY, textMuted: MUTED, bg: PAGE, soft: SOFT, border: LINE, card: CARD, onSolid: ON_SOLID } = InsightPalette;
+  return {
+    flex: { flex: 1 },
+    pressed: { opacity: 0.6 },
+    safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: CARD },
+    header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    headerStart: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: SOFT },
+    newChatIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    headerPill: { flexShrink: 1, maxWidth: '62%', paddingHorizontal: 12, height: 32, borderRadius: 8, backgroundColor: SOFT, justifyContent: 'center' },
+    headerPillText: { color: INK, fontSize: 13, fontWeight: '500' },
+    headerPillMuted: { color: MUTED, fontWeight: '400' },
+    panel: { flex: 1 },
+    messages: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, gap: 22 },
+    emptyList: { flexGrow: 1, justifyContent: 'center' },
+    welcome: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12 },
+    welcomeArt: { width: 148, height: 148, marginBottom: 4 },
+    welcomeTitle: { fontFamily: Fonts?.serif, fontSize: 26, lineHeight: 34, color: INK, textAlign: 'center', letterSpacing: -0.3 },
+    welcomeSubtitle: { fontSize: 14, lineHeight: 21, color: MUTED, marginTop: 8, maxWidth: 270, textAlign: 'center' },
+    starterChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 26, maxWidth: 340 },
+    starterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
+    starterTitle: { color: BODY, fontSize: 13, fontWeight: '500' },
+    holdingsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 22, width: '100%', maxWidth: 340, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: LINE, backgroundColor: CARD },
+    holdingsTitle: { color: INK, fontSize: 14, fontWeight: '600' },
+    holdingsHint: { color: MUTED, fontSize: 12, lineHeight: 17, marginTop: 2 },
+    holdingsAction: { color: INK, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
+    promptLabel: { fontSize: 12, color: MUTED, fontWeight: '500' },
+    userMessage: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 14, backgroundColor: dark ? Palette.purpleMuted : '#EFE8FF', paddingHorizontal: 14, paddingVertical: 10 },
+    messageText: { color: INK, fontSize: 14, lineHeight: 21 },
+    assistantMessage: { gap: 6, paddingRight: 8 },
+    streamingDot: { alignSelf: 'flex-start' },
+    responseStatus: { fontSize: 11, color: MUTED, fontStyle: 'italic', marginTop: 3 },
+    loading: { paddingVertical: 50, alignItems: 'center', gap: 15 }, muted: { color: MUTED, fontSize: 13 },
+    instrumentSection: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }, instrumentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: CARD, paddingLeft: 12, paddingRight: 5, paddingVertical: 4 },
+    exchange: { color: MUTED, fontSize: 10, fontWeight: '600', letterSpacing: 0.4 }, symbolInput: { flex: 1, minWidth: 50, fontSize: 13, color: INK, paddingVertical: 10, paddingHorizontal: 6, minHeight: 40 },
+    analyzeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, backgroundColor: INK, borderRadius: 8 }, analyzeText: { color: ON_SOLID, fontSize: 12, fontWeight: '600' },
+    instrumentHint: { fontSize: 11, lineHeight: 16, color: MUTED, paddingTop: 7 },
+    composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
+    // Pill composer: round "+" (modes and tools) · message · round send/stop. Buttons stay at the bottom as the message grows.
+    composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: 30, backgroundColor: dark ? '#2A1820' : '#FFF2F6', borderWidth: 1, borderColor: dark ? '#4A2A38' : '#F1CAD8', boxShadow: '0 2px 10px rgba(180,72,112,0.08)' },
+    roundButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    plusButton: { backgroundColor: dark ? '#3A2230' : '#F8DFE8' },
+    plusButtonOpen: { backgroundColor: dark ? '#4A2A3A' : '#F2CEDC' },
+    plus: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+    plusOpen: { transform: [{ rotate: '45deg' }] },
+    plusBarH: { position: 'absolute', width: 18, height: 2, borderRadius: 1, backgroundColor: INK },
+    plusBarV: { position: 'absolute', width: 2, height: 18, borderRadius: 1, backgroundColor: INK },
+    input: { flex: 1, color: INK, fontSize: 16, lineHeight: 22, minHeight: 44, maxHeight: 120, paddingHorizontal: 6, paddingTop: 11, paddingBottom: 11 },
+    sendButton: { backgroundColor: INK },
+    sendDisabled: { backgroundColor: dark ? '#33202A' : '#F4DDE5' },
+    arrow: { width: 18, height: 18, alignItems: 'center' },
+    arrowHead: { position: 'absolute', top: 2, width: 10, height: 10, borderTopWidth: 2.2, borderLeftWidth: 2.2, borderColor: ON_SOLID, transform: [{ rotate: '45deg' }] },
+    arrowStem: { position: 'absolute', top: 2, bottom: 1, width: 2.2, borderRadius: 1.1, backgroundColor: ON_SOLID },
+    arrowMuted: { borderColor: MUTED },
+    arrowStemMuted: { backgroundColor: MUTED },
+    stopGlyph: { height: 12, width: 12, borderRadius: 3, backgroundColor: ON_SOLID },
+    disabled: { opacity: 0.4 },
+    modeTagRow: { flexDirection: 'row', paddingHorizontal: 6, paddingBottom: 6 },
+    modeTag: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 10, paddingRight: 8, height: 26, borderRadius: 13, backgroundColor: dark ? Palette.purpleMuted : '#EFE8FF' },
+    modeTagText: { color: dark ? Palette.purple : '#4C3DB8', fontSize: 12, fontWeight: '600' },
+    modeTagClose: { color: dark ? Palette.purple : '#4C3DB8', fontSize: 16, lineHeight: 18 },
+    modeMenu: { position: 'absolute', left: 12, bottom: '100%', width: 268, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, boxShadow: '0 8px 24px rgba(31,31,30,0.10)', zIndex: 10 },
+    modeOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 12, minHeight: 44 },
+    modeOptionPressed: { backgroundColor: PAGE },
+    modeOptionLabel: { color: INK, fontSize: 14, fontWeight: '500' },
+    modeOptionHint: { color: MUTED, fontSize: 12, marginTop: 2 },
+    modeCheck: { color: INK, fontSize: 14, fontWeight: '600' },
+    menuDivider: { height: StyleSheet.hairlineWidth, backgroundColor: LINE, marginVertical: 4, marginHorizontal: 8 },
+    disclaimer: { textAlign: 'center', color: MUTED, fontSize: 10, lineHeight: 15, paddingTop: 8, paddingBottom: 2 },
+    errorBox: { padding: 10, backgroundColor: Palette.redMuted, borderRadius: 9, marginHorizontal: 16, marginTop: 6 }, errorText: { color: dark ? InsightPalette.red : '#B91C1C', fontSize: 12, lineHeight: 17 },
+    restart: { minHeight: 44, flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center', marginHorizontal: 16 }, restartText: { color: INK, fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
+    modalBackdrop: { backgroundColor: Palette.overlay },
+    drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: PAGE, boxShadow: '8px 0 32px rgba(31,31,30,0.12)' },
+    drawerContent: { flex: 1, paddingHorizontal: 18 },
+    drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 20, gap: 8 }, drawerTitle: { fontFamily: Fonts?.serif, fontSize: 20, color: INK, flex: 1 }, closeGlyph: { fontSize: 22, color: INK },
+    newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, borderRadius: 10, paddingHorizontal: 13, backgroundColor: SOFT }, newChatText: { color: INK, fontSize: 13, fontWeight: '500' },
+    historySearch: { paddingHorizontal: 13, paddingVertical: 12, minHeight: 44, marginTop: 12, borderWidth: 1, borderColor: LINE, backgroundColor: CARD, borderRadius: 10, color: INK, fontSize: 13 },
+    historyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, refreshButton: { padding: 12 }, refreshText: { color: MUTED, fontSize: 12 }, historyList: { gap: 4, paddingTop: 5, paddingBottom: 20 },
+    historyItem: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 10 }, activeHistoryItem: { backgroundColor: SOFT }, historyTitle: { color: BODY, fontSize: 14, lineHeight: 20 }, historyKind: { color: MUTED, fontSize: 11, marginTop: 4 }, confirmItem: { backgroundColor: CARD, borderWidth: 1, borderColor: LINE, gap: 8 }, confirmTitle: { color: INK, fontSize: 14, fontWeight: '600' },
+    confirmButton: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }, confirmCancel: { color: BODY, fontSize: 13, fontWeight: '500' },
+    deleteButton: { backgroundColor: '#DC2626' }, deleteText: { color: Palette.onAccent, fontSize: 13, fontWeight: '600' },
+    emptyHistory: { color: MUTED, fontSize: 13, lineHeight: 20, paddingVertical: 25 }, historyLoading: { marginTop: 30 },
+  };
 });

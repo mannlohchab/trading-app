@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { memo, useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { Help } from '@/components/backtesting/BacktestUi';
+import { makeStyles } from '@/hooks/use-theme';
 import { RunTicket } from '@/components/backtesting/RunTicket';
 import { metricText } from '@/lib/backtesting';
 import { bandTone, signedPercent, statusPill, ticketDate, ticketMarket } from '@/lib/runTicket';
@@ -14,6 +15,7 @@ import { useAuth } from '@/store/auth';
 
 /** References persisted jobs, so a card stays useful after a queued chat response finishes. */
 export const AiResearchRunCard = memo(function AiResearchRunCard({ run }: { run: AiResearchRun }) {
+  const styles = useStyles();
   const userId = useAuth(state => state.user?.id);
   const [focused, setFocused] = useState(false);
   useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
@@ -54,7 +56,7 @@ export const AiResearchRunCard = memo(function AiResearchRunCard({ run }: { run:
   </View>;
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_Palette, InsightPalette) => ({
   wrap: { marginTop: 12 },
-  error: { color: '#DC2626', fontSize: 12, lineHeight: 18 },
-});
+  error: { color: InsightPalette.red, fontSize: 12, lineHeight: 18 },
+}));

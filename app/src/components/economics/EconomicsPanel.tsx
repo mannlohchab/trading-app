@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Linking, Pressable, ScrollView, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette } from '@/hooks/use-theme';
 import { IndicatorTable } from '@/components/economics/IndicatorTable';
 import { api } from '@/lib/api';
 import { calendarDate, economicTime, economicValue, type EconomicCalendarEvent, type EconomicData, type EconomicIndicator, type EconomicNews, type EconomicsMode } from '@/lib/economics';
@@ -16,6 +16,8 @@ const INDICATORS = [
 ];
 type Item = EconomicCalendarEvent | EconomicIndicator | EconomicNews;
 export function EconomicsPanel({ mode }: { mode: EconomicsMode }) {
+  const styles = useStyles();
+  const P = useInsightPalette();
   const [calendarSource, setCalendarSource] = useState('Releases');
   const [offset, setOffset] = useState(0);
   const [span, setSpan] = useState('7 days');
@@ -107,13 +109,13 @@ export function EconomicsPanel({ mode }: { mode: EconomicsMode }) {
     </View>}
   />;
 }
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_palette, P, scheme) => ({
   flex: { flex: 1 }, list: { paddingBottom: 24 }, controls: { paddingHorizontal: 16, gap: 12, paddingBottom: 16 },
   search: { minHeight: 44, borderWidth: 1, borderColor: P.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: P.card, color: P.text, fontSize: 14 },
   chips: { gap: 8 }, chip: { minHeight: 40, justifyContent: 'center', borderWidth: 1, borderColor: P.border, paddingHorizontal: 12, borderRadius: 20, backgroundColor: P.card }, chipSelected: { backgroundColor: P.text }, white: { color: P.onSolid },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 }, dateButton: { width: 40, minHeight: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: P.soft, borderRadius: 8 }, dateLabel: { flex: 1, alignItems: 'center', minHeight: 44, justifyContent: 'center' }, link: { color: P.text, fontSize: 24 },
-  sourceBox: { gap: 6 }, source: { color: P.text, fontSize: 12, textDecorationLine: 'underline' }, sourceButton: { minHeight: 40, justifyContent: 'center' }, small: { color: P.textSecondary, fontSize: 12, lineHeight: 18 }, warning: { color: '#A23E3E', fontSize: 12, lineHeight: 18 },
+  sourceBox: { gap: 6 }, source: { color: P.text, fontSize: 12, textDecorationLine: 'underline' }, sourceButton: { minHeight: 40, justifyContent: 'center' }, small: { color: P.textSecondary, fontSize: 12, lineHeight: 18 }, warning: { color: scheme === 'dark' ? '#E58A8A' : '#A23E3E', fontSize: 12, lineHeight: 18 },
   card: { marginHorizontal: 16, marginBottom: 12, padding: 16, borderRadius: 16, backgroundColor: P.card, borderWidth: 1, borderColor: P.border, gap: 7 },
   meta: { color: P.textMuted, fontSize: 12, lineHeight: 17 }, title: { color: P.text, fontSize: 17, fontWeight: '600', lineHeight: 23 },
   values: { flexDirection: 'row', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: P.border, marginTop: 4 }, valueCell: { flex: 1, gap: 5 }, value: { color: P.text, fontSize: 16, lineHeight: 22 }, loading: { padding: 32 },
-});
+}));

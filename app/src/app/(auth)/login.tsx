@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { Link, router, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useCallback, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/ui/AppText';
@@ -11,8 +11,12 @@ import { authClient } from '@/lib/authClient';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { demoApi } from '@/lib/demoData';
 import { useAuth, type User } from '@/store/auth';
+import { makeStyles, useColorScheme, usePalette } from '@/hooks/use-theme';
 
 export default function LoginScreen() {
+  const styles = useStyles();
+  const Palette = usePalette();
+  const scheme = useColorScheme();
   const setSession = useAuth((s) => s.setSession);
   const refresh = useAuth((s) => s.refresh);
   const [showLogin, setShowLogin] = useState(false);
@@ -27,9 +31,10 @@ export default function LoginScreen() {
   const onSignInSuccess = useCallback(() => router.replace(nextRoute.current), []);
 
   useFocusEffect(useCallback(() => {
-    setStatusBarStyle('dark');
-    return () => setStatusBarStyle('dark');
-  }, []));
+    const style = scheme === 'dark' ? 'light' : 'dark';
+    setStatusBarStyle(style);
+    return () => setStatusBarStyle(style);
+  }, [scheme]));
 
   async function onSubmit() {
     if (submitting.current) return false;
@@ -90,7 +95,7 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   value={email}
                   onChangeText={setEmail}
-                  placeholderTextColor="#9A9FB0"
+                  placeholderTextColor={Palette.textMuted}
                   autoComplete="email"
                   placeholder="you@email.com"
                 />
@@ -101,7 +106,7 @@ export default function LoginScreen() {
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
-                  placeholderTextColor="#9A9FB0"
+                  placeholderTextColor={Palette.textMuted}
                   autoComplete="current-password"
                   returnKeyType="go"
                   onSubmitEditing={() => { void swipeButton.current?.submit(); }}
@@ -161,101 +166,104 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F2EDEA' },
-  safe: { flex: 1 },
-  wrap: { flexGrow: 1, maxWidth: 460, width: '100%', alignSelf: 'center' },
-  loginWrap: { justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
-  welcome: { flexGrow: 1, paddingBottom: 12 },
-  wordmark: {
-    color: '#16181D',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.3,
-    textAlign: 'center',
-    paddingTop: 8,
-  },
-  stage: { flex: 1, minHeight: 280 },
-  hero: { width: '86%', height: '86%', alignSelf: 'center', marginTop: '6%' },
-  orbit: { position: 'absolute' },
-  chart: { width: '30%', aspectRatio: 1, top: '2%', left: '1%' },
-  piggy: { width: '32%', aspectRatio: 1, top: '4%', right: '0%' },
-  cash: { width: '24%', aspectRatio: 1, bottom: '14%', left: '3%' },
-  wallet: { width: '34%', aspectRatio: 670 / 663, bottom: '8%', right: '0%' },
-  copy: { paddingHorizontal: 22, paddingBottom: 8 },
-  title: {
-    color: '#16181D',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '600',
-    letterSpacing: -1.1,
-    textAlign: 'center',
-  },
-  titleSoft: {
-    color: '#16181D',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '400',
-    letterSpacing: -1.1,
-    textAlign: 'center',
-  },
-  description: {
-    color: '#5C6578',
-    fontSize: 15,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 22,
-    paddingHorizontal: 12,
-  },
-  primary: {
-    backgroundColor: '#16181D',
-    borderRadius: 14,
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#16181D',
-  },
-  primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  secondary: {
-    marginTop: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#E4DDD8',
-  },
-  secondaryText: { color: '#16181D', fontSize: 16, fontWeight: '600' },
-  focused: { borderColor: '#0066FF' },
-  pressed: { opacity: 0.72 },
-  form: {
-    gap: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#E6E8F0',
-  },
-  backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 16 },
-  backText: { color: '#0066FF', fontSize: 15, fontWeight: '600' },
-  formTitle: { color: '#16181D', fontSize: 30, fontWeight: '600', letterSpacing: -0.8 },
-  formSubtitle: { color: '#5C6578', fontSize: 15, marginBottom: 8 },
-  label: { color: '#5C6578', fontSize: 13, fontWeight: '600', marginTop: 6 },
-  input: {
-    backgroundColor: '#F7F4F2',
-    borderWidth: 1,
-    borderColor: '#E3E6F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#16181D',
-    fontSize: 16,
-    minHeight: 48,
-  },
-  error: { color: '#E11D48', marginTop: 4 },
-  hint: { color: '#5C6578', fontSize: 12, textAlign: 'center', marginTop: 12 },
-  link: { color: '#0066FF', textAlign: 'center', marginTop: 8, fontWeight: '600', paddingVertical: 12 },
+const useStyles = makeStyles((Palette, _, scheme) => {
+  const dark = scheme === 'dark';
+  return {
+    screen: { flex: 1, backgroundColor: dark ? Palette.bg : '#F2EDEA' },
+    safe: { flex: 1 },
+    wrap: { flexGrow: 1, maxWidth: 460, width: '100%', alignSelf: 'center' },
+    loginWrap: { justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
+    welcome: { flexGrow: 1, paddingBottom: 12 },
+    wordmark: {
+      color: Palette.text,
+      fontSize: 16,
+      fontWeight: '600',
+      letterSpacing: -0.3,
+      textAlign: 'center',
+      paddingTop: 8,
+    },
+    stage: { flex: 1, minHeight: 280 },
+    hero: { width: '86%', height: '86%', alignSelf: 'center', marginTop: '6%' },
+    orbit: { position: 'absolute' },
+    chart: { width: '30%', aspectRatio: 1, top: '2%', left: '1%' },
+    piggy: { width: '32%', aspectRatio: 1, top: '4%', right: '0%' },
+    cash: { width: '24%', aspectRatio: 1, bottom: '14%', left: '3%' },
+    wallet: { width: '34%', aspectRatio: 670 / 663, bottom: '8%', right: '0%' },
+    copy: { paddingHorizontal: 22, paddingBottom: 8 },
+    title: {
+      color: Palette.text,
+      fontSize: 34,
+      lineHeight: 38,
+      fontWeight: '600',
+      letterSpacing: -1.1,
+      textAlign: 'center',
+    },
+    titleSoft: {
+      color: Palette.text,
+      fontSize: 34,
+      lineHeight: 38,
+      fontWeight: '400',
+      letterSpacing: -1.1,
+      textAlign: 'center',
+    },
+    description: {
+      color: dark ? Palette.textSecondary : '#5C6578',
+      fontSize: 15,
+      lineHeight: 21,
+      textAlign: 'center',
+      marginTop: 12,
+      marginBottom: 22,
+      paddingHorizontal: 12,
+    },
+    primary: {
+      backgroundColor: Palette.inverse,
+      borderRadius: 14,
+      minHeight: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: Palette.inverse,
+    },
+    primaryText: { color: Palette.onInverse, fontSize: 16, fontWeight: '600' },
+    secondary: {
+      marginTop: 10,
+      backgroundColor: Palette.card,
+      borderRadius: 14,
+      minHeight: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: dark ? Palette.border : '#E4DDD8',
+    },
+    secondaryText: { color: Palette.text, fontSize: 16, fontWeight: '600' },
+    focused: { borderColor: Palette.accent },
+    pressed: { opacity: 0.72 },
+    form: {
+      gap: 10,
+      backgroundColor: Palette.card,
+      borderRadius: 24,
+      padding: 22,
+      borderWidth: 1,
+      borderColor: dark ? Palette.border : '#E6E8F0',
+    },
+    backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 16 },
+    backText: { color: Palette.accent, fontSize: 15, fontWeight: '600' },
+    formTitle: { color: Palette.text, fontSize: 30, fontWeight: '600', letterSpacing: -0.8 },
+    formSubtitle: { color: dark ? Palette.textSecondary : '#5C6578', fontSize: 15, marginBottom: 8 },
+    label: { color: dark ? Palette.textSecondary : '#5C6578', fontSize: 13, fontWeight: '600', marginTop: 6 },
+    input: {
+      backgroundColor: dark ? Palette.bg : '#F7F4F2',
+      borderWidth: 1,
+      borderColor: Palette.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      color: Palette.text,
+      fontSize: 16,
+      minHeight: 48,
+    },
+    error: { color: Palette.red, marginTop: 4 },
+    hint: { color: dark ? Palette.textSecondary : '#5C6578', fontSize: 12, textAlign: 'center', marginTop: 12 },
+    link: { color: Palette.accent, textAlign: 'center', marginTop: 8, fontWeight: '600', paddingVertical: 12 },
+  };
 });

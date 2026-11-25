@@ -6,12 +6,9 @@ import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-
 import type { QuoteLike } from '@/components/markets/InstrumentRow';
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette, usePalette } from '@/hooks/use-theme';
 import { formatMarketPrice, formatPct } from '@/lib/format';
 
-/** Same green/red as the chart page, so price direction reads the same everywhere. */
-const UP = '#089981';
-const DOWN = '#F23645';
 const ICON = 44;
 
 export type QuoteSection = { key: string; title: string; note?: string; data: QuoteLike[] };
@@ -21,7 +18,11 @@ function signed(value: number, quote: QuoteLike) {
 }
 
 const QuoteRow = memo(function QuoteRow({ quote, last }: { quote: QuoteLike; last: boolean }) {
-  const color = quote.change > 0 ? UP : quote.change < 0 ? DOWN : P.textSecondary;
+  const styles = useStyles();
+  const Palette = usePalette();
+  const P = useInsightPalette();
+  // Same green/red as the chart page, so price direction reads the same everywhere.
+  const color = quote.change > 0 ? Palette.chartUp : quote.change < 0 ? Palette.chartDown : P.textSecondary;
   return (
     <Pressable
       accessibilityRole="button"
@@ -54,6 +55,8 @@ type Props = {
 
 /** Watchlist-style grouped quotes: collapsible sections, icon + symbol/name, price + change. */
 export function MarketQuoteList({ sections, refreshing = false, onRefresh }: Props) {
+  const styles = useStyles();
+  const P = useInsightPalette();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const visible = sections.filter(section => section.data.length || section.note);
   return (
@@ -91,7 +94,7 @@ export function MarketQuoteList({ sections, refreshing = false, onRefresh }: Pro
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_palette, P) => ({
   content: { paddingBottom: 24 },
   pressed: { opacity: 0.6 },
   sectionWrap: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: P.border },
@@ -110,4 +113,4 @@ const styles = StyleSheet.create({
   right: { alignItems: 'flex-end', maxWidth: '52%' },
   price: { color: P.text, fontSize: 17, fontWeight: '500', fontVariant: ['tabular-nums'] },
   change: { fontSize: 14, marginTop: 3, fontVariant: ['tabular-nums'] },
-});
+}));

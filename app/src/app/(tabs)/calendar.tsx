@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { Pressable, SectionList, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CalendarEventCard } from '@/components/calendar/CalendarEventCard';
@@ -11,6 +11,7 @@ import { Text, TextInput } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Fonts } from '@/constants/theme';
+import { makeStyles, useColorScheme, usePalette } from '@/hooks/use-theme';
 import { fetchFinancialCalendar } from '@/lib/calendarApi';
 import { calendarSections, calendarTimezone, filterCalendarEvents, toDateKey, type CalendarImpact, type CalendarView } from '@/lib/financialCalendar';
 import { useAuth } from '@/store/auth';
@@ -20,7 +21,13 @@ const IMPACTS: { value: CalendarImpact; label: string; color?: string }[] = [
   { value: 'medium', label: 'Medium', color: '#E9B16D' }, { value: 'low', label: 'Low', color: '#65B89A' },
 ];
 
+/** Solid purple behind white icons and labels; reads on both themes. */
+const PURPLE_FILL = '#6F47E9';
+
 export default function FinancialCalendarScreen() {
+  const styles = useStyles();
+  const Palette = usePalette();
+  const scheme = useColorScheme();
   const user = useAuth(s => s.user);
   const timeZone = calendarTimezone(user?.timezone);
   const [impact, setImpact] = useState<CalendarImpact>('all');
@@ -92,7 +99,7 @@ export default function FinancialCalendarScreen() {
     {filtersOpen && <View style={styles.filters}>
       <View style={styles.searchWrap}>
         <View accessible={false} pointerEvents="none" style={styles.searchIcon}><View style={styles.searchHandle} /></View>
-        <TextInput accessibilityLabel="Search calendar events or currencies" value={search} onChangeText={setSearch} autoCorrect={false} placeholder="Search events or currencies" placeholderTextColor="#96909F" style={styles.search} />
+        <TextInput accessibilityLabel="Search calendar events or currencies" value={search} onChangeText={setSearch} autoCorrect={false} placeholder="Search events or currencies" placeholderTextColor={scheme === 'dark' ? Palette.textMuted : '#96909F'} style={styles.search} />
       </View>
       <View style={styles.impactFilters}>
         {IMPACTS.map(item => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected: impact === item.value }} onPress={() => setImpact(item.value)} style={({ pressed }) => [styles.impactChip, impact === item.value && styles.impactChipActive, pressed && styles.pressed]}>
@@ -153,55 +160,58 @@ export default function FinancialCalendarScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 480, alignSelf: 'center' },
-  list: { paddingHorizontal: 20, paddingBottom: 32 },
-  agendaHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 18 },
-  agendaCopy: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 },
-  agendaTitle: { fontFamily: Fonts.sans, color: '#1C1C1E', fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.5, flexShrink: 1 },
-  eventCount: { fontFamily: Fonts.sans, color: '#AEAEB2', fontSize: 13, fontWeight: '500' },
-  filterButton: { width: 36, height: 36, backgroundColor: '#6F47E9', borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  filterIcon: { width: 18, gap: 7 },
-  filterLine: { height: 1, backgroundColor: '#FFFFFF', width: 18 },
-  filterKnobLeft: { position: 'absolute', width: 5, height: 5, borderRadius: 3, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#6F47E9', left: 4, top: -2 },
-  filterKnobRight: { position: 'absolute', width: 5, height: 5, borderRadius: 3, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#6F47E9', right: 3, top: -2 },
-  activeFilterDot: { position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: '#E3F5BB' },
-  agendaMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, flexWrap: 'wrap', paddingBottom: 4 },
-  timezoneText: { fontFamily: Fonts.sans, color: '#8E8E93', fontSize: 12, lineHeight: 16, flexShrink: 1 },
-  scopeButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  scopeText: { fontFamily: Fonts.sans, color: '#6F47E9', fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  scopeChevron: { width: 6, height: 6, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: '#6F47E9', transform: [{ rotate: '-45deg' }] },
-  filters: { paddingBottom: 12, gap: 9 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, borderRadius: 12, backgroundColor: '#F6F2FC', borderWidth: 1.5, borderColor: '#CFC5DF' },
-  searchIcon: { width: 13, height: 13, borderWidth: 1.8, borderColor: '#655D70', borderRadius: 7, marginRight: 3 },
-  searchHandle: { position: 'absolute', width: 6, height: 1.5, backgroundColor: '#655D70', right: -5, bottom: -2, transform: [{ rotate: '45deg' }] },
-  search: { fontFamily: Fonts.sans, flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 10, fontSize: 13, fontWeight: '600', color: '#2F2936' },
-  impactFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  impactChip: { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 12, gap: 6, justifyContent: 'center', borderRadius: 12, borderWidth: 1.5, borderColor: '#D8CFE5', backgroundColor: '#FFFFFF' },
-  impactChipActive: { backgroundColor: '#6F47E9', borderColor: '#6F47E9' },
-  impactDot: { width: 6, height: 6, borderRadius: 3 },
-  chipText: { fontFamily: Fonts.sans, color: '#514A59', fontSize: 12, fontWeight: '700' },
-  impactTextActive: { color: '#FFFFFF', fontWeight: '800' },
-  clearFilters: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  demoLabel: { fontFamily: Fonts.sans, color: '#918B99', fontSize: 8, lineHeight: 12, letterSpacing: 1, marginBottom: 10 },
-  provenance: { gap: 5, paddingTop: 15, marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F0F4' },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  sourceLink: { minHeight: 44, justifyContent: 'center', flexShrink: 1 },
-  sourceText: { fontFamily: Fonts.sans, color: '#77707F', fontSize: 10, lineHeight: 16, flexShrink: 1 },
-  sourceNote: { fontFamily: Fonts.sans, color: '#918B99', fontSize: 10, lineHeight: 17 },
-  meta: { fontFamily: Fonts.sans, color: '#918B99', fontSize: 10, lineHeight: 16 },
-  refresh: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 14, backgroundColor: '#F7F5FA' },
-  refreshText: { fontFamily: Fonts.sans, color: '#6F47E9', fontSize: 22, lineHeight: 28 },
-  warning: { color: '#946323' },
-  warningBanner: { fontFamily: Fonts.sans, color: '#946323', fontSize: 11, lineHeight: 18, padding: 12, borderRadius: 12, backgroundColor: '#FFF5E6', marginBottom: 10 },
-  sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 16, paddingBottom: 4 },
-  sectionTitle: { flex: 1, color: '#8E8E93', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  sectionCount: { fontFamily: Fonts.sans, color: '#AEAEB2', fontSize: 12 },
-  loading: { gap: 12, paddingTop: 12 },
-  skeleton: { height: 72, borderRadius: 16 },
-  empty: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 32, gap: 8, borderTopWidth: 1, borderTopColor: '#F1F0F4' },
-  emptyTitle: { fontFamily: Fonts.sans, fontSize: 16, fontWeight: '500', color: '#4E4658' },
-  emptyText: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 20, textAlign: 'center', color: '#918B99' },
-  emptyButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
-  pressed: { opacity: 0.55 },
+const useStyles = makeStyles((Palette, _, scheme) => {
+  const dark = scheme === 'dark';
+  return {
+    safe: { flex: 1, backgroundColor: Palette.bgElevated, width: '100%', maxWidth: 480, alignSelf: 'center' },
+    list: { paddingHorizontal: 20, paddingBottom: 32 },
+    agendaHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 18 },
+    agendaCopy: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 },
+    agendaTitle: { fontFamily: Fonts.sans, color: dark ? Palette.text : '#1C1C1E', fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.5, flexShrink: 1 },
+    eventCount: { fontFamily: Fonts.sans, color: dark ? Palette.textMuted : '#AEAEB2', fontSize: 13, fontWeight: '500' },
+    filterButton: { width: 36, height: 36, backgroundColor: PURPLE_FILL, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    filterIcon: { width: 18, gap: 7 },
+    filterLine: { height: 1, backgroundColor: Palette.onAccent, width: 18 },
+    filterKnobLeft: { position: 'absolute', width: 5, height: 5, borderRadius: 3, borderWidth: 1, borderColor: Palette.onAccent, backgroundColor: PURPLE_FILL, left: 4, top: -2 },
+    filterKnobRight: { position: 'absolute', width: 5, height: 5, borderRadius: 3, borderWidth: 1, borderColor: Palette.onAccent, backgroundColor: PURPLE_FILL, right: 3, top: -2 },
+    activeFilterDot: { position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: '#E3F5BB' },
+    agendaMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, flexWrap: 'wrap', paddingBottom: 4 },
+    timezoneText: { fontFamily: Fonts.sans, color: dark ? Palette.textSecondary : '#8E8E93', fontSize: 12, lineHeight: 16, flexShrink: 1 },
+    scopeButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    scopeText: { fontFamily: Fonts.sans, color: Palette.purple, fontSize: 13, lineHeight: 18, fontWeight: '600' },
+    scopeChevron: { width: 6, height: 6, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: Palette.purple, transform: [{ rotate: '-45deg' }] },
+    filters: { paddingBottom: 12, gap: 9 },
+    searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, borderRadius: 12, backgroundColor: dark ? Palette.purpleMuted : '#F6F2FC', borderWidth: 1.5, borderColor: dark ? '#3B3354' : '#CFC5DF' },
+    searchIcon: { width: 13, height: 13, borderWidth: 1.8, borderColor: dark ? Palette.textSecondary : '#655D70', borderRadius: 7, marginRight: 3 },
+    searchHandle: { position: 'absolute', width: 6, height: 1.5, backgroundColor: dark ? Palette.textSecondary : '#655D70', right: -5, bottom: -2, transform: [{ rotate: '45deg' }] },
+    search: { fontFamily: Fonts.sans, flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 10, fontSize: 13, fontWeight: '600', color: dark ? Palette.text : '#2F2936' },
+    impactFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    impactChip: { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 12, gap: 6, justifyContent: 'center', borderRadius: 12, borderWidth: 1.5, borderColor: dark ? '#3B3354' : '#D8CFE5', backgroundColor: Palette.card },
+    impactChipActive: { backgroundColor: PURPLE_FILL, borderColor: PURPLE_FILL },
+    impactDot: { width: 6, height: 6, borderRadius: 3 },
+    chipText: { fontFamily: Fonts.sans, color: dark ? Palette.textSecondary : '#514A59', fontSize: 12, fontWeight: '700' },
+    impactTextActive: { color: Palette.onAccent, fontWeight: '800' },
+    clearFilters: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+    demoLabel: { fontFamily: Fonts.sans, color: dark ? Palette.textMuted : '#918B99', fontSize: 8, lineHeight: 12, letterSpacing: 1, marginBottom: 10 },
+    provenance: { gap: 5, paddingTop: 15, marginTop: 12, borderTopWidth: 1, borderTopColor: dark ? Palette.borderSubtle : '#F1F0F4' },
+    sourceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+    sourceLink: { minHeight: 44, justifyContent: 'center', flexShrink: 1 },
+    sourceText: { fontFamily: Fonts.sans, color: dark ? Palette.textSecondary : '#77707F', fontSize: 10, lineHeight: 16, flexShrink: 1 },
+    sourceNote: { fontFamily: Fonts.sans, color: dark ? Palette.textMuted : '#918B99', fontSize: 10, lineHeight: 17 },
+    meta: { fontFamily: Fonts.sans, color: dark ? Palette.textMuted : '#918B99', fontSize: 10, lineHeight: 16 },
+    refresh: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 14, backgroundColor: dark ? Palette.pill : '#F7F5FA' },
+    refreshText: { fontFamily: Fonts.sans, color: Palette.purple, fontSize: 22, lineHeight: 28 },
+    warning: { color: dark ? Palette.yellow : '#946323' },
+    warningBanner: { fontFamily: Fonts.sans, color: dark ? Palette.yellow : '#946323', fontSize: 11, lineHeight: 18, padding: 12, borderRadius: 12, backgroundColor: dark ? '#2A2010' : '#FFF5E6', marginBottom: 10 },
+    sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 16, paddingBottom: 4 },
+    sectionTitle: { flex: 1, color: dark ? Palette.textSecondary : '#8E8E93', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '600' },
+    sectionCount: { fontFamily: Fonts.sans, color: dark ? Palette.textMuted : '#AEAEB2', fontSize: 12 },
+    loading: { gap: 12, paddingTop: 12 },
+    skeleton: { height: 72, borderRadius: 16 },
+    empty: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 32, gap: 8, borderTopWidth: 1, borderTopColor: dark ? Palette.borderSubtle : '#F1F0F4' },
+    emptyTitle: { fontFamily: Fonts.sans, fontSize: 16, fontWeight: '500', color: dark ? Palette.text : '#4E4658' },
+    emptyText: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 20, textAlign: 'center', color: dark ? Palette.textMuted : '#918B99' },
+    emptyButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+    pressed: { opacity: 0.55 },
+  };
 });

@@ -3,12 +3,13 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/AppText';
-import { Palette } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 
 type Props = { visible: boolean; onClose: () => void };
 
 /** Opening offer. The gift is the visual; the balance is the paper account people already receive. */
 export function WelcomeGift({ visible, onClose }: Props) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
@@ -32,19 +33,19 @@ export function WelcomeGift({ visible, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette, _insight, scheme) => ({
   backdrop: { flex: 1, justifyContent: 'flex-end' },
   card: {
-    width: '100%', borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: '#FFFFFF',
+    width: '100%', borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: Palette.card,
     alignItems: 'center', paddingHorizontal: 22, paddingTop: 18, overflow: 'hidden',
   },
-  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: 150, backgroundColor: '#F4F1FF' },
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: 150, backgroundColor: scheme === 'dark' ? Palette.purpleMuted : '#F4F1FF' },
   close: { position: 'absolute', top: 10, right: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   closeGlyph: { color: Palette.textSecondary, fontSize: 28, lineHeight: 30 },
   gift: { width: 168, height: 168, marginTop: 8 },
   title: { color: Palette.text, fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.4, textAlign: 'center', marginTop: 4 },
   body: { color: Palette.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 6, maxWidth: 280 },
-  button: { alignSelf: 'stretch', minHeight: 52, borderRadius: 26, backgroundColor: '#16181D', alignItems: 'center', justifyContent: 'center', marginTop: 22 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  button: { alignSelf: 'stretch', minHeight: 52, borderRadius: 26, backgroundColor: Palette.inverse, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
+  buttonText: { color: Palette.onInverse, fontSize: 16, fontWeight: '700' },
   pressed: { opacity: 0.7 },
-});
+}));

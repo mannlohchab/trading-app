@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StockPreviewChart } from '@/components/charts/StockPreviewChart';
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
-import { Palette } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { fetchHistory, fetchQuote } from '@/lib/marketData';
 import { useLiveMarket } from '@/hooks/use-live-market';
 import { DEMO_MODE } from '@/lib/demoMode';
@@ -19,6 +19,8 @@ import { buildPreviewChart, PREVIEW_RANGES, type PreviewRange } from '@/lib/stoc
 const date = (time: number) => new Date(time * 1000).toLocaleDateString('en-US', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function StockDetailScreen() {
+  const styles = useStyles();
+  const Palette = usePalette();
   const params = useLocalSearchParams<{ symbol: string; exchange?: string; name?: string }>();
   const symbol = String(params.symbol ?? 'BTCUSDT').toUpperCase();
   const exchange = String(params.exchange ?? 'BINANCE').toUpperCase();
@@ -86,7 +88,7 @@ export default function StockDetailScreen() {
             </Pressable>)}
           </View>
           {chart ? <StockPreviewChart key={`${symbol}-${exchange}-${range}`} chart={chart} metadata={metadata} /> : <View style={styles.chartEmpty}>
-            {historyQuery.isPending ? <ActivityIndicator color="#0066ff" /> : null}
+            {historyQuery.isPending ? <ActivityIndicator color={Palette.accent} /> : null}
             <Text style={styles.emptyText}>{historyQuery.isPending ? 'Loading price history…' : historyQuery.isError ? 'Price history is temporarily unavailable' : 'Not enough price history for this range'}</Text>
             {historyQuery.isError ? <Pressable onPress={() => void historyQuery.refetch()} accessibilityRole="button"><Text style={styles.retry}>Try again</Text></Pressable> : null}
           </View>}
@@ -110,7 +112,7 @@ export default function StockDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   safe: { flex: 1, backgroundColor: Palette.bg },
   page: { flex: 1, width: '100%', maxWidth: 620, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
@@ -134,10 +136,10 @@ const styles = StyleSheet.create({
   range: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
   rangeActive: { backgroundColor: Palette.card },
   rangeText: { fontSize: 14, color: Palette.textSecondary },
-  rangeTextActive: { color: '#0052D6', fontWeight: '600' },
+  rangeTextActive: { color: Palette.accentText, fontWeight: '600' },
   chartEmpty: { height: 245, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { color: Palette.textMuted, fontSize: 14, textAlign: 'center' },
-  retry: { color: '#0052D6', fontSize: 13, paddingVertical: 8 },
+  retry: { color: Palette.accentText, fontSize: 13, paddingVertical: 8 },
   historyInfo: { marginTop: 12, gap: 4, marginBottom: 20 },
   historyCaption: { color: Palette.textMuted, fontSize: 12 },
   stats: { backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border, borderRadius: 18, padding: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
@@ -145,6 +147,6 @@ const styles = StyleSheet.create({
   statLabel: { color: Palette.textSecondary, fontSize: 13 },
   statValue: { color: Palette.text, fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
   footer: { paddingHorizontal: 20, paddingBottom: 18, paddingTop: 12 },
-  openButton: { backgroundColor: Palette.card, borderRadius: 14, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1, borderColor: '#0066FF', overflow: 'hidden' },
-  openText: { color: '#0052D6', fontSize: 17, fontWeight: '600' },
-});
+  openButton: { backgroundColor: Palette.card, borderRadius: 14, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1, borderColor: Palette.accent, overflow: 'hidden' },
+  openText: { color: Palette.accentText, fontSize: 17, fontWeight: '600' },
+}));

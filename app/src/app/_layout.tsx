@@ -3,15 +3,17 @@ import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
 import { LaunchSplash } from '@/components/auth/LaunchSplash';
 import { UpdateBanner } from '@/components/ui/UpdateBanner';
-import { AppFont, Palette } from '@/constants/theme';
+import { AppFont } from '@/constants/theme';
+import { useColorScheme, usePalette } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth';
 import { setAuthProblemHandler } from '@/lib/api';
 import { DEMO_MODE } from '@/lib/demoMode';
+import { useThemeStore } from '@/store/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,10 +26,23 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const hydrated = useAuth((s) => s.hydrated);
+  const themeHydrated = useThemeStore((s) => s.hydrated);
+  const scheme = useColorScheme();
+  const Palette = usePalette();
 
   useEffect(() => {
-    void hydrate().finally(() => SplashScreen.hideAsync());
+    // Read the saved theme before the first frame so dark mode never flashes light.
+    void Promise.all([hydrate(), useThemeStore.getState().hydrate()]).finally(() => SplashScreen.hideAsync());
   }, [hydrate]);
+
+  // Web: the page behind the app, scrollbars and form controls follow the theme too.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    document.documentElement.style.colorScheme = scheme;
+    document.documentElement.style.background = Palette.bg;
+    document.body.style.background = Palette.bg;
+    document.body.style.color = Palette.text;
+  }, [scheme, Palette]);
 
   // The backend ended the session, or the account still needs its phone verified.
   useEffect(() => {
@@ -44,12 +59,12 @@ export default function RootLayout() {
     return () => setAuthProblemHandler(undefined);
   }, []);
 
-  if (!hydrated) return null;
+  if (!hydrated || !themeHydrated) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
       <View style={{ flex: 1, backgroundColor: Palette.bg }}>
-      <StatusBar style="dark" />
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <View style={{ flex: 1 }}>
       <Stack
         screenOptions={{
@@ -79,7 +94,7 @@ export default function RootLayout() {
       <UpdateBanner />
       </View>
       {DEMO_MODE && <View style={{ backgroundColor: Palette.card, paddingVertical: 6, paddingHorizontal: 12 }}>
-        <Text style={{ color: '#0052D6', fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
+        <Text style={{ color: Palette.accentText, fontSize: 10, textAlign: 'center' }}>Demo preview · Sample data · Changes reset on reload</Text>
       </View>}
       </View>
     </QueryClientProvider>

@@ -1,10 +1,11 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/ui/AppText';
-import { Palette, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { authClient } from '@/lib/authClient';
 import { useAuth } from '@/store/auth';
 
@@ -12,6 +13,8 @@ const E164 = /^\+[1-9]\d{7,14}$/;
 
 /** Step two of sign-up: the backend activates an account once a phone number is verified by OTP. */
 export default function VerifyPhoneScreen() {
+  const styles = useStyles();
+  const Palette = usePalette();
   const user = useAuth((s) => s.user);
   const refresh = useAuth((s) => s.refresh);
   const signOut = useAuth((s) => s.signOut);
@@ -94,7 +97,7 @@ export default function VerifyPhoneScreen() {
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
           <Pressable accessibilityRole="button" style={[styles.button, loading && styles.disabled]} disabled={loading}
             onPress={() => void (sentTo ? verify() : sendCode())}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{sentTo ? 'Verify' : 'Send code'}</Text>}
+            {loading ? <ActivityIndicator color={Palette.onAccent} /> : <Text style={styles.buttonText}>{sentTo ? 'Verify' : 'Send code'}</Text>}
           </Pressable>
           {sentTo ? (
             <Pressable accessibilityRole="button" disabled={loading || cooldown > 0} onPress={() => void sendCode()}>
@@ -110,7 +113,7 @@ export default function VerifyPhoneScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   safe: { flex: 1, backgroundColor: Palette.bg },
   wrap: { flex: 1, padding: Spacing.four, justifyContent: 'center', maxWidth: 420, width: '100%', alignSelf: 'center' },
   brand: { color: Palette.text, fontSize: 28, fontWeight: '800' },
@@ -123,9 +126,9 @@ const styles = StyleSheet.create({
   },
   code: { fontSize: 22, letterSpacing: 6, fontVariant: ['tabular-nums'] },
   button: { marginTop: Spacing.three, backgroundColor: Palette.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  buttonText: { color: Palette.onAccent, fontWeight: '700', fontSize: 16 },
   disabled: { opacity: 0.5 },
   error: { color: Palette.red, marginTop: 8 },
   link: { color: Palette.accent, textAlign: 'center', marginTop: 16, fontWeight: '600', paddingVertical: 8 },
   secondaryLink: { color: Palette.textSecondary, textAlign: 'center', marginTop: 4, paddingVertical: 8 },
-});
+}));

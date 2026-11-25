@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 
+import { makeStyles } from '@/hooks/use-theme';
 import { formatMarketPrice, type PriceMetadata } from '@/lib/format';
 import { buildPreviewChart, nearestChartPoint, previewLineSegments } from '@/lib/stockPreview';
 
@@ -9,6 +10,7 @@ type Chart = NonNullable<ReturnType<typeof buildPreviewChart>>;
 const CHART_HEIGHT = 210;
 
 export function StockPreviewChart({ chart, metadata }: { chart: Chart; metadata?: PriceMetadata }) {
+  const styles = useStyles();
   const [width, setWidth] = useState(280);
   const [selectedTime, setSelectedTime] = useState<number>();
   const selected = chart.points.find(p => p.time === selectedTime) ?? chart.points[chart.points.length - 1];
@@ -69,19 +71,20 @@ export function StockPreviewChart({ chart, metadata }: { chart: Chart; metadata?
   );
 }
 
-const styles = StyleSheet.create({
-  card: { marginTop: 18, padding: 14, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E3E6F0' },
-  heading: { fontSize: 16, fontWeight: '600', color: '#16181D' },
+const useStyles = makeStyles((Palette, _insight, scheme) => ({
+  card: { marginTop: 18, padding: 14, borderRadius: 18, backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border },
+  heading: { fontSize: 16, fontWeight: '600', color: Palette.text },
   chart: { flexDirection: 'row', height: CHART_HEIGHT, marginTop: 34, marginBottom: 14 },
   axis: { width: 68, justifyContent: 'space-between', paddingRight: 8, marginTop: -5, marginBottom: -5 },
-  axisText: { color: '#6B7185', fontSize: 12, fontVariant: ['tabular-nums'] },
-  plot: { flex: 1, marginRight: 5, backgroundColor: '#FFFFFF' },
-  line: { position: 'absolute', height: 2, borderRadius: 1, backgroundColor: '#0066FF' },
+  axisText: { color: Palette.textSecondary, fontSize: 12, fontVariant: ['tabular-nums'] },
+  plot: { flex: 1, marginRight: 5, backgroundColor: Palette.card },
+  line: { position: 'absolute', height: 2, borderRadius: 1, backgroundColor: Palette.accent },
   timeAxis: { flexDirection: 'row', justifyContent: 'space-between', marginLeft: 68, marginRight: 5, marginBottom: 16 },
-  grid: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#E3E6F0' },
-  cursor: { position: 'absolute', bottom: 0, width: 1, backgroundColor: '#8DB5FF' },
-  dot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, marginLeft: -4.5, marginTop: -4.5, backgroundColor: '#0066ff', borderWidth: 2, borderColor: '#FFFFFF' },
-  bubble: { position: 'absolute', width: 92, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 16, backgroundColor: '#16181D' },
-  bubbleText: { color: '#FFFFFF', textAlign: 'center', fontSize: 12, fontWeight: '600' },
-  selected: { color: '#6B7185', fontSize: 12, textAlign: 'right', marginRight: 5 },
-});
+  grid: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: Palette.border },
+  // No token for the pale-blue cursor line.
+  cursor: { position: 'absolute', bottom: 0, width: 1, backgroundColor: scheme === 'dark' ? '#2F5594' : '#8DB5FF' },
+  dot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, marginLeft: -4.5, marginTop: -4.5, backgroundColor: Palette.accent, borderWidth: 2, borderColor: Palette.card },
+  bubble: { position: 'absolute', width: 92, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 16, backgroundColor: Palette.inverse },
+  bubbleText: { color: Palette.onInverse, textAlign: 'center', fontSize: 12, fontWeight: '600' },
+  selected: { color: Palette.textSecondary, fontSize: 12, textAlign: 'right', marginRight: 5 },
+}));

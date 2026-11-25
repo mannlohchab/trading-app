@@ -1,18 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { PostCard } from '@/components/community/PostCard';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { COMMUNITY_API, refreshCommunity, type CommunityDetail, type CommunityComment } from '@/lib/community';
 import { timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 
 export default function PostDetailScreen() {
+  const styles = useStyles();
+  const P = useInsightPalette();
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = useAuth(s => s.user?.id);
   const [comment, setComment] = useState('');
@@ -76,7 +78,7 @@ export default function PostDetailScreen() {
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_, P) => ({
   flex: { flex: 1 }, safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: P.bg },
   loading: { padding: 40 }, list: { paddingTop: 12, paddingBottom: 24 },
   section: { color: P.text, fontSize: 16, fontWeight: '600', paddingHorizontal: 16, paddingBottom: 12 },
@@ -93,4 +95,4 @@ const styles = StyleSheet.create({
   send: { backgroundColor: P.text, minHeight: 44, borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center' },
   sendText: { color: P.onSolid, fontWeight: '600', fontSize: 13 }, disabled: { opacity: 0.4 },
   counter: { textAlign: 'right', fontSize: 11, color: P.textMuted, marginTop: 4 },
-});
+}));

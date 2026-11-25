@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { formatMarketPrice } from '@/lib/format';
 import { cancelOrder, fetchOrders } from '@/lib/paperTrading';
 import { useAuth } from '@/store/auth';
 
 export function PaperOrders() {
+  const styles = useStyles();
   const userId = useAuth(s => s.user?.id);
   const qc = useQueryClient();
   const query = useQuery({ queryKey: ['paper-orders', userId], enabled: Boolean(userId), refetchInterval: 10_000,
@@ -33,9 +34,9 @@ export function PaperOrders() {
     </View>)}
   </View>;
 }
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_palette, P) => ({
   block: { gap: 12, marginBottom: 24 }, heading: { fontSize: 20, fontWeight: '700', color: P.text },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: P.border },
   details: { flex: 1, gap: 5 }, title: { fontWeight: '600', color: P.text }, meta: { color: P.textSecondary, fontSize: 12 },
   error: { color: P.red }, cancel: { padding: 10, borderRadius: 8, backgroundColor: 'rgba(240,113,120,0.14)' }, cancelText: { color: P.red, fontWeight: '600' },
-});
+}));

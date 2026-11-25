@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Action, Card, EquityChart, Heading, Help, Metric, RiskStatisticsView, Status, backtestStyles as S } from '@/components/backtesting/BacktestUi';
+import { Action, Card, EquityChart, Heading, Help, Metric, RiskStatisticsView, Status, useBacktestStyles } from '@/components/backtesting/BacktestUi';
 import { isActiveBacktest, metricText } from '@/lib/backtesting';
 import { cancelBacktest, getBacktest, getBacktestDataset, getBacktestEquity, getBacktestTrades, replayBacktest } from '@/lib/backtestingApi';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { useAuth } from '@/store/auth';
 
 export default function BacktestDetailScreen() {
+  const S = useBacktestStyles();
   const params = useLocalSearchParams<{ id: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const userId = useAuth(state => state.user?.id);

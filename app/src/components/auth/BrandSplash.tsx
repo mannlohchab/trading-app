@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
   Easing,
   ReduceMotion,
@@ -9,11 +9,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/AppText';
+import { makeStyles } from '@/hooks/use-theme';
 
 type Props = { exiting?: boolean };
 
 /** Wordmark on the same sky as the welcome screen. Coins arrive on the next screen. */
 export function BrandSplash({ exiting = false }: Props) {
+  const styles = useStyles();
   const opacity = useSharedValue(0);
 
   useEffect(() => {
@@ -37,23 +39,24 @@ export function BrandSplash({ exiting = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F2EDEA', alignItems: 'center', justifyContent: 'center' },
+const useStyles = makeStyles((Palette, _InsightPalette, scheme) => ({
+  // Light keeps the welcome screen's warm sky; dark matches the app background.
+  screen: { flex: 1, backgroundColor: scheme === 'dark' ? Palette.bg : '#F2EDEA', alignItems: 'center', justifyContent: 'center' },
   mark: { alignItems: 'center' },
   kicker: {
-    color: '#16181D',
+    color: Palette.text,
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 3.4,
     textTransform: 'uppercase',
   },
   name: {
-    color: '#16181D',
+    color: Palette.text,
     fontSize: 44,
     lineHeight: 50,
     fontWeight: '600',
     letterSpacing: -1.4,
     marginTop: 4,
   },
-  rule: { width: 28, height: 2, borderRadius: 1, backgroundColor: '#16181D', marginTop: 14 },
-});
+  rule: { width: 28, height: 2, borderRadius: 1, backgroundColor: Palette.text, marginTop: 14 },
+}));

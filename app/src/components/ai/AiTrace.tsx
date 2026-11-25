@@ -1,13 +1,11 @@
 // The assistant's work while answering, as a trace: a line per tool call that pulses while it runs,
 // shows a tick and its duration when done, and expands to show what it was asked.
 import { memo, useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { formatDuration, stepDetails, stepTitle, visibleSteps, type ToolStep } from '@/lib/aiTrace';
-
-const ERROR = '#B91C1C';
 
 /** Gently pulses its children while `active` (a native stand-in for a text shimmer). Still when reduce-motion is on. */
 function Pulse({ active, children }: { active: boolean; children: ReactNode }) {
@@ -32,12 +30,14 @@ function Pulse({ active, children }: { active: boolean; children: ReactNode }) {
 }
 
 function StatusMark({ status }: { status: ToolStep['status'] | 'thinking' }) {
+  const styles = useStyles();
   if (status === 'done') return <Text style={styles.tick}>✓</Text>;
-  if (status === 'error') return <Text style={[styles.tick, { color: ERROR }]}>!</Text>;
+  if (status === 'error') return <Text style={[styles.tick, styles.errorText]}>!</Text>;
   return <View style={styles.dotBox}><View style={styles.dot} /></View>;
 }
 
 function Step({ step }: { step: ToolStep }) {
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const details = stepDetails(step);
   const expandable = details.length > 0 || !!step.error;
@@ -81,6 +81,7 @@ function Step({ step }: { step: ToolStep }) {
 
 /** Tool steps, then (while nothing has been written yet) a pulsing "Thinking" line. */
 export const AiTrace = memo(function AiTrace({ steps: all, thinking }: { steps?: ToolStep[]; thinking?: boolean }) {
+  const styles = useStyles();
   const steps = visibleSteps(all);
   if (!steps.length && !thinking) return null;
   return (
@@ -96,13 +97,13 @@ export const AiTrace = memo(function AiTrace({ steps: all, thinking }: { steps?:
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_Palette, P, scheme) => ({
   trace: { gap: 8, paddingVertical: 2 },
   trigger: { alignSelf: 'flex-start', maxWidth: '100%', borderRadius: 6 },
   pressed: { opacity: 0.6 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 22, maxWidth: '100%' },
   title: { color: P.textSecondary, fontSize: 13, lineHeight: 19 },
-  errorText: { color: ERROR },
+  errorText: { color: scheme === 'dark' ? '#F87171' : '#B91C1C' },
   duration: { color: P.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] },
   tick: { width: 14, textAlign: 'center', color: P.textMuted, fontSize: 12, fontWeight: '700' },
   dotBox: { width: 14, alignItems: 'center' },
@@ -113,4 +114,4 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', gap: 10 },
   detailLabel: { width: 76, color: P.textMuted, fontSize: 12, lineHeight: 18 },
   detailValue: { flex: 1, color: P.body, fontSize: 12, lineHeight: 18 },
-});
+}));

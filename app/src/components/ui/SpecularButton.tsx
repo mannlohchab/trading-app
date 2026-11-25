@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, type AccessibilityRole, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, type AccessibilityRole, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 
 export type SpecularButtonProps = {
   children?: ReactNode;
@@ -43,8 +44,10 @@ export default function SpecularButton({
   accessibilityRole = 'button',
   style,
   radius = 28,
-  textColor = '#16181D',
+  textColor,
 }: SpecularButtonProps) {
+  const styles = useStyles();
+  const Palette = usePalette();
   const label = accessibilityLabel ?? (typeof children === 'string' ? children : undefined);
   return (
     <Pressable
@@ -60,25 +63,25 @@ export default function SpecularButton({
         disabled && styles.disabled,
         style,
       ]}>
-      <Text style={[styles.label, { color: textColor }]}>{children}</Text>
+      <Text style={[styles.label, { color: textColor ?? Palette.text }]}>{children}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   button: {
     alignSelf: 'stretch',
     width: '100%',
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Palette.card,
     borderWidth: 1,
-    borderColor: '#E3E6F0',
+    borderColor: Palette.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  pressed: { backgroundColor: '#F7F7FC' },
+  pressed: { backgroundColor: Palette.cardHover },
   disabled: { opacity: 0.5 },
   label: { fontSize: 18, fontWeight: '600', letterSpacing: -0.2 },
-});
+}));

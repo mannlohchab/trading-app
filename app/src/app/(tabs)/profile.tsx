@@ -15,22 +15,24 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { SymbolIcon } from '@/components/markets/SymbolIcon';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, useInsightPalette, usePalette } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { formatMarketPrice, formatUsd, formatPct } from '@/lib/format';
 import { displayNameOf, useAuth, type User } from '@/store/auth';
 
 const TABS = ['Overview', 'Portfolio', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
-/** Same green/red as the Market list and chart. */
-const UP = '#089981';
-const DOWN = '#F23645';
 
 type PaperTransaction = PaperActivity;
 
 const money = (value: number | null, digits = 2) => value === null ? '—' : formatUsd(value, digits);
 const percent = (value: number | null) => value === null ? '—' : formatPct(value);
-const tone = (value: number | null | undefined) => value == null || value === 0 ? P.textSecondary : value > 0 ? UP : DOWN;
+/** P&L colour: the same green/red as the Market list and chart. */
+function useTone() {
+  const P = useInsightPalette();
+  const Palette = usePalette();
+  return (value: number | null | undefined) => value == null || value === 0 ? P.textSecondary : value > 0 ? Palette.chartUp : Palette.chartDown;
+}
 
 function parseTimestamp(value: string) {
   const trimmed = value.trim();
@@ -56,6 +58,9 @@ function overviewErrorMessage(error: unknown, hasData: boolean) {
 }
 
 export default function ProfileScreen() {
+  const styles = useStyles();
+  const P = useInsightPalette();
+  const tone = useTone();
   const [tab, setTab] = useState<Tab>('Overview');
   // Other screens can open a specific tab, e.g. the top bar's bell opens Settings. `at` makes each request distinct.
   const params = useLocalSearchParams<{ tab?: string; at?: string }>();
@@ -265,10 +270,13 @@ export default function ProfileScreen() {
 }
 
 function ActivityRow({ tx, last }: { tx: PaperTransaction; last?: boolean }) {
+  const styles = useStyles();
+  const P = useInsightPalette();
+  const Palette = usePalette();
   return (
     <View style={[styles.row, last && styles.rowLast]}>
       <View style={[styles.side, { backgroundColor: tx.type === 'BUY' ? 'rgba(8,153,129,0.16)' : tx.type === 'SELL' ? 'rgba(242,54,69,0.16)' : P.soft }]}>
-        <Text style={[styles.sideText, { color: tx.type === 'BUY' ? UP : tx.type === 'SELL' ? DOWN : P.body }]}>{tx.type}</Text>
+        <Text style={[styles.sideText, { color: tx.type === 'BUY' ? Palette.chartUp : tx.type === 'SELL' ? Palette.chartDown : P.body }]}>{tx.type}</Text>
       </View>
       <View style={styles.rowMain}>
         <Text style={styles.rowTitle} numberOfLines={1}>{tx.symbol ?? 'Account'}</Text>
@@ -280,6 +288,7 @@ function ActivityRow({ tx, last }: { tx: PaperTransaction; last?: boolean }) {
 }
 
 function ActivityList({ query }: { query: { isLoading: boolean; isError: boolean; isSuccess: boolean; data?: { transactions: PaperTransaction[] }; refetch: () => unknown } }) {
+  const styles = useStyles();
   return (
     <>
       {query.isLoading ? <InstrumentRowSkeleton /> : null}
@@ -298,6 +307,7 @@ const LINE_ICONS = {
 };
 
 function Line({ label, value, color, last, onPress, icon }: { label: string; value: string; color?: string; last?: boolean; onPress?: () => void; icon?: keyof typeof LINE_ICONS }) {
+  const styles = useStyles();
   const content = <>
     <View style={styles.lineStart}>
       {icon ? <Image source={LINE_ICONS[icon]} style={styles.lineIcon} contentFit="contain" accessible={false} /> : null}
@@ -311,6 +321,7 @@ function Line({ label, value, color, last, onPress, icon }: { label: string; val
 }
 
 function SectionTitle({ title, count }: { title: string; count?: number }) {
+  const styles = useStyles();
   return (
     <View style={styles.sectionTitleRow}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -319,10 +330,10 @@ function SectionTitle({ title, count }: { title: string; count?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_, P) => ({
   fill: { flex: 1 },
   pressed: { opacity: 0.55 },
-  safe: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: '#FFFFFF' },
+  safe: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: P.card },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   title: { color: P.text, fontSize: 26, lineHeight: 34, letterSpacing: -0.3 },
   iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: P.soft, alignItems: 'center', justifyContent: 'center' },
@@ -381,4 +392,4 @@ const styles = StyleSheet.create({
   emptyText: { color: P.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 300 },
   emptyButton: { marginTop: 6, minHeight: 40, paddingHorizontal: 16, borderRadius: 20, backgroundColor: P.text, justifyContent: 'center' },
   emptyButtonText: { color: P.onSolid, fontSize: 13, fontWeight: '600' },
-});
+}));

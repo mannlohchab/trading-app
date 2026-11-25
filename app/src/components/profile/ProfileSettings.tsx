@@ -5,12 +5,14 @@ import { Text, TextInput } from '@/components/ui/AppText';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GlassIcon, GlassPressable } from '@/components/ui/GlassIcon';
 import { AiMemorySettings } from '@/components/profile/AiMemorySettings';
-import { Palette } from '@/constants/theme';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/authClient';
 import { DEMO_MODE } from '@/lib/demoMode';
 import { prepareProfileUpdate, validatePasswordChange } from '@/lib/profileSettings';
 import type { User } from '@/store/auth';
+import { useThemeStore, type ThemePreference } from '@/store/theme';
 
 type Profile = { name: string | null; username: string | null; image: string | null; phoneNumber: string | null; timezone: string | null };
 type Preferences = { general: { notificationsEnabled: boolean } };
@@ -28,6 +30,8 @@ export function ProfileSettings(props: Props) {
 }
 
 function SettingsForm({ user, onUserSaved, onLogout }: Props) {
+  const styles = useStyles();
+  const Palette = usePalette();
   // An explicit empty string is a draft too: clearing a username must reach the API.
   const [nameDraft, setNameDraft] = useState<string>();
   const [usernameDraft, setUsernameDraft] = useState<string>();
@@ -146,6 +150,8 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
         <Status feedback={preferenceFeedback} />
       </View>
 
+      <AppearanceCard />
+
       <AiMemorySettings userId={user.id} />
 
       <View style={styles.card}>
@@ -166,7 +172,7 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
         accessibilityState={{ disabled: busy, busy: logoutMutation.isPending }}
         onPress={() => { if (!busy) logoutMutation.mutate(); }}
         style={({ pressed }) => [styles.logout, busy && styles.disabled, pressed && styles.pressed]}>
-        {logoutMutation.isPending ? <ActivityIndicator color="#E11D48" /> : <GlassIcon name="send" rotation={180} size={23} tone="purple" />}
+        {logoutMutation.isPending ? <ActivityIndicator color={Palette.red} /> : <GlassIcon name="send" rotation={180} size={23} tone="purple" />}
         <Text style={styles.logoutText}>{logoutMutation.isPending ? 'Logging out…' : 'Log out'}</Text>
       </GlassPressable>
       <Status feedback={logoutMutation.isError ? { error: true, message: logoutMutation.error.message || 'Could not log out. Please try again.' } : null} />
@@ -174,13 +180,41 @@ function SettingsForm({ user, onUserSaved, onLogout }: Props) {
   );
 }
 
+const THEME_OPTIONS: { label: string; value: ThemePreference }[] = [
+  { label: 'System', value: 'system' },
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
+];
+
+/** Saved on this device only; `System` follows the phone's light/dark setting. */
+function AppearanceCard() {
+  const styles = useStyles();
+  const preference = useThemeStore((s) => s.preference);
+  const setPreference = useThemeStore((s) => s.setPreference);
+  const selected = THEME_OPTIONS.find((option) => option.value === preference) ?? THEME_OPTIONS[0];
+  return <View style={styles.card}>
+    <CardHeading icon="card" title="Appearance" subtitle="Choose light, dark, or match your device" />
+    <View accessibilityRole="tablist" accessibilityLabel="Theme">
+      <SegmentedTabs tabs={THEME_OPTIONS.map((option) => option.label)} value={selected.label}
+        onChange={(label) => {
+          const next = THEME_OPTIONS.find((option) => option.label === label);
+          if (next && next.value !== preference) setPreference(next.value);
+        }} />
+    </View>
+    <Text style={styles.helper}>{preference === 'system' ? 'Follows your device’s appearance setting.' : `Always ${selected.label.toLowerCase()}, whatever your device uses.`}</Text>
+  </View>;
+}
+
 function CardHeading({ icon, title, subtitle }: { icon: ComponentProps<typeof GlassIcon>['name']; title: string; subtitle: string }) {
+  const styles = useStyles();
   return <View style={styles.heading}><View style={styles.iconTile}><GlassIcon name={icon} size={28} tone="purple" /></View>
     <View style={styles.flex}><Text accessibilityRole="header" style={styles.headingTitle}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>
   </View>;
 }
 
 function Field({ label, ...props }: ComponentProps<typeof TextInput> & { label: string }) {
+  const styles = useStyles();
+  const Palette = usePalette();
   return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput {...props}
     accessibilityLabel={label} placeholderTextColor={Palette.textMuted} autoCapitalize={props.autoCapitalize ?? (props.secureTextEntry ? 'none' : 'sentences')}
     autoCorrect={props.autoCorrect ?? !props.secureTextEntry} style={[styles.input, props.multiline && styles.bio, !props.editable && styles.disabled]} /></View>;
@@ -189,13 +223,16 @@ function Field({ label, ...props }: ComponentProps<typeof TextInput> & { label: 
 function PreferenceRow({ title, description, value, disabled, onChange }: {
   title: string; description: string; value: boolean; disabled: boolean; onChange: (value: boolean) => void;
 }) {
+  const styles = useStyles();
+  const Palette = usePalette();
   return <View style={styles.preferenceRow}><View style={styles.flex}><Text style={styles.preferenceTitle}>{title}</Text>
     <Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={title}
     accessibilityHint={description} disabled={disabled} value={value} onValueChange={onChange}
-    trackColor={{ false: Palette.border, true: Palette.accent }} thumbColor="#ffffff" ios_backgroundColor={Palette.border} /></View>;
+    trackColor={{ false: Palette.border, true: Palette.accent }} thumbColor={Palette.onAccent} ios_backgroundColor={Palette.border} /></View>;
 }
 
 function Status({ feedback }: { feedback: Feedback }) {
+  const styles = useStyles();
   return feedback ? <Text accessibilityRole={feedback.error ? 'alert' : undefined} accessibilityLiveRegion="polite"
     style={[styles.feedback, feedback.error ? styles.error : styles.success]}>{feedback.message}</Text> : null;
 }
@@ -203,19 +240,21 @@ function Status({ feedback }: { feedback: Feedback }) {
 function ActionButton({ title, pendingTitle, pending, disabled, secondary, onPress }: {
   title: string; pendingTitle: string; pending: boolean; disabled: boolean; secondary?: boolean; onPress: () => void;
 }) {
+  const styles = useStyles();
+  const Palette = usePalette();
   return <GlassPressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled, busy: pending }}
     disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.secondaryButton,
       disabled && styles.disabled, pressed && styles.pressed]}>
-    {pending ? <ActivityIndicator color={secondary ? '#0066FF' : '#ffffff'} size="small" /> : null}
+    {pending ? <ActivityIndicator color={secondary ? Palette.accent : Palette.onAccent} size="small" /> : null}
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{pending ? pendingTitle : title}</Text>
   </GlassPressable>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   container: { paddingHorizontal: 20, gap: 16 },
   card: { padding: 18, borderRadius: 22, backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#F3EEFF', alignItems: 'center', justifyContent: 'center' },
+  iconTile: { width: 46, height: 46, borderRadius: 15, backgroundColor: Palette.purpleMuted, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
   headingTitle: { color: Palette.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.3 },
   subtitle: { color: Palette.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 17 },
@@ -233,14 +272,14 @@ const styles = StyleSheet.create({
   preferenceTitle: { fontSize: 14, fontWeight: '500', color: Palette.text },
   preferenceDescription: { fontSize: 11, color: Palette.textSecondary, lineHeight: 16, marginTop: 4 },
   button: { minHeight: 48, marginTop: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 13, backgroundColor: Palette.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  buttonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
-  secondaryButton: { backgroundColor: Palette.accentMuted, borderWidth: 1, borderColor: '#0066FF' },
-  secondaryText: { color: '#0052D6' },
+  buttonText: { color: Palette.onAccent, fontSize: 14, fontWeight: '600' },
+  secondaryButton: { backgroundColor: Palette.accentMuted, borderWidth: 1, borderColor: Palette.accent },
+  secondaryText: { color: Palette.accentText },
   feedback: { fontSize: 12, lineHeight: 18, marginTop: 10 },
-  error: { color: '#E11D48' },
-  success: { color: '#059669' },
+  error: { color: Palette.red },
+  success: { color: Palette.success },
   logout: { minHeight: 52, backgroundColor: 'rgba(244,63,94,0.12)', borderWidth: 1, borderColor: 'rgba(244,63,94,0.35)', borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  logoutText: { color: '#E11D48', fontSize: 13, fontWeight: '600' },
+  logoutText: { color: Palette.red, fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.75 },
-});
+}));

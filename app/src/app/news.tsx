@@ -1,13 +1,15 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { NewsRow, NewsRowSkeleton } from '@/components/markets/NewsList';
-import { Palette } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import { fetchNews, type NewsArticle } from '@/lib/newsApi';
 
 /** All crypto news, newest first, loading older stories as you scroll. */
 export default function NewsScreen() {
+  const styles = useStyles();
+  const Palette = usePalette();
   const feed = useInfiniteQuery({
     queryKey: ['news', 'all'],
     initialPageParam: null as string | null,
@@ -39,8 +41,8 @@ export default function NewsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Palette) => ({
   safe: { flex: 1, backgroundColor: Palette.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
   list: { paddingHorizontal: 18, paddingBottom: 28 },
   footer: { marginVertical: 20 },
-});
+}));

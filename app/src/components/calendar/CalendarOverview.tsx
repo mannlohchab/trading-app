@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
-import { Fonts } from '@/constants/theme';
+import { Fonts, type ColorScheme } from '@/constants/theme';
+import { makeStyles, useColorScheme } from '@/hooks/use-theme';
 import { calendarGrid, eventDay, moveCalendarDate, type CalendarEvent, type CalendarView } from '@/lib/financialCalendar';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -18,11 +19,12 @@ type Props = {
   onDayChange: (day: string) => void;
 };
 
-function dotColor(event: CalendarEvent) {
+function dotColor(event: CalendarEvent, scheme: ColorScheme) {
   if (event.importance === 3) return '#4C8DFF';
   if (event.importance === 2) return '#34C759';
   if (event.importance === 1) return '#FF5A7A';
-  return '#C7C7CC';
+  // The faint grey would glare on a dark surface.
+  return scheme === 'dark' ? '#4A4F5C' : '#C7C7CC';
 }
 
 function headerDate(day: string) {
@@ -33,24 +35,27 @@ function headerDate(day: string) {
 }
 
 function Chevron({ direction }: { direction: 'left' | 'right' | 'down' }) {
+  const styles = useStyles();
   const rotate = direction === 'left' ? '-135deg' : direction === 'down' ? '135deg' : '45deg';
   return <View style={[styles.chevron, { transform: [{ rotate }] }]} />;
 }
 
 export function CalendarOverview({ selectedDay, today, events = NO_EVENTS, timeZone, view, onViewChange, onDayChange }: Props) {
+  const styles = useStyles();
+  const scheme = useColorScheme();
   const anchor = selectedDay === 'all' ? today : selectedDay;
   const cells = calendarGrid(anchor, view);
   const dots = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const event of events) {
       const key = eventDay(event, timeZone);
-      const color = dotColor(event);
+      const color = dotColor(event, scheme);
       const colors = map.get(key) ?? [];
       if (!colors.includes(color) && colors.length < 3) colors.push(color);
       map.set(key, colors);
     }
     return map;
-  }, [events, timeZone]);
+  }, [events, timeZone, scheme]);
 
   return <View style={styles.calendar}>
     <View style={styles.header}>
@@ -109,35 +114,39 @@ export function CalendarOverview({ selectedDay, today, events = NO_EVENTS, timeZ
   </View>;
 }
 
-const styles = StyleSheet.create({
-  calendar: { paddingTop: 8, paddingBottom: 8 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 18 },
-  headerCopy: { flex: 1, minWidth: 0 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  inlineChevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { fontFamily: Fonts.sans, color: '#8E8E93', fontSize: 12, lineHeight: 16, fontWeight: '500' },
-  dateTitle: { fontFamily: Fonts.sans, color: '#1C1C1E', fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.3, flexShrink: 1 },
-  nav: { flexDirection: 'row', alignItems: 'center' },
-  iconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
-  chevron: { width: 8, height: 8, borderTopWidth: 1.5, borderRightWidth: 1.5, borderColor: '#1C1C1E', marginTop: -1 },
-  weekdays: { flexDirection: 'row', marginBottom: 6 },
-  weekday: { flex: 1, fontFamily: Fonts.sans, color: '#AEAEB2', fontSize: 12, lineHeight: 16, fontWeight: '500', textAlign: 'center' },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  monthCell: { width: '14.285714%', height: 48, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
-  dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  daySelected: { backgroundColor: '#111111' },
-  dayText: { fontFamily: Fonts.sans, color: '#3A3A3C', fontSize: 15, lineHeight: 18, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  todayText: { fontWeight: '700', color: '#1C1C1E' },
-  dayTextSelected: { color: '#FFFFFF', fontWeight: '600' },
-  dotRow: { flexDirection: 'row', gap: 2, height: 6, marginTop: 2, alignItems: 'center' },
-  dot: { width: 4, height: 4, borderRadius: 2 },
-  weekStrip: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8 },
-  weekDay: { flex: 1, alignItems: 'center', gap: 6, minHeight: 62, paddingVertical: 4 },
-  weekName: { fontFamily: Fonts.sans, color: '#8E8E93', fontSize: 12, lineHeight: 16, fontWeight: '500' },
-  weekNameSelected: { color: '#1C1C1E', fontWeight: '700', textDecorationLine: 'underline' },
-  weekNumber: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  weekNumberSelected: { backgroundColor: '#111111' },
-  weekNumberText: { fontFamily: Fonts.sans, color: '#3A3A3C', fontSize: 15, lineHeight: 18, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  weekNumberTextSelected: { color: '#FFFFFF', fontWeight: '600' },
-  pressed: { opacity: 0.45 },
+// iOS system greys in light mode (kept exactly); dark mode uses the palette's text and inverse roles.
+const useStyles = makeStyles((Palette, _insight, scheme) => {
+  const tone = (light: string, dark: string) => scheme === 'dark' ? dark : light;
+  return {
+    calendar: { paddingTop: 8, paddingBottom: 8 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 18 },
+    headerCopy: { flex: 1, minWidth: 0 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    inlineChevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+    eyebrow: { fontFamily: Fonts.sans, color: tone('#8E8E93', Palette.textSecondary), fontSize: 12, lineHeight: 16, fontWeight: '500' },
+    dateTitle: { fontFamily: Fonts.sans, color: tone('#1C1C1E', Palette.text), fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.3, flexShrink: 1 },
+    nav: { flexDirection: 'row', alignItems: 'center' },
+    iconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
+    chevron: { width: 8, height: 8, borderTopWidth: 1.5, borderRightWidth: 1.5, borderColor: tone('#1C1C1E', Palette.text), marginTop: -1 },
+    weekdays: { flexDirection: 'row', marginBottom: 6 },
+    weekday: { flex: 1, fontFamily: Fonts.sans, color: tone('#AEAEB2', Palette.textMuted), fontSize: 12, lineHeight: 16, fontWeight: '500', textAlign: 'center' },
+    monthGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    monthCell: { width: '14.285714%', height: 48, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
+    dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    daySelected: { backgroundColor: tone('#111111', Palette.inverse) },
+    dayText: { fontFamily: Fonts.sans, color: tone('#3A3A3C', '#C8CCD8'), fontSize: 15, lineHeight: 18, fontWeight: '500', fontVariant: ['tabular-nums'] },
+    todayText: { fontWeight: '700', color: tone('#1C1C1E', Palette.text) },
+    dayTextSelected: { color: tone('#FFFFFF', Palette.onInverse), fontWeight: '600' },
+    dotRow: { flexDirection: 'row', gap: 2, height: 6, marginTop: 2, alignItems: 'center' },
+    dot: { width: 4, height: 4, borderRadius: 2 },
+    weekStrip: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8 },
+    weekDay: { flex: 1, alignItems: 'center', gap: 6, minHeight: 62, paddingVertical: 4 },
+    weekName: { fontFamily: Fonts.sans, color: tone('#8E8E93', Palette.textSecondary), fontSize: 12, lineHeight: 16, fontWeight: '500' },
+    weekNameSelected: { color: tone('#1C1C1E', Palette.text), fontWeight: '700', textDecorationLine: 'underline' },
+    weekNumber: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    weekNumberSelected: { backgroundColor: tone('#111111', Palette.inverse) },
+    weekNumberText: { fontFamily: Fonts.sans, color: tone('#3A3A3C', '#C8CCD8'), fontSize: 15, lineHeight: 18, fontWeight: '500', fontVariant: ['tabular-nums'] },
+    weekNumberTextSelected: { color: tone('#FFFFFF', Palette.onInverse), fontWeight: '600' },
+    pressed: { opacity: 0.45 },
+  };
 });

@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 
+import { useColorScheme, usePalette } from '@/hooks/use-theme';
+
 import SpecularButtonBase from './SpecularButton.jsx';
 import type { SpecularButtonProps } from './SpecularButton';
 
@@ -63,17 +65,21 @@ export default function SpecularButton({
   style,
   accessibilityLabel,
 }: SpecularButtonProps) {
+  const Palette = usePalette();
+  const dark = useColorScheme() === 'dark';
   const label = accessibilityLabel ?? (typeof children === 'string' ? children : undefined);
+  // Fill the base component's light defaults from the active theme; `specular-button--dark` softens the CSS shadow.
+  const themeClass = dark ? 'specular-button--dark' : '';
   return (
     <WebSpecularButton
       size={size}
       radius={radius}
-      tint={tint}
+      tint={tint ?? Palette.accent}
       tintOpacity={tintOpacity}
       blur={blur}
-      textColor={textColor}
-      lineColor={lineColor}
-      baseColor={baseColor}
+      textColor={textColor ?? Palette.text}
+      lineColor={lineColor ?? Palette.accent}
+      baseColor={baseColor ?? (dark ? '#3A4150' : '#C9CEDB')}
       intensity={intensity}
       idleIntensity={idleIntensity}
       shineSize={shineSize}
@@ -86,7 +92,7 @@ export default function SpecularButton({
       autoAnimate={autoAnimate}
       disabled={disabled}
       onClick={onClick ?? onPress}
-      className={className}
+      className={[themeClass, className].filter(Boolean).join(' ') || undefined}
       type={type}
       aria-label={label}
       style={{ boxSizing: 'border-box', ...(StyleSheet.flatten(style) ?? {}) } as CSSProperties}

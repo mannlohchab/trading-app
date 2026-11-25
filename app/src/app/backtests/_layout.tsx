@@ -1,8 +1,10 @@
 import { Redirect, Stack } from 'expo-router';
-import { AppFont, InsightPalette as P } from '@/constants/theme';
+import { AppFont } from '@/constants/theme';
+import { useInsightPalette } from '@/hooks/use-theme';
 import { useAuth } from '@/store/auth';
 
 export default function BacktestingLayout() {
+  const P = useInsightPalette();
   const user = useAuth(state => state.user);
   const hydrated = useAuth(state => state.hydrated);
   if (!hydrated) return null;

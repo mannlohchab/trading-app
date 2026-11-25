@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppTopBar } from '@/components/navigation/AppTopBar';
 import { Text } from '@/components/ui/AppText';
@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { InsightPalette as P, Palette } from '@/constants/theme';
+import { makeStyles, useInsightPalette } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { COMMUNITY_API, type CommunityPage } from '@/lib/community';
 import { useAuth } from '@/store/auth';
@@ -19,6 +19,8 @@ const TABS = ['For You', "Editors' Picks", 'Following', 'Saved'] as const;
 const TAB_MAP = { 'For You': 'foryou', "Editors' Picks": 'editors', Following: 'following', Saved: 'saved' } as const;
 
 export default function CommunityScreen() {
+  const styles = useStyles();
+  const P = useInsightPalette();
   const [tab, setTab] = useState<(typeof TABS)[number]>('For You');
   const userId = useAuth(s => s.user?.id);
   const feed = useInfiniteQuery({
@@ -55,7 +57,7 @@ export default function CommunityScreen() {
     />
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_, P) => ({
   safe: { flex: 1, backgroundColor: P.bg, width: '100%', maxWidth: 480, alignSelf: 'center' },
   header: { paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: P.text, fontSize: 26, lineHeight: 34, fontWeight: '400', letterSpacing: -0.3 },
@@ -63,4 +65,4 @@ const styles = StyleSheet.create({
   composeText: { color: P.onSolid, fontSize: 13, fontWeight: '600' },
   tabs: { paddingHorizontal: 16, marginBottom: 12 }, list: { paddingBottom: 32 },
   loading: { padding: 16, gap: 12 }, footer: { padding: 16 },
-});
+}));

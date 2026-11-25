@@ -1,13 +1,12 @@
 import { memo, useMemo, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles, usePalette } from '@/hooks/use-theme';
 import type { AiBacktestResult } from '@/lib/aiBlocks';
 import { pairName } from '@/lib/marketData';
 
-const UP = '#089981', DOWN = '#F23645';
 const PLOT_H = 88;
 
 function fmt(v: string | number | null | undefined, digits = 2) {
@@ -18,6 +17,8 @@ function fmt(v: string | number | null | undefined, digits = 2) {
 }
 
 function EquitySpark({ points }: { points: { time: number; equity: string }[] }) {
+  const styles = useStyles();
+  const { chartUp: UP, chartDown: DOWN } = usePalette();
   const [width, setWidth] = useState(0);
   const path = useMemo(() => {
     if (width <= 0 || points.length < 2) return null;
@@ -60,6 +61,8 @@ function EquitySpark({ points }: { points: { time: number; equity: string }[] })
 
 /** Engine-backed backtest summary: metrics, equity sparkline, recent trades. */
 export const AiBacktestCard = memo(function AiBacktestCard({ result }: { result: AiBacktestResult }) {
+  const styles = useStyles();
+  const { chartUp: UP, chartDown: DOWN } = usePalette();
   const m = result.metrics;
   const ret = Number(m.totalReturnPercent);
   const up = Number.isFinite(ret) ? ret >= 0 : true;
@@ -119,6 +122,7 @@ export const AiBacktestCard = memo(function AiBacktestCard({ result }: { result:
 });
 
 function Metric({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -127,7 +131,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_Palette, P) => ({
   card: {
     marginTop: 10, padding: 14, borderRadius: 16,
     backgroundColor: P.card, borderWidth: 1, borderColor: P.border, gap: 10,
@@ -152,4 +156,4 @@ const styles = StyleSheet.create({
   disclaimer: { color: P.textMuted, fontSize: 11, lineHeight: 14 },
   workspaceButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, backgroundColor: P.soft },
   workspaceText: { color: P.text, fontSize: 12, fontWeight: '600' },
-});
+}));

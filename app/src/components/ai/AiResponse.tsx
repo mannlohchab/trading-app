@@ -1,10 +1,11 @@
 import { memo, useMemo } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
-import { InsightPalette as P } from '@/constants/theme';
+import { makeStyles } from '@/hooks/use-theme';
 import { cellTone, isNumericCell, parseInline, parseResponse, plainCell, type ResponseBlock } from '@/lib/aiResponse';
 
 function Inline({ content }: { content: string }) {
+  const styles = useStyles();
   return <>{parseInline(content).map((part, index) => (
     <Text key={index} style={part.style ? styles[part.style] : undefined}>{part.text}</Text>
   ))}</>;
@@ -15,6 +16,7 @@ const columnWidth = (cells: string[]) =>
   Math.min(210, Math.max(64, Math.max(...cells.map(cell => plainCell(cell).length)) * 7.6 + 24));
 
 function Table({ block }: { block: ResponseBlock }) {
+  const styles = useStyles();
   const header = block.header ?? [];
   const rows = block.rows ?? [];
   const columns = header.map((title, c) => {
@@ -52,6 +54,7 @@ function Table({ block }: { block: ResponseBlock }) {
 }
 
 export const AiResponse = memo(function AiResponse({ content }: { content: string }) {
+  const styles = useStyles();
   const blocks = useMemo(() => parseResponse(content), [content]);
   return <View style={styles.body}>
     {blocks.map((block, index) => {
@@ -77,7 +80,7 @@ export const AiResponse = memo(function AiResponse({ content }: { content: strin
   </View>;
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((_Palette, P, scheme) => ({
   body: { gap: 10, paddingTop: 2, paddingBottom: 2 },
   text: { color: P.body, fontSize: 14, lineHeight: 22 },
   heading: { color: P.text, fontSize: 16, lineHeight: 23, fontWeight: '700', marginTop: 8 },
@@ -100,11 +103,11 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row' },
   tableHeader: { backgroundColor: P.soft, borderBottomWidth: 1, borderBottomColor: P.border },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: P.border },
-  altRow: { backgroundColor: '#FAFAF8' },
+  altRow: { backgroundColor: scheme === 'dark' ? '#181817' : '#FAFAF8' },
   cell: { flexGrow: 1, flexShrink: 0, paddingHorizontal: 11, paddingVertical: 9, color: P.body, fontSize: 13, lineHeight: 19 },
   headerCell: { color: P.textSecondary, fontSize: 11, lineHeight: 16, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase' },
   firstCell: { color: P.text, fontWeight: '600' },
   numberCell: { fontVariant: ['tabular-nums'] },
-  up: { color: '#15803D', fontWeight: '600' },
-  down: { color: '#B91C1C', fontWeight: '600' },
-});
+  up: { color: scheme === 'dark' ? '#4ADE80' : '#15803D', fontWeight: '600' },
+  down: { color: scheme === 'dark' ? '#F87171' : '#B91C1C', fontWeight: '600' },
+}));

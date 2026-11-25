@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+import { useColorScheme as useDeviceColorScheme } from 'react-native';
+
+import type { ColorScheme } from '@/constants/theme';
+import { useThemeStore } from '@/store/theme';
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * The scheme the app renders in. Server rendering has no device appearance, so `system` renders
+ * light until the client hydrates.
  */
-export function useColorScheme() {
+export function useColorScheme(): ColorScheme {
   const [hasHydrated, setHasHydrated] = useState(false);
+  useEffect(() => setHasHydrated(true), []);
 
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
+  const preference = useThemeStore((s) => s.preference);
+  const device = useDeviceColorScheme();
+  if (preference !== 'system') return preference;
+  return hasHydrated && device === 'dark' ? 'dark' : 'light';
 }
