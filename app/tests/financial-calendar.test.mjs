@@ -38,3 +38,33 @@ test('new calendar endpoint is supported only by the explicitly selected demo AP
   assert.ok(data.items.length > 0);
   assert.ok(data.items.every(e => e.id && e.event && e.day));
 });
+
+test('time zone picker offsets, labels and search', async () => {
+  const { formatUtcOffset, timezoneOffsetMinutes, timezoneOption, timezoneOptions } = await import('../src/lib/timezones.ts');
+  const winter = new Date('2026-01-15T12:00:00Z'), summer = new Date('2026-07-15T12:00:00Z');
+  assert.equal(timezoneOffsetMinutes('Asia/Kolkata', winter), 330);
+  assert.equal(timezoneOffsetMinutes('America/New_York', winter), -300);
+  assert.equal(timezoneOffsetMinutes('America/New_York', summer), -240);
+  assert.equal(formatUtcOffset(0), 'UTC');
+  assert.equal(formatUtcOffset(330), 'UTC+5:30');
+  assert.equal(formatUtcOffset(-300), 'UTC−5');
+  assert.deepEqual({ ...timezoneOption('America/Sao_Paulo', winter) }, { zone: 'America/Sao_Paulo', city: 'Sao Paulo', region: 'America', offset: 'UTC−3', offsetMinutes: -180 });
+
+  const browse = timezoneOptions({ current: 'Asia/Kolkata', device: 'Europe/Lisbon', at: winter });
+  assert.deepEqual(browse.slice(0, 2).map(o => o.zone), ['Asia/Kolkata', 'Europe/Lisbon']);
+  assert.equal(browse.filter(o => o.zone === 'Asia/Kolkata').length, 1);
+  const rest = browse.slice(2).map(o => o.offsetMinutes);
+  assert.deepEqual(rest, [...rest].sort((a, b) => a - b));
+
+  assert.ok(timezoneOptions({ search: 'new york', zones: ['America/New_York'] }).some(o => o.zone === 'America/New_York'));
+  assert.ok(timezoneOptions({ search: 'utc+5:30', at: winter }).every(o => o.offset === 'UTC+5:30'));
+  assert.ok(timezoneOptions({ search: 'utc-5', at: winter }).some(o => o.zone === 'America/New_York'));
+  assert.deepEqual(timezoneOptions({ search: 'nowhere' }), []);
+  assert.ok(!timezoneOptions({ current: 'Not/AZone' }).some(o => o.zone === 'Not/AZone'));
+});
+
+test('demo profile saves the calendar time zone', async () => {
+  const demo = createDemoApi();
+  const saved = await demo.request('/api/v1/me/profile', { method: 'PATCH', body: { timezone: 'America/New_York' } });
+  assert.equal(saved.timezone, 'America/New_York');
+});

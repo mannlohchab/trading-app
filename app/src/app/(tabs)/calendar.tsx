@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useCallback, useMemo, useState } from 'react';
@@ -7,14 +8,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CalendarEventCard } from '@/components/calendar/CalendarEventCard';
 import { CalendarOverview } from '@/components/calendar/CalendarOverview';
+import { TimezonePicker } from '@/components/calendar/TimezonePicker';
 import { Text, TextInput } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Fonts } from '@/constants/theme';
 import { makeStyles, useColorScheme, usePalette } from '@/hooks/use-theme';
+import { api } from '@/lib/api';
 import { fetchFinancialCalendar } from '@/lib/calendarApi';
 import { calendarSections, calendarTimezone, filterCalendarEvents, toDateKey, type CalendarImpact, type CalendarView } from '@/lib/financialCalendar';
-import { useAuth } from '@/store/auth';
+import { timezoneOption } from '@/lib/timezones';
+import { useAuth, type User } from '@/store/auth';
 
 const IMPACTS: { value: CalendarImpact; label: string; color?: string }[] = [
   { value: 'all', label: 'All impact' }, { value: 'high', label: 'High', color: '#A18AE7' },
@@ -23,13 +27,19 @@ const IMPACTS: { value: CalendarImpact; label: string; color?: string }[] = [
 
 /** Solid purple behind white icons and labels; reads on both themes. */
 const PURPLE_FILL = '#6F47E9';
+const FUNNEL_ICON = require('@/assets/icons/ui/funnel.png');
 
 export default function FinancialCalendarScreen() {
   const styles = useStyles();
   const Palette = usePalette();
   const scheme = useColorScheme();
   const user = useAuth(s => s.user);
+  const updateUser = useAuth(s => s.updateUser);
   const timeZone = calendarTimezone(user?.timezone);
+  const deviceTimeZone = calendarTimezone();
+  const zoneLabel = useMemo(() => { const o = timezoneOption(timeZone); return `${o.city} · ${o.offset}`; }, [timeZone]);
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [zoneError, setZoneError] = useState('');
   const [impact, setImpact] = useState<CalendarImpact>('all');
   const [day, setDay] = useState('today');
   const [view, setView] = useState<CalendarView>('month');
@@ -43,6 +53,24 @@ export default function FinancialCalendarScreen() {
     enabled: user?.status === 'ACTIVE', staleTime: 5 * 60_000, retry: false,
   });
   const { refetch } = query;
+  // Optimistic: the calendar re-renders in the new zone at once and rolls back if the profile save fails.
+  const zoneMutation = useMutation({
+    mutationFn: (zone: string) => api<{ timezone: string | null }>('/api/v1/me/profile', { method: 'PATCH', body: { timezone: zone } }),
+    onMutate: zone => {
+      const previous = useAuth.getState().user;
+      setZoneError('');
+      if (previous) updateUser({ ...previous, timezone: zone });
+      return { previous };
+    },
+    onSuccess: profile => {
+      const latest = useAuth.getState().user;
+      if (latest && profile.timezone) updateUser({ ...latest, timezone: profile.timezone });
+    },
+    onError: (error, _zone, context?: { previous: User | null }) => {
+      if (context?.previous) updateUser(context.previous);
+      setZoneError(error.message || 'Could not save your time zone. Please try again.');
+    },
+  });
   const active = user?.status === 'ACTIVE';
   useFocusEffect(useCallback(() => {
     if (!active) return;
@@ -81,15 +109,15 @@ export default function FinancialCalendarScreen() {
         {data && <Text style={styles.eventCount}>{count}</Text>}
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Search and filter events" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
-        <View style={styles.filterIcon} accessible={false}>
-          <View style={styles.filterLine}><View style={styles.filterKnobLeft} /></View>
-          <View style={styles.filterLine}><View style={styles.filterKnobRight} /></View>
-        </View>
+        <Image source={FUNNEL_ICON} style={styles.filterIcon} contentFit="contain" accessible={false} />
         {hasFilters && <View style={styles.activeFilterDot} />}
       </Pressable>
     </View>
     <View style={styles.agendaMeta}>
-      <Text style={styles.timezoneText}>Times in {timeZone.replaceAll('_', ' ')}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Time zone: ${zoneLabel}. Change time zone`} disabled={zoneMutation.isPending} onPress={() => setZoneOpen(true)} style={({ pressed }) => [styles.zoneButton, pressed && styles.pressed]}>
+        <Text style={styles.timezoneText} numberOfLines={1}>Times in <Text style={styles.zoneName}>{zoneLabel}</Text></Text>
+        <View style={styles.zoneChevron} />
+      </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={selectedDay === 'all' ? 'Show today' : 'Show full week'} onPress={() => setDay(selectedDay === 'all' ? 'today' : 'all')} style={({ pressed }) => [styles.scopeButton, pressed && styles.pressed]}>
         <Text style={styles.scopeText}>{selectedDay === 'all' ? 'Back to today' : 'Full week'}</Text>
         <View style={styles.scopeChevron} />
@@ -116,6 +144,7 @@ export default function FinancialCalendarScreen() {
     {oldWeek && <Text style={styles.warningBanner}>All events in this published schedule are before today.</Text>}
     {query.isError && <ErrorBanner message={data ? 'Could not refresh the calendar. Showing saved events.' : 'Could not load the calendar. Please try again shortly.'} onRetry={() => void refetch()} />}
     {linkError ? <ErrorBanner message={linkError} /> : null}
+    {zoneError ? <ErrorBanner message={zoneError} /> : null}
   </View>;
 
   const footer = data ? <View style={styles.provenance}>
@@ -157,6 +186,8 @@ export default function FinancialCalendarScreen() {
       </View> : null}
       renderItem={({ item }) => <CalendarEventCard event={item} timeZone={timeZone} layout={view === 'week' ? 'timeline' : 'list'} onSource={url => void openSource(url)} />}
     />
+    <TimezonePicker visible={zoneOpen} current={timeZone} device={deviceTimeZone} onClose={() => setZoneOpen(false)}
+      onSelect={zone => { setZoneOpen(false); if (zone !== timeZone) zoneMutation.mutate(zone); }} />
   </SafeAreaView>;
 }
 
@@ -170,13 +201,13 @@ const useStyles = makeStyles((Palette, _, scheme) => {
     agendaTitle: { fontFamily: Fonts.sans, color: dark ? Palette.text : '#1C1C1E', fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.5, flexShrink: 1 },
     eventCount: { fontFamily: Fonts.sans, color: dark ? Palette.textMuted : '#AEAEB2', fontSize: 13, fontWeight: '500' },
     filterButton: { width: 36, height: 36, backgroundColor: PURPLE_FILL, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    filterIcon: { width: 18, gap: 7 },
-    filterLine: { height: 1, backgroundColor: Palette.onAccent, width: 18 },
-    filterKnobLeft: { position: 'absolute', width: 5, height: 5, borderRadius: 3, borderWidth: 1, borderColor: Palette.onAccent, backgroundColor: PURPLE_FILL, left: 4, top: -2 },
-    filterKnobRight: { position: 'absolute', width: 5, height: 5, borderRadius: 3, borderWidth: 1, borderColor: Palette.onAccent, backgroundColor: PURPLE_FILL, right: 3, top: -2 },
+    filterIcon: { width: 18, height: 18 },
     activeFilterDot: { position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: '#E3F5BB' },
     agendaMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, flexWrap: 'wrap', paddingBottom: 4 },
+    zoneButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
     timezoneText: { fontFamily: Fonts.sans, color: dark ? Palette.textSecondary : '#8E8E93', fontSize: 12, lineHeight: 16, flexShrink: 1 },
+    zoneName: { color: dark ? Palette.text : '#4E4658', fontWeight: '600' },
+    zoneChevron: { width: 6, height: 6, marginTop: -3, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: dark ? Palette.textSecondary : '#8E8E93', transform: [{ rotate: '45deg' }] },
     scopeButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6 },
     scopeText: { fontFamily: Fonts.sans, color: Palette.purple, fontSize: 13, lineHeight: 18, fontWeight: '600' },
     scopeChevron: { width: 6, height: 6, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: Palette.purple, transform: [{ rotate: '-45deg' }] },

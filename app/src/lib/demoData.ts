@@ -206,6 +206,7 @@ export function createDemoApi() {
       if (url.pathname === '/api/v1/me/profile' && method === 'PATCH') {
         if (typeof body.name === 'string') user.displayName = body.name;
         if (typeof body.username === 'string' || body.username === null) user.username = body.username as string | null;
+        if (typeof body.timezone === 'string') user.timezone = body.timezone;
         return { name: user.displayName, username: user.username, image: user.avatarUrl, phoneNumber: user.phoneNumber, timezone: user.timezone };
       }
       if (url.pathname === '/api/users/me' && method === 'PATCH') {
