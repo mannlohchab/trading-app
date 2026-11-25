@@ -279,7 +279,7 @@ const useStyles = makeStyles((Palette, InsightPalette, scheme) => {
     grid: { marginHorizontal: 16, borderWidth: 1, borderColor: LINE, borderRadius: 10, overflow: 'hidden', backgroundColor: CARD },
     gridRow: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: LINE },
     headerRow: { backgroundColor: SOFT },
-    altRow: { backgroundColor: dark ? '#20201E' : '#FBFBFA' },
+    altRow: { backgroundColor: dark ? Palette.cardHover : '#FBFBFA' },
     headerText: { color: BODY, fontSize: 11, fontWeight: '600', letterSpacing: 0.3, textTransform: 'uppercase' },
     headerCell: { paddingHorizontal: 8, paddingVertical: 9, borderLeftWidth: StyleSheet.hairlineWidth, borderColor: LINE },
     indexCell: { width: 30, textAlign: 'center', textAlignVertical: 'center', paddingVertical: 9, color: MUTED, fontSize: 11, fontVariant: ['tabular-nums'] },

@@ -41,12 +41,12 @@ export default function AppTabs() {
       }} />
       <Tabs.Screen name="market" options={{
         title: 'Market',
-        sceneStyle: { backgroundColor: InsightPalette.card },
+        sceneStyle: { backgroundColor: InsightPalette.bgElevated },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="chart" tone={focused ? 'purple' : 'neutral'} />,
       }} />
       <Tabs.Screen name="ai" options={{
         title: 'Insights',
-        sceneStyle: { backgroundColor: InsightPalette.card },
+        sceneStyle: { backgroundColor: InsightPalette.bgElevated },
         // Full-screen chat: the header's home button replaces the dock.
         tabBarStyle: { display: 'none' },
         tabBarIcon: ({ focused }) => <GlassIcon size={26} name="analytics" tone={focused ? 'purple' : 'neutral'} />,
@@ -66,7 +66,7 @@ export default function AppTabs() {
         tabBarButton: () => null,
         // The tab bar still wraps each button in a `flex: 1` slot; hide it so the dock has no gap.
         tabBarItemStyle: { display: 'none' },
-        sceneStyle: { backgroundColor: InsightPalette.card },
+        sceneStyle: { backgroundColor: InsightPalette.bgElevated },
       }} />
     </Tabs>
   );

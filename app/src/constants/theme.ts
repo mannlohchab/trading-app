@@ -51,7 +51,7 @@ export type PaletteColors = { readonly [K in keyof typeof LightPalette]: string 
 /** Dark fintech surfaces: cool near-black layers, brighter brand blue for contrast. */
 const DarkPalette: PaletteColors = {
   bg: '#0B0D12',
-  bgElevated: '#12151C',
+  bgElevated: '#0B0D12',
   card: '#151922',
   cardHover: '#1B202B',
   border: '#262B37',
@@ -77,7 +77,7 @@ const DarkPalette: PaletteColors = {
   inverse: '#ECEEF4',
   onInverse: '#0B0D12',
   shadow: '#000000',
-  chartBg: '#12151C',
+  chartBg: '#0B0D12',
   chartText: '#D1D4DC',
   chartMuted: '#8A8F9C',
   chartGrid: '#232733',
@@ -108,23 +108,23 @@ const LightInsightPalette = {
 
 export type InsightPaletteColors = { readonly [K in keyof typeof LightInsightPalette]: string };
 
-/** Warm dark theme for Insights and Community. */
+/** Dark Insights/Community surfaces: the same page and card shades as the main dark theme. */
 const DarkInsightPalette: InsightPaletteColors = {
-  bg: '#141413',
-  bgElevated: '#1C1C1A',
-  card: '#1C1C1A',
-  soft: '#262624',
-  border: '#2E2E2B',
-  borderSubtle: '#262624',
-  text: '#EDEDEA',
-  body: '#CFCFCA',
-  textSecondary: '#A3A39E',
-  textMuted: '#7D7D78',
-  accent: '#EDEDEA',
-  accentMuted: '#262624',
+  bg: '#0B0D12',
+  bgElevated: '#0B0D12',
+  card: '#151922',
+  soft: '#1E2330',
+  border: '#262B37',
+  borderSubtle: '#1E232E',
+  text: '#ECEEF4',
+  body: '#CDD1DC',
+  textSecondary: '#A0A6B8',
+  textMuted: '#6E7487',
+  accent: '#ECEEF4',
+  accentMuted: '#1E2330',
   red: '#F87171',
-  yellow: '#EDEDEA',
-  onSolid: '#141413',
+  yellow: '#ECEEF4',
+  onSolid: '#0B0D12',
 };
 
 export const Palettes: Record<ColorScheme, PaletteColors> = { light: LightPalette, dark: DarkPalette };

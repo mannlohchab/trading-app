@@ -574,7 +574,7 @@ const useStyles = makeStyles((Palette, InsightPalette, scheme) => {
   return {
     flex: { flex: 1 },
     pressed: { opacity: 0.6 },
-    safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: CARD },
+    safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: InsightPalette.bgElevated },
     header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
     headerStart: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: SOFT },

@@ -4,10 +4,10 @@ import { Text } from '@/components/ui/AppText';
 import { makeStyles, useColorScheme } from '@/hooks/use-theme';
 import { BAND, PILL, type BandTone, type PillTone } from '@/lib/runTicket';
 
-/** Ticket ink: a blue-black in light mode, warm near-white in dark mode. `onInk` labels sit on `ink` fills. */
+/** Ticket ink: a blue-black in light mode, cool near-white in dark mode. `onInk` labels sit on `ink` fills. */
 const TICKET = {
   light: { ink: '#0B0B2B', muted: '#7A8090', onInk: '#FFFFFF', dash: '#E2E5EC', gain: '#078A62', loss: '#C62D2D' },
-  dark: { ink: '#EDEDEA', muted: '#A3A39E', onInk: '#141413', dash: '#2E2E2B', gain: '#34D399', loss: '#F87171' },
+  dark: { ink: '#ECEEF4', muted: '#A0A6B8', onInk: '#0B0D12', dash: '#262B37', gain: '#34D399', loss: '#F87171' },
 } as const;
 
 export type TicketAction = {

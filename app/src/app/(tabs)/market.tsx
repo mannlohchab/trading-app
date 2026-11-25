@@ -61,7 +61,7 @@ function MarketPrices({ sort }: { sort: 'volume' | 'gainers' | 'losers' }) {
 }
 
 const useStyles = makeStyles((_, P) => ({
-  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: P.card },
+  safe: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: P.bgElevated },
   header: { paddingHorizontal: 16, paddingBottom: 14 },
   title: { color: P.text, fontSize: 26, lineHeight: 34, letterSpacing: -0.3 },
   subtitle: { color: P.textSecondary, fontSize: 14, marginTop: 4 },

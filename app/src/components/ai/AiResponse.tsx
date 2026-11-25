@@ -103,7 +103,7 @@ const useStyles = makeStyles((_Palette, P, scheme) => ({
   tableRow: { flexDirection: 'row' },
   tableHeader: { backgroundColor: P.soft, borderBottomWidth: 1, borderBottomColor: P.border },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: P.border },
-  altRow: { backgroundColor: scheme === 'dark' ? '#181817' : '#FAFAF8' },
+  altRow: { backgroundColor: scheme === 'dark' ? '#1B202B' : '#FAFAF8' },
   cell: { flexGrow: 1, flexShrink: 0, paddingHorizontal: 11, paddingVertical: 9, color: P.body, fontSize: 13, lineHeight: 19 },
   headerCell: { color: P.textSecondary, fontSize: 11, lineHeight: 16, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase' },
   firstCell: { color: P.text, fontWeight: '600' },

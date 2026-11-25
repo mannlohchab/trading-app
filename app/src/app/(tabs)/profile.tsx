@@ -333,7 +333,7 @@ function SectionTitle({ title, count }: { title: string; count?: number }) {
 const useStyles = makeStyles((_, P) => ({
   fill: { flex: 1 },
   pressed: { opacity: 0.55 },
-  safe: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: P.card },
+  safe: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: P.bgElevated },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   title: { color: P.text, fontSize: 26, lineHeight: 34, letterSpacing: -0.3 },
   iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: P.soft, alignItems: 'center', justifyContent: 'center' },
