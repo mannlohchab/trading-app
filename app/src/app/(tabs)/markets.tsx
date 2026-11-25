@@ -149,7 +149,8 @@ export default function MarketsScreen() {
     { label: 'Markets', art: require('@/assets/images/home-markets.png'), onPress: () => router.push('/(tabs)/market') },
     { label: 'Calendar', art: require('@/assets/images/home-calendar.png'), onPress: () => router.push('/(tabs)/calendar') },
     { label: 'Community', art: require('@/assets/images/home-community.png'), onPress: () => router.push('/(tabs)/community') },
-    { label: 'Portfolio', art: require('@/assets/images/home-portfolio.png'), onPress: () => router.push('/(tabs)/profile') },
+    // The Profile screen stays mounted on its last tab, so ask for Portfolio explicitly (`at` makes each tap a new request).
+    { label: 'Portfolio', art: require('@/assets/images/home-portfolio.png'), onPress: () => router.navigate({ pathname: '/(tabs)/profile', params: { tab: 'Portfolio', at: String(Date.now()) } }) },
     { label: 'AI Insight', art: require('@/assets/images/home-ai.png'), onPress: () => router.push({ pathname: '/(tabs)/ai', params: { from: 'home' } }) },
   ];
 

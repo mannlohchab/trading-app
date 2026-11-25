@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/AppText';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Action, Card, Field, Heading, Help, Metric, Status, backtestStyles as S } from '@/components/backtesting/BacktestUi';
+import { Action, Card, Field, Heading, Help, backtestStyles as S } from '@/components/backtesting/BacktestUi';
+import { RunTicket } from '@/components/backtesting/RunTicket';
+import { bandTone, signedPercent, statusPill, ticketDate, ticketMarket } from '@/lib/runTicket';
 import { BACKTEST_TIMEFRAMES, comparisonNotes, defaultBacktestDraft, isActiveBacktest, metricText, prepareBacktest, type BacktestDraft, type BacktestRun } from '@/lib/backtesting';
 import { createBacktest, getBacktest, getBacktestStrategy, listBacktests, listBacktestStrategies } from '@/lib/backtestingApi';
 import { DEMO_MODE } from '@/lib/demoMode';
@@ -103,22 +105,42 @@ export default function BacktestsScreen() {
         {history.isError ? <ErrorBanner message={history.error.message} onRetry={() => void history.refetch()} /> : null}
         {!history.isPending && !history.isError && !runs.length ? <Card><Heading>No runs yet</Heading><Help>Choose a saved strategy to create your first backtest.</Help><Action title="Create a backtest" onPress={() => setSection('new')} /></Card> : null}
         {runs.length ? <Help>Select up to three completed runs to compare their results.</Help> : null}
-        {runs.map(run => <Card key={run.id}><Pressable accessibilityRole="button" accessibilityLabel={`Open ${run.strategy.name ?? 'backtest'} results`}
-          onPress={() => router.push({ pathname: '/backtests/[id]', params: { id: run.id } })}>
-          <View style={S.row}><Text style={{ fontSize: 16, fontWeight: '600', flex: 1 }}>{run.strategy.name ?? 'Backtest'}</Text><Status status={run.status} /></View>
-          <Help>{run.market.exchange} · {run.market.symbol} · {run.market.timeframe} · v{run.strategy.version ?? '—'}</Help>
-          <Help>{new Date(run.createdAt).toLocaleString()}</Help>
-          {run.summary ? <View style={S.wrap}><Metric label="Return" value={run.summary.totalReturnPercent} suffix="%" tone /><Metric label="Drawdown at close" value={run.summary.maxDrawdownPercent} suffix="%" /><Metric label="Trades" value={run.summary.totalTrades} /></View> : null}
-          {run.error ? <Text style={S.error}>{run.error.message}</Text> : null}
-        </Pressable>{run.status === 'COMPLETED' ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`Compare ${run.strategy.name ?? 'run'}`}
-          accessibilityState={{ checked: comparison.includes(run.id), disabled: !comparison.includes(run.id) && comparison.length >= 3 }}
-          disabled={!comparison.includes(run.id) && comparison.length >= 3} onPress={() => toggleComparison(run.id)} style={[S.chip, comparison.includes(run.id) && S.selected]}>
-          <Text>{comparison.includes(run.id) ? '✓ Selected for comparison' : 'Compare this run'}</Text></Pressable> : null}</Card>)}
+        <View style={{ gap: 18 }}>{runs.map(run => <BacktestTicket key={run.id} run={run} comparing={comparison.includes(run.id)}
+          canCompare={comparison.includes(run.id) || comparison.length < 3} onToggleCompare={() => toggleComparison(run.id)} />)}</View>
         {history.hasNextPage ? <Action secondary title="Load older runs" pending={history.isFetchingNextPage} onPress={() => void history.fetchNextPage()} /> : null}
         {comparison.length ? <Comparison ids={comparison} userId={userId} onClear={() => setComparison([])} /> : null}
       </> : null}
     </ScrollView>
   </KeyboardAvoidingView>;
+}
+
+/** One saved run as a ticket card (see components/backtesting/RunTicket). */
+function BacktestTicket({ run, comparing, canCompare, onToggleCompare }: { run: BacktestRun; comparing: boolean; canCompare: boolean; onToggleCompare: () => void }) {
+  const name = run.strategy.name ?? 'Backtest';
+  const open = () => router.push({ pathname: '/backtests/[id]', params: { id: run.id } });
+  const result = run.status === 'COMPLETED' ? signedPercent(run.summary?.totalReturnPercent) : null;
+  const returnValue = Number(run.summary?.totalReturnPercent);
+  const trades = run.summary?.totalTrades;
+  const period = run.range ? `Tested ${ticketDate(run.range.start)} – ${ticketDate(run.range.end)}` : '';
+  const caption = result
+    ? [`Return · ${metricText(trades, '', 0)} trades · max drawdown ${metricText(run.summary?.maxDrawdownPercent, '%')}`, period].filter(Boolean).join('\n')
+    : period;
+  return <RunTicket
+    band={bandTone(run.status, run.status === 'COMPLETED' ? run.summary?.totalReturnPercent : undefined)}
+    headerLeft={ticketMarket(run.market)} headerRight={ticketDate(run.createdAt)}
+    eyebrow={[run.market.exchange, run.strategy.version ? `Strategy v${run.strategy.version}` : null].filter(Boolean).join(' · ')}
+    title={name} status={statusPill(run.status)}
+    value={result} valueTone={result ? (returnValue >= 0 ? 'gain' : 'loss') : undefined} caption={caption}
+    busy={isActiveBacktest(run.status)}
+    note={run.error ? <Text style={S.error}>{run.error.message}</Text>
+      : isActiveBacktest(run.status) ? <Help>Results appear here when the run finishes.</Help>
+      : run.status === 'CANCELLED' ? <Help>Cancelled before it finished.</Help> : null}
+    onPress={open} accessibilityLabel={`Open ${name} results`}
+    actions={[
+      ...(run.status === 'COMPLETED' ? [{ label: comparing ? '✓ Comparing' : 'Compare', variant: comparing ? 'solid' as const : 'outline' as const,
+        checked: comparing, disabled: !canCompare, accessibilityLabel: `Compare ${name}`, onPress: onToggleCompare }] : []),
+      { label: 'View results', onPress: open, accessibilityLabel: `View ${name} results` },
+    ]} />;
 }
 
 function Comparison({ ids, userId, onClear }: { ids: string[]; userId?: string; onClear: () => void }) {

@@ -36,7 +36,7 @@ export function AppTopBar({ onBrandPress, logoBorder = false }: Props) {
           onPress={() => router.navigate({ pathname: '/(tabs)/profile', params: { tab: 'Settings', at: String(Date.now()) } })}>
           <GlassIcon name="bell" size={24} tone="purple" />
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open portfolio" style={styles.portfolioPill} onPress={() => router.navigate('/(tabs)/profile')}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open portfolio" style={styles.portfolioPill} onPress={() => router.navigate({ pathname: '/(tabs)/profile', params: { tab: 'Portfolio', at: String(Date.now()) } })}>
           <Text style={styles.portfolioText}>Portfolio</Text>
         </Pressable>
       </View>
