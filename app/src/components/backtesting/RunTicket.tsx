@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   },
   card: { borderRadius: 26, overflow: 'hidden' },
   pressed: { opacity: 0.85 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 22, paddingTop: 18, paddingBottom: 34 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 22, paddingTop: 9, paddingBottom: 26 },
   headerText: { fontSize: 17, letterSpacing: 0.3, fontWeight: '500' },
   headerLeft: { flexShrink: 1 },
   bodyTop: { marginTop: -18, backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
