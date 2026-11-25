@@ -1,1 +1,0 @@
-ALTER TABLE "ai_market_briefs" ADD COLUMN "duration_seconds" integer;
