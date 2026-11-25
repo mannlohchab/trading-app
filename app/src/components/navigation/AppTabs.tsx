@@ -61,6 +61,8 @@ export default function AppTabs() {
         // Opened from the top bar, so it has no dock button. Not `href: null`: Expo Router 58 marks
         // that tab hidden and redirects every visit to it back to Home.
         tabBarButton: () => null,
+        // The tab bar still wraps each button in a `flex: 1` slot; hide it so the dock has no gap.
+        tabBarItemStyle: { display: 'none' },
         sceneStyle: { backgroundColor: '#FFFFFF' },
       }} />
     </Tabs>
