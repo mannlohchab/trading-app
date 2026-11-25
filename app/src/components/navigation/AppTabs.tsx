@@ -58,7 +58,9 @@ export default function AppTabs() {
       }} />
       <Tabs.Screen name="profile" options={{
         title: 'Profile',
-        href: null,
+        // Opened from the top bar, so it has no dock button. Not `href: null`: Expo Router 58 marks
+        // that tab hidden and redirects every visit to it back to Home.
+        tabBarButton: () => null,
         sceneStyle: { backgroundColor: '#FFFFFF' },
       }} />
     </Tabs>
