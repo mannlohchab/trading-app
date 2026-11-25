@@ -4,7 +4,7 @@ import { config } from './config';
 import { db } from './db/client';
 import { clientIpResolver } from './http/client-ip';
 import { createLogger } from './logger';
-import { createAiModule, NEMOTRON_FREE_MODEL, WORKERS_AI_MODELS, OpenRouterChatProvider, WorkersAiProvider } from './modules/ai';
+import { createAiModule, MIMO_MODELS, MimoChatProvider, NEMOTRON_FREE_MODEL, WORKERS_AI_MODELS, OpenRouterChatProvider, WorkersAiProvider } from './modules/ai';
 import { backtestGateway } from './modules/ai/infrastructure/gateways';
 import { backtestResearchGateway } from './modules/ai/infrastructure/backtest-research.gateway';
 import { createLiveTestingGateway } from './modules/ai/infrastructure/live-testing.gateway';
@@ -67,14 +67,19 @@ export function composeModules() {
   const ai = createAiModule({
     db,
     requireActiveUser: identity.requireActiveUser,
-    providers: [
-      ...(config.ai.openRouter ? [new OpenRouterChatProvider(config.ai.openRouter)] : []),
-      ...(config.ai.cloudflare ? [new WorkersAiProvider(config.ai.cloudflare)] : []),
-    ],
-    models: [
-      ...(config.ai.openRouter ? [NEMOTRON_FREE_MODEL] : []),
-      ...WORKERS_AI_MODELS,
-    ],
+    // MiMo is the only chat model when its key is set; otherwise free Nemotron / Workers AI.
+    providers: config.ai.mimo
+      ? [new MimoChatProvider(config.ai.mimo)]
+      : [
+        ...(config.ai.openRouter ? [new OpenRouterChatProvider(config.ai.openRouter)] : []),
+        ...(config.ai.cloudflare ? [new WorkersAiProvider(config.ai.cloudflare)] : []),
+      ],
+    models: config.ai.mimo
+      ? MIMO_MODELS
+      : [
+        ...(config.ai.openRouter ? [NEMOTRON_FREE_MODEL] : []),
+        ...WORKERS_AI_MODELS,
+      ],
     defaultModelId: config.ai.defaultModel,
     fallbackModelIds: config.ai.fallbackModels,
     limits: config.ai.limits,
@@ -95,14 +100,15 @@ export function composeModules() {
       },
     },
   });
-  if (!config.ai.openRouter && !config.ai.cloudflare) console.warn('[ai] No chat model configured: set OPENROUTER_API_KEY or CF_ACCOUNT_ID/CF_API_TOKEN');
+  if (config.ai.mimo) console.log(`[ai] main model: MiMo (${config.ai.defaultModel}, fallbacks ${config.ai.fallbackModels.join(', ')}) via ${config.ai.mimo.baseUrl}`);
+  else if (!config.ai.openRouter && !config.ai.cloudflare) console.warn('[ai] No chat model configured: set MIMO_API_KEY (or OPENROUTER_API_KEY / CF_ACCOUNT_ID+CF_API_TOKEN)');
   else if (config.ai.openRouter) console.log('[ai] default chat model is free Nemotron when AI_DEFAULT_MODEL is nemotron-free');
   if (md.scriptProvider === 'gemini' && !md.gemini) console.warn('[ai] GEMINI_API_KEY not set: Morning Decode will use the factual fallback script');
   if (md.scriptProvider === 'openrouter' && !md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode script provider openrouter is unavailable');
   if (config.ai.webResearch) {
-    console.log(`[ai] web research enabled: ${config.ai.webResearch.model} via ${config.ai.webResearch.firecrawlBaseUrl}`);
+    console.log(`[ai] web research enabled: ${config.ai.webResearch.model.provider} ${config.ai.webResearch.model.model} via ${config.ai.webResearch.firecrawlBaseUrl}`);
   } else if (process.env.FIRECRAWL_API_URL?.trim()) {
-    console.warn('[ai] FIRECRAWL_API_URL is set but web research is off: OPENROUTER_API_KEY is required, and RESEARCH_MODEL must be a free Nemotron id');
+    console.warn('[ai] FIRECRAWL_API_URL is set but web research is off: set MIMO_API_KEY (or OPENROUTER_API_KEY with a free Nemotron RESEARCH_MODEL)');
   }
   if (!md.openRouter) console.warn('[ai] OPENROUTER_API_KEY not set: Morning Decode audio (TTS) will be unavailable');
 

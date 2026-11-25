@@ -1,0 +1,23 @@
+[
+  {
+    "model": "mimo-ultraspeed",
+    "task": "rsi-backtest",
+    "pass": true,
+    "problems": [],
+    "ms": 36964,
+    "tools": [
+      "analyze_market",
+      "get_tickers",
+      "show_chart",
+      "draft_strategy",
+      "run_backtest",
+      "suggest_next_steps"
+    ],
+    "errors": [],
+    "nextSteps": true,
+    "finish": "stop",
+    "rounds": 4,
+    "tokens": 132574,
+    "reply": "Strategy built and queued for backtesting. Here's what it does:\n\n**The idea:** when BTC drops fast enough that its **RSI** (a 0–100 momentum gauge; under 30 = \"oversold\") sinks below 30 on a 1-hour close, buy the dip, then sell once momentum recovers.\n\n**The rules (BTCUSDT, 1h, long only):**\n- **Enter:** 1h candle closes with RSI(14) below 30\n- **Exit:** RSI climbs back above 50, or **stop loss −4%**, or **take profit +8%**\n- **Size:** 10% of balance per trade\n\nAt the current price (~73,886 USDT) that stop sits near 70,930 — just under the ~72,998 support — and the target near 79,797, by the ~79,499 resistance (chart below).\n\n**What the market shows now:** BTC is in a **downtrend** on the 1h (−6.9% recently) and RSI is **23.2 — already oversold**, so this setup is live right now. Note: an oversold RSI in a falling market can stay low and keep falling.\n\n**Backtest:** queued over the past year — **25 Nov 2025 → now (25 Nov 2026, UTC)**, ~8,700 1h candles, 10,000 USDT virtual capital, 0.1% commission per side, 1 tick slippage. It's running; the card below will fill in with results (trades, win rate, return, drawdown). Past results don't promise future returns.\n\n**When this fails:** sharp downtrends (\"falling knives\") where each dip gets stopped out, and choppy sideways ranges that whipsaw the RSI exit."
+  }
+]

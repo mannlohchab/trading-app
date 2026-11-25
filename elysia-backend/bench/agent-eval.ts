@@ -2,7 +2,8 @@
  * Agent eval: runs real user tasks through the real assistant (real tools, in-memory Postgres,
  * fake Binance data) against live chat models, and checks whether each model used the right tools.
  *
- *   OPENROUTER_API_KEY=… bun bench/agent-eval.ts                     # free Nemotron
+ *   MIMO_API_KEY=… bun bench/agent-eval.ts                           # MiMo Pro Ultraspeed (default)
+ *   OPENROUTER_API_KEY=… EVAL_MODELS=nemotron-free bun bench/agent-eval.ts
  *   CF_ACCOUNT_ID=… CF_API_TOKEN=… EVAL_MODELS=gpt-oss-120b bun bench/agent-eval.ts
  *   EVAL_MODELS=nemotron-free,gpt-oss-120b EVAL_TASKS=guide-holdings,rsi-backtest bun bench/agent-eval.ts
  *
@@ -11,12 +12,13 @@
  * and as JSON to bench/results/agent-eval-<time>.json.
  */
 import { mkdir } from 'node:fs/promises';
-import { NEMOTRON_FREE_MODEL, OpenRouterChatProvider, WORKERS_AI_MODELS, WorkersAiProvider, type ChatModelProvider, type ModelProfile } from '../src/modules/ai';
+import { MIMO_MODELS, MimoChatProvider, NEMOTRON_FREE_MODEL, OpenRouterChatProvider, WORKERS_AI_MODELS, WorkersAiProvider, type ChatModelProvider, type ModelProfile } from '../src/modules/ai';
 import { createTestApp } from '../tests/helpers/test-app';
 import { activeUser } from '../tests/helpers/users';
+import { candle } from '../tests/helpers/fake-market';
 import { definition, recentWalk, seedCandles } from '../tests/backtesting/fixtures';
 
-type Reply = { content: string; toolCalls: { name: string; ok: boolean; arguments: unknown }[]; blockTypes: string[] };
+type Reply = { content: string; toolCalls: { name: string; ok: boolean; arguments: unknown; error?: string }[]; blockTypes: string[] };
 type Task = {
   id: string;
   prompt: string;
@@ -34,7 +36,7 @@ const mentions = (...words: string[]) => (r: Reply) =>
 
 export const TASKS: Task[] = [
   { id: 'guide-holdings', prompt: 'How do I add the coins I own so you can review them?', needs: [['get_app_guide']], check: mentions('Edit holdings', 'Paste from Excel', 'Add row') },
-  { id: 'guide-watchlist', prompt: 'Can I set a price alert or add BTC to a watchlist?', needs: [['get_app_guide']], check: mentions('not available', "isn't available", 'not in the app', "doesn't have", 'does not have', 'no watchlist', 'no price alert') },
+  { id: 'guide-watchlist', prompt: 'Can I set a price alert or add BTC to a watchlist?', needs: [['get_app_guide']], check: mentions("not available", "isn't available", "not in the app", "not in TradingGurukul", "not in tradinggurukul", "doesn't have", 'does not have', 'no watchlist', 'no price alert') },
   { id: 'guide-results', prompt: 'Where do I find my old backtest results?', needs: [['get_app_guide', 'suggest_next_steps', 'list_backtests']], check: mentions('Run history', 'Backtesting') },
   { id: 'price-check', prompt: 'Check Bitcoin right now', needs: [['get_tickers', 'analyze_market']], avoid: ['draft_strategy', 'start_live_test'] },
   { id: 'movers', prompt: "What are today's biggest gainers?", needs: [['get_top_movers']] },
@@ -51,6 +53,8 @@ export const TASKS: Task[] = [
 function providersFromEnv() {
   const providers: ChatModelProvider[] = [];
   const models: ModelProfile[] = [];
+  const mimoKey = (process.env.MIMO_API_KEY ?? process.env.TEXT_API_KEY)?.trim();
+  if (mimoKey) { providers.push(new MimoChatProvider({ apiKey: mimoKey, baseUrl: process.env.MIMO_BASE_URL?.trim() || undefined })); models.push(...MIMO_MODELS); }
   const key = process.env.OPENROUTER_API_KEY?.trim();
   if (key) { providers.push(new OpenRouterChatProvider({ apiKey: key })); models.push(NEMOTRON_FREE_MODEL); }
   const accountId = process.env.CF_ACCOUNT_ID?.trim(), apiToken = process.env.CF_API_TOKEN?.trim();
@@ -75,6 +79,15 @@ export async function runModel(model: ModelProfile, providers: ChatModelProvider
   try {
     await t.market.catalog.sync('BINANCE');
     await seedCandles(t, recentWalk(t, 1500));
+    // Exchange candles for charts and analysis (the fake exchange ignores the timeframe): a gentle
+    // random walk around 74k with some intrabar range, so indicators have something to read.
+    let price = 74_000;
+    const now = Date.now();
+    t.provider.candles = Array.from({ length: 400 }, (_, i) => {
+      price *= 1 + Math.sin(i / 9) * 0.004 + (((i * 7919) % 13) - 6) * 0.0006;
+      const c = candle(now - (400 - i) * 3_600_000, price.toFixed(2), true, 60);
+      return { ...c, open: (price * 0.998).toFixed(2), high: (price * 1.004).toFixed(2), low: (price * 0.995).toFixed(2), volume: String(100 + (i % 17) * 10) };
+    });
     const u = await activeUser(t);
     await u.c.post('/api/v1/strategies', { name: 'EMA cross', definition: definition() });
     await t.portfolio.service.replace(u.user.id, [
@@ -95,13 +108,14 @@ export async function runModel(model: ModelProfile, providers: ChatModelProvider
       }
       const reply: Reply = {
         content: message.content,
-        toolCalls: (message.metadata.toolCalls ?? []).map((c: any) => ({ name: c.name, ok: c.ok, arguments: c.arguments })),
+        toolCalls: (message.metadata.toolCalls ?? []).map((c: any) => ({ name: c.name, ok: c.ok, arguments: c.arguments, ...(c.error && { error: c.error }) })),
         blockTypes: (message.metadata.blocks ?? []).map((b: any) => b.type),
       };
       const problems = score(task, reply);
       rows.push({
         model: model.id, task: task.id, pass: !problems.length, problems, ms,
-        tools: reply.toolCalls.map(c => `${c.name}${c.ok ? '' : '✗'}`), nextSteps: reply.blockTypes.includes('actions'),
+        tools: reply.toolCalls.map(c => `${c.name}${c.ok ? '' : '✗'}`), errors: reply.toolCalls.filter(c => !c.ok).map(c => `${c.name}(${JSON.stringify(c.arguments)}): ${(c as any).error}`), nextSteps: reply.blockTypes.includes('actions'),
+        finish: message.metadata.finishReason, rounds: message.metadata.rounds,
         tokens: (message.tokenUsage?.inputTokens ?? 0) + (message.tokenUsage?.outputTokens ?? 0), reply: reply.content,
       });
       console.error(`${model.id} ${task.id}: ${problems.length ? `FAIL (${problems.join('; ')})` : 'ok'} in ${(ms / 1000).toFixed(1)}s`);
@@ -116,7 +130,7 @@ if (import.meta.main) await main();
 
 async function main() {
   const { providers, models } = providersFromEnv();
-  const wanted = process.env.EVAL_MODELS?.split(',').map(s => s.trim()).filter(Boolean) ?? ['nemotron-free'];
+  const wanted = process.env.EVAL_MODELS?.split(',').map(s => s.trim()).filter(Boolean) ?? ['mimo-ultraspeed'];
   const selected = models.filter(m => wanted.includes(m.id));
   if (!selected.length) {
     console.error(`No configured model matches EVAL_MODELS=${wanted.join(',')}. Configured: ${models.map(m => m.id).join(', ') || 'none (set OPENROUTER_API_KEY or CF_ACCOUNT_ID/CF_API_TOKEN)'}`);

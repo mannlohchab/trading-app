@@ -136,3 +136,27 @@ test('stripToolMarkup cleans stored replies', async () => {
   expect(stripToolMarkup(LEAKED)).toBe('Here is a plan.\n\nDone.');
   expect(stripToolMarkup('<tool_call>\n<function=draft_strategy>\n<parameter=symbol>\nBTCUSDT')).toBe('');
 });
+
+describe('thinking that uses up the output budget', () => {
+  let t: Awaited<ReturnType<typeof createTestApp>>;
+  let u: Awaited<ReturnType<typeof activeUser>>;
+  beforeAll(async () => { t = await createTestApp(); u = await activeUser(t); });
+  afterAll(() => t.close());
+
+  test('the step is retried once without thinking instead of ending with an empty reply', async () => {
+    const { done: finished } = await import('../helpers/fake-ai');
+    const lengthStop = { type: 'done' as const, finishReason: 'length' as const, usage: { inputTokens: 100, outputTokens: 8192 }, reasoning: 'long thoughts' };
+    t.model.script([lengthStop], [text('Here is the strategy.'), finished(100, 50)]);
+    const id = (await u.c.post('/api/v1/ai/conversations', {})).body.id as string;
+    const reply = (await u.c.post(`/api/v1/ai/conversations/${id}/messages`, { content: 'Design a strategy', stream: false })).body.assistantMessage;
+    expect(reply.content).toBe('Here is the strategy.');
+    expect(t.model.requests.map(r => r.disableThinking ?? false)).toEqual([false, true]);
+    expect(reply.tokenUsage).toMatchObject({ inputTokens: 200, outputTokens: 8242 });
+
+    // Only once: a second empty length stop ends the turn as before.
+    t.model.script([lengthStop], [lengthStop]);
+    const id2 = (await u.c.post('/api/v1/ai/conversations', {})).body.id as string;
+    await u.c.post(`/api/v1/ai/conversations/${id2}/messages`, { content: 'Again', stream: false });
+    expect(t.model.requests).toHaveLength(2);
+  });
+});

@@ -35,6 +35,8 @@ export type ChatRequest = {
   temperature?: number;
   /** For reasoning models: how much hidden thinking to do before answering. */
   reasoningEffort?: 'low' | 'medium' | 'high';
+  /** Turn hidden thinking off for this call (used when thinking used up the whole output budget). */
+  disableThinking?: boolean;
   signal?: AbortSignal;
 };
 

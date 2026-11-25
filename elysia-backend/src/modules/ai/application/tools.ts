@@ -314,7 +314,7 @@ export function createTools(
     }),
     ...(webResearch ? [defineTool(
       'research_web',
-      'Ask the web research sub-agent one specific question about news, filings, announcements, or other public-source facts that the market and portfolio tools do not have. It searches and reads public pages with the free research model, then returns a short answer and the URLs it actually read. Use at most once. Do not use it for live prices, indicators, or the user\'s holdings.',
+      'Ask the web research sub-agent one specific question about news, filings, announcements, or other public-source facts that the market and portfolio tools do not have. It searches and reads public pages, then returns a short answer and the URLs it actually read. Use at most once. Do not use it for live prices, indicators, or the user\'s holdings.',
       z.strictObject({ question: z.string().min(3).max(500).describe('One self-contained question, including the asset or event name') }),
       async ({ question }) => {
         if (webResearchCount >= 1) throw new ToolInputError('Web research was already used in this answer.');
@@ -324,7 +324,6 @@ export function createTools(
           return {
             result: {
               ...brief,
-              cost: 0,
               note: 'Cite only these sources. This is public-web research, not a live market quote.',
             },
           };

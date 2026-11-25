@@ -1,4 +1,4 @@
-// Port for Morning Decode script generation. Implementations talk to Gemini or OpenRouter server-side only.
+// Port for Morning Decode script generation. Implementations talk to MiMo, Gemini or OpenRouter server-side only.
 
 export interface BriefScriptLlm {
   readonly name: string;

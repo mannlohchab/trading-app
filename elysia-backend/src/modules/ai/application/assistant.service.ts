@@ -148,9 +148,10 @@ export class AssistantService {
         // Out of tool steps: say so, or the model writes its next call out as text.
         const finalNote: ChatMessage[] = model.supportsTools && !allowTools ? [{ role: 'user', content: FINAL_ROUND_NOTE }] : [];
         let done: { finishReason: string; usage: ModelUsage } | undefined;
+        let thinkingOff = false;
 
         // Try the chain; a model may be skipped only if it failed before producing any output.
-        for (let i = 0; ; i++) {
+        for (;;) {
           const started = Date.now();
           try {
             for await (const event of this.provider(model).stream({
@@ -160,6 +161,7 @@ export class AssistantService {
               maxOutputTokens: model.maxOutputTokens,
               temperature: 0.3,
               ...(model.reasoningEffort && { reasoningEffort: model.reasoningEffort }),
+              ...(thinkingOff && { disableThinking: true }),
               signal: input.signal,
             })) {
               if (event.type === 'text') {
@@ -174,12 +176,23 @@ export class AssistantService {
               }
             }
             await usage.record({ userId: input.userId, conversationId: conversation.id, turnId, provider: model.provider, model: model.id, status: 'SUCCEEDED', usage: done?.usage ?? { inputTokens: 0, outputTokens: 0 }, toolCalls: round.calls.length, latencyMs: Date.now() - started });
+            // Hidden thinking used the whole output budget, so nothing came out: redo this step once
+            // without thinking rather than end the turn with an empty reply.
+            if (done?.finishReason === 'length' && !round.text && !round.calls.length && !markup.removed && !thinkingOff) {
+              this.deps.log?.(`Model ${model.id} spent its output budget thinking; retrying the step without thinking`);
+              thinkingOff = true;
+              total = sumUsage(total, done.usage);
+              done = undefined;
+              round.reasoning = undefined;
+              round.reasoningDetails = undefined;
+              continue;
+            }
             break;
           } catch (error) {
             const cancelled = input.signal?.aborted;
             await usage.record({ userId: input.userId, conversationId: conversation.id, turnId, provider: model.provider, model: model.id, status: cancelled ? 'CANCELLED' : 'FAILED', usage: { inputTokens: 0, outputTokens: 0 }, toolCalls: 0, latencyMs: Date.now() - started, errorCode: error instanceof AiProviderError ? error.code : 'UNEXPECTED' })
               .catch(e => this.deps.log?.('Recording AI usage failed', e));
-            const next = chain[i + 1];
+            const next = chain[chain.indexOf(model) + 1];
             if (!cancelled && error instanceof AiProviderError && error.retryable && next && !round.text && !round.calls.length) {
               this.deps.log?.(`Model ${model.id} failed (${error.code}); falling back to ${next.id}`);
               model = next;

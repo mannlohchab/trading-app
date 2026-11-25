@@ -1,0 +1,23 @@
+[
+  {
+    "model": "mimo-ultraspeed",
+    "task": "rsi-backtest",
+    "pass": true,
+    "problems": [],
+    "ms": 54948,
+    "tools": [
+      "analyze_market",
+      "show_chart",
+      "get_backtesting_capabilities",
+      "draft_strategy",
+      "run_backtest",
+      "suggest_next_steps"
+    ],
+    "errors": [],
+    "nextSteps": true,
+    "finish": "stop",
+    "rounds": 4,
+    "tokens": 150069,
+    "reply": "Here's your **RSI Dip Buy** strategy on BTCUSDT (1h), now drafted and backtesting.\n\n**Current market context:** BTC is at **$73,565**, down ~6.9% recently. RSI(14) is at **23.2 — deep oversold**, which is exactly the kind of dip this strategy looks for. Support sits near **$72,998** and resistance near **$79,499** (visible on the chart below).\n\n---\n\n**How the strategy works:**\n- **Entry (buy):** When the 14-period RSI crosses **above 30** — meaning the dip is losing steam and momentum is turning up from oversold territory.\n- **Exit (sell):** When RSI crosses **above 70** — the recovery has pushed into overbought, time to take profit. Or earlier if a **3% stop loss** or **6% take profit** is hit first.\n- **Position size:** 10% of your balance per trade.\n\nThe idea is simple: buy fear (oversold), sell greed (overbought).\n\n**Backtest details (queued):**\n- **~10,000 hourly candles** (roughly 14 months of data)\n- Starting capital: **10,000 USDT**\n- Commission: 0.1% per side, 1-tick slippage\n\nThe backtest is **running now** — results will appear on the card shortly. RSI strategies tend to work best in ranging/choppy markets and can struggle in strong one-directional trends where oversold stays oversold."
+  }
+]

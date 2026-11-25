@@ -1,4 +1,4 @@
-// A short research loop: free Nemotron decides what to look up, Firecrawl
+// A short research loop: the research model (MiMo, or free Nemotron) decides what to look up, Firecrawl
 // searches and reads public pages, and the model answers only from those pages.
 import { z } from 'zod';
 import { assertPublicHttpUrl } from '../domain/public-url';

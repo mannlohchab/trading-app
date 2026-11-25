@@ -1,6 +1,19 @@
 import type { ModelProfile } from '../application/ports';
 import { FREE_NEMOTRON_MODEL } from '../domain/free-nemotron';
 
+/**
+ * The app's main models (Xiaomi MiMo Token Plan). When a MiMo key is set these are the only chat
+ * models offered: ultraspeed answers ~3x faster than pro, pro and flash are its fallbacks.
+ * Their reasoning counts against maxOutputTokens, hence the larger budget.
+ */
+export const MIMO_MODELS: ModelProfile[] = [
+  { id: 'mimo-ultraspeed', provider: 'mimo', providerModel: 'mimo-v2.6-pro-ultraspeed', label: 'MiMo Pro Ultraspeed', supportsTools: true, contextWindow: 128_000, maxOutputTokens: 8192, reasoningEffort: 'low' },
+  { id: 'mimo-pro', provider: 'mimo', providerModel: 'mimo-v2.6-pro', label: 'MiMo Pro', supportsTools: true, contextWindow: 128_000, maxOutputTokens: 8192, reasoningEffort: 'low' },
+  { id: 'mimo-flash', provider: 'mimo', providerModel: 'mimo-v2.6-flash', label: 'MiMo Flash', supportsTools: true, contextWindow: 128_000, maxOutputTokens: 4096, reasoningEffort: 'low' },
+];
+export const MIMO_DEFAULT_MODEL = 'mimo-ultraspeed';
+export const MIMO_FALLBACK_MODELS = ['mimo-pro', 'mimo-flash'];
+
 /** Default chat model. OpenRouter's free Nemotron endpoint; the provider refuses any other id. */
 export const NEMOTRON_FREE_MODEL: ModelProfile = {
   id: 'nemotron-free',

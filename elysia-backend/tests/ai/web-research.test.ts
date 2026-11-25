@@ -191,7 +191,7 @@ describe('research_web tool', () => {
     });
     const tool = tools.find(item => item.spec.name === 'research_web')!;
     const outcome = await tool.run({ question: 'What did the exchange announce?' });
-    expect(outcome.result).toMatchObject({ cost: 0, model: FREE_NEMOTRON_MODEL, answer: 'A notice was published.' });
+    expect(outcome.result).toMatchObject({ model: FREE_NEMOTRON_MODEL, answer: 'A notice was published.' });
     await expect(tool.run({ question: 'What else was announced?' })).rejects.toBeInstanceOf(ToolInputError);
   });
 });

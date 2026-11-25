@@ -1,4 +1,5 @@
 import { assertFreeNemotronModel, FREE_NEMOTRON_MODEL } from './modules/ai/domain/free-nemotron';
+import { MIMO_DEFAULT_MODEL, MIMO_FALLBACK_MODELS } from './modules/ai/infrastructure/model-registry';
 
 const env = process.env;
 const isProduction = env.NODE_ENV === 'production';
@@ -12,6 +13,18 @@ function required(name: string, devFallback: string): string {
 const list = (value: string | undefined) => (value ?? '').split(',').map(v => v.trim()).filter(Boolean);
 const pair = <K extends string>(keys: Record<K, string | undefined>) =>
   Object.values(keys).every(Boolean) ? (keys as Record<K, string>) : undefined;
+
+const mimoConfig = (() => {
+  const apiKey = (env.MIMO_API_KEY ?? env.TEXT_API_KEY)?.trim();
+  if (!apiKey) return undefined;
+  return {
+    apiKey,
+    /** Token Plan keys work only on their region's endpoint (sgp, or cn for China keys). */
+    baseUrl: env.MIMO_BASE_URL?.trim() || 'https://token-plan-sgp.xiaomimimo.com/v1',
+    /** For non-chat text (research sub-agent, Morning Decode script). */
+    textModel: env.MIMO_TEXT_MODEL?.trim() || 'mimo-v2.6-pro-ultraspeed',
+  };
+})();
 
 const port = Number(env.PORT ?? 4001);
 const authSecret = required('BETTER_AUTH_SECRET', 'dev-only-better-auth-secret-change-me-0123456789');
@@ -49,14 +62,20 @@ export const config = {
   },
   sms: { provider: smsProvider },
   ai: {
+    /**
+     * Xiaomi MiMo (Token Plan): the app's main model. When the key is set, chat, web research and
+     * the Morning Decode script all use MiMo and no other chat model is offered.
+     * TEXT_API_KEY is accepted as an older name for MIMO_API_KEY.
+     */
+    mimo: mimoConfig,
     cloudflare: pair({ accountId: env.CF_ACCOUNT_ID?.trim(), apiToken: env.CF_API_TOKEN?.trim() }),
-    defaultModel: env.AI_DEFAULT_MODEL?.trim() || 'nemotron-free',
+    defaultModel: mimoConfig ? MIMO_DEFAULT_MODEL : env.AI_DEFAULT_MODEL?.trim() || 'nemotron-free',
     openRouter: (() => {
       const apiKey = env.OPENROUTER_API_KEY?.trim();
       if (!apiKey) return undefined;
       return { apiKey, baseUrl: env.OPENROUTER_BASE_URL?.trim() || undefined };
     })(),
-    fallbackModels: list(env.AI_FALLBACK_MODELS ?? 'llama-4-scout,mistral-small-3.1'),
+    fallbackModels: mimoConfig ? MIMO_FALLBACK_MODELS : list(env.AI_FALLBACK_MODELS ?? 'llama-4-scout,mistral-small-3.1'),
     limits: {
       turnsPerDay: Number(env.AI_DAILY_TURN_LIMIT ?? 50),
       tokensPerDay: Number(env.AI_DAILY_TOKEN_LIMIT ?? 250_000),
@@ -67,14 +86,15 @@ export const config = {
      * TTS: OpenRouter speech model when OPENROUTER_API_KEY is set.
      */
     morningDecode: (() => {
-      const scriptProvider = (env.MORNING_DECODE_SCRIPT_PROVIDER?.trim().toLowerCase() || 'openrouter') as 'gemini' | 'openrouter';
-      if (scriptProvider !== 'gemini' && scriptProvider !== 'openrouter') {
-        throw new Error('MORNING_DECODE_SCRIPT_PROVIDER must be "gemini" or "openrouter"');
+      const scriptProvider = (mimoConfig ? 'mimo' : env.MORNING_DECODE_SCRIPT_PROVIDER?.trim().toLowerCase() || 'openrouter') as 'mimo' | 'gemini' | 'openrouter';
+      if (scriptProvider !== 'mimo' && scriptProvider !== 'gemini' && scriptProvider !== 'openrouter') {
+        throw new Error('MORNING_DECODE_SCRIPT_PROVIDER must be "gemini" or "openrouter" (MiMo is used automatically when MIMO_API_KEY is set)');
       }
       const geminiKey = env.GEMINI_API_KEY?.trim();
       const openRouterKey = env.OPENROUTER_API_KEY?.trim();
       return {
         scriptProvider,
+        mimo: mimoConfig && { apiKey: mimoConfig.apiKey, baseUrl: mimoConfig.baseUrl, model: mimoConfig.textModel },
         gemini: geminiKey
           ? { apiKey: geminiKey, model: env.GEMINI_MODEL?.trim() || 'gemini-2.0-flash' }
           : undefined,
@@ -94,17 +114,20 @@ export const config = {
      * an OpenRouter key are set. The model is rejected unless it is a free Nemotron id.
      */
     webResearch: (() => {
+      const firecrawlBaseUrl = env.FIRECRAWL_API_URL?.trim();
+      if (!firecrawlBaseUrl) return undefined;
+      const crawler = { firecrawlBaseUrl: firecrawlBaseUrl.replace(/\/$/, ''), firecrawlApiKey: env.FIRECRAWL_API_KEY?.trim() || undefined };
+      if (mimoConfig) {
+        return { ...crawler, model: { provider: 'mimo' as const, apiKey: mimoConfig.apiKey, baseUrl: mimoConfig.baseUrl, model: mimoConfig.textModel } };
+      }
+      // Without MiMo: free Nemotron only, so the sub-agent cannot spend OpenRouter credits.
       const requested = env.RESEARCH_MODEL?.trim();
       if (requested) assertFreeNemotronModel(requested);
-      const firecrawlBaseUrl = env.FIRECRAWL_API_URL?.trim();
       const openRouterApiKey = env.OPENROUTER_API_KEY?.trim();
-      if (!firecrawlBaseUrl || !openRouterApiKey) return undefined;
+      if (!openRouterApiKey) return undefined;
       return {
-        openRouterApiKey,
-        model: assertFreeNemotronModel(requested || FREE_NEMOTRON_MODEL),
-        openRouterBaseUrl: env.OPENROUTER_BASE_URL?.trim() || undefined,
-        firecrawlBaseUrl: firecrawlBaseUrl.replace(/\/$/, ''),
-        firecrawlApiKey: env.FIRECRAWL_API_KEY?.trim() || undefined,
+        ...crawler,
+        model: { provider: 'openrouter' as const, apiKey: openRouterApiKey, baseUrl: env.OPENROUTER_BASE_URL?.trim() || undefined, model: assertFreeNemotronModel(requested || FREE_NEMOTRON_MODEL) },
       };
     })(),
   },

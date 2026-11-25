@@ -24,18 +24,21 @@ import { OpenRouterScriptLlm } from './infrastructure/openrouter-script';
 import { OpenRouterTts } from './infrastructure/openrouter-tts';
 import { FirecrawlClient } from './infrastructure/firecrawl-client';
 import { WebResearchAgent } from './application/web-research-agent';
+import { MimoResearchModel, MimoScriptLlm } from './infrastructure/mimo';
 import { userSnapshotSource } from './infrastructure/user-snapshot';
 import { DrizzleMemoryRepository } from './infrastructure/drizzle-memory.repository';
 import { createMemoryTools } from './application/memory-tools';
 
 export type { ChatModelProvider, ChatRequest, ChatStreamEvent, ModelProfile } from './application/ports';
 export { AiProviderError } from './application/errors';
-export { NEMOTRON_FREE_MODEL, WORKERS_AI_MODELS } from './infrastructure/model-registry';
+export { MIMO_DEFAULT_MODEL, MIMO_FALLBACK_MODELS, MIMO_MODELS, NEMOTRON_FREE_MODEL, WORKERS_AI_MODELS } from './infrastructure/model-registry';
+export { MIMO_DEFAULT_BASE_URL, MimoChatProvider, MimoResearchModel, MimoScriptLlm } from './infrastructure/mimo';
 export { OpenRouterChatProvider } from './infrastructure/openrouter-chat';
 export { WorkersAiProvider } from './infrastructure/workers-ai.provider';
 
 export type MorningDecodeConfig = {
-  scriptProvider: 'gemini' | 'openrouter';
+  scriptProvider: 'mimo' | 'gemini' | 'openrouter';
+  mimo?: { apiKey: string; baseUrl?: string; model: string };
   gemini?: { apiKey: string; model: string };
   openRouter?: { apiKey: string; scriptModel: string; ttsModel: string; voice: string };
 };
@@ -60,13 +63,13 @@ export function createAiModule(deps: {
   /** Morning Decode script + TTS providers (Gemini / OpenRouter). */
   morningDecode?: MorningDecodeConfig;
   /**
-   * Web research sub-agent. The model id must already be a free Nemotron `:free` id.
-   * Firecrawl is the self-hosted crawler; it is not given an LLM key.
+   * Web research sub-agent: MiMo when configured, otherwise free Nemotron on OpenRouter (whose id
+   * must already be a `:free` Nemotron id). Firecrawl is the self-hosted crawler; it gets no LLM key.
    */
   webResearch?: {
-    openRouterApiKey: string;
-    model: string;
-    openRouterBaseUrl?: string;
+    model:
+      | { provider: 'mimo'; apiKey: string; baseUrl?: string; model: string }
+      | { provider: 'openrouter'; apiKey: string; baseUrl?: string; model: string };
     firecrawlBaseUrl: string;
     firecrawlApiKey?: string;
   };
@@ -84,11 +87,9 @@ export function createAiModule(deps: {
   const clock = deps.clock ?? { now: () => new Date() };
   const webResearch = deps.webResearch
     ? new WebResearchAgent({
-      model: new OpenRouterResearchModel({
-        apiKey: deps.webResearch.openRouterApiKey,
-        model: deps.webResearch.model,
-        ...(deps.webResearch.openRouterBaseUrl && { baseUrl: deps.webResearch.openRouterBaseUrl }),
-      }),
+      model: deps.webResearch.model.provider === 'mimo'
+        ? new MimoResearchModel({ apiKey: deps.webResearch.model.apiKey, model: deps.webResearch.model.model, ...(deps.webResearch.model.baseUrl && { baseUrl: deps.webResearch.model.baseUrl }) })
+        : new OpenRouterResearchModel({ apiKey: deps.webResearch.model.apiKey, model: deps.webResearch.model.model, ...(deps.webResearch.model.baseUrl && { baseUrl: deps.webResearch.model.baseUrl }) }),
       crawler: new FirecrawlClient({
         baseUrl: deps.webResearch.firecrawlBaseUrl,
         ...(deps.webResearch.firecrawlApiKey && { apiKey: deps.webResearch.firecrawlApiKey }),
@@ -131,7 +132,9 @@ export function createAiModule(deps: {
   const conversations = new ConversationService({ conversations: conversationsRepo, strategies });
 
   const md = deps.morningDecode;
-  const script = md?.scriptProvider === 'openrouter' && md.openRouter
+  const script = md?.scriptProvider === 'mimo' && md.mimo
+    ? new MimoScriptLlm({ apiKey: md.mimo.apiKey, model: md.mimo.model, ...(md.mimo.baseUrl && { baseUrl: md.mimo.baseUrl }) })
+    : md?.scriptProvider === 'openrouter' && md.openRouter
     ? new OpenRouterScriptLlm({ apiKey: md.openRouter.apiKey, model: md.openRouter.scriptModel })
     : md?.gemini
       ? new GeminiScriptLlm({ apiKey: md.gemini.apiKey, model: md.gemini.model })
