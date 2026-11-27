@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Söhne";
+  src: local("Söhne"), local("Sohne"), local("Soehne"), local("Söhne Buch"),
+    local("Sohne Buch");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Söhne";
+  src: local("Söhne Kräftig"), local("Sohne Kraftig"), local("Söhne Medium"),
+    local("Sohne Medium");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Söhne";
+  src: local("Söhne Halbfett"), local("Sohne Halbfett"), local("Söhne Semibold"),
+    local("Sohne Semibold");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Söhne";
+  src: local("Söhne Dreiviertelfett"), local("Sohne Dreiviertelfett"),
+    local("Söhne Bold"), local("Sohne Bold");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "Söhne", "Sohne", "Soehne", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Söhne", "Sohne", "Soehne", ui-sans-serif, system-ui, sans-serif;
+
+  /* Exchange chrome — TradingView dark */
+  --color-ex-bg: #000000;
+  --color-ex-panel: #000000;
+  --color-ex-panel-2: #1e222d;
+  --color-ex-border: #1e222d;
+  --color-ex-border-strong: #2a2e39;
+  --color-ex-text: #d1d4dc;
+  --color-ex-muted: #787b86;
+  --color-ex-up: #089981;
+  --color-ex-down: #f23645;
+  --color-ex-accent: #f07d00;
+  --color-ex-buy: #2962ff;
+  --color-ex-up-dim: #0e2e28;
+  --color-ex-down-dim: #3d1f24;
+
+  /* Actions on dark chrome */
+  --color-ex-slate: #d1d4dc;
+  --color-ex-slate-hover: #ffffff;
+  --color-ex-slate-soft: #363a45;
+  --color-ex-slate-muted: #787b86;
+
+  /* Chart pane — near-black TradingView */
+  --color-chart-bg: #000000;
+  --color-chart-panel: #000000;
+  --color-chart-border: #1e222d;
+  --color-chart-text: #d1d4dc;
+  --color-chart-muted: #787b86;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  color-scheme: dark;
+  @apply bg-ex-bg text-ex-text font-sans antialiased;
+  font-size: 13px;
+}
+
+#root,
+body > div {
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #363a45;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

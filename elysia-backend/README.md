@@ -230,6 +230,7 @@ Flow: sign in with Google, Apple or email → the user is `PENDING_PHONE_VERIFIC
 - Rate limits (per client IP): sign-in 10/min, sign-up 5/min, send-otp 3/min, verify 10/min. Set `TRUSTED_PROXY_IP_HEADER` when deployed behind a proxy, or all traffic shares one IP.
 - Phone-number login and phone password reset are disabled.
 - **Mobile app:** `@better-auth/expo` stores the session cookie in SecureStore and sends it as a `Cookie` header (also on the market WebSocket). Its origin, `tradinggurukul://`, must be in `AUTH_TRUSTED_ORIGINS`. Outside production, Expo Go's `exp://` origins are trusted automatically.
+- **Trading terminal (`../frontend/webapp`):** a same-origin web client. The Vite dev proxy, or nginx in its image, forwards `/api` (including the market WebSocket) here, so the browser sends the session cookie itself. Its origin must be in `AUTH_TRUSTED_ORIGINS`: `http://localhost:5173` in dev, the site's public origin in production.
 
 ## Profile & preferences (`modules/profiles`)
 
