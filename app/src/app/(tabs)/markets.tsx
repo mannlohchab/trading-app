@@ -148,7 +148,6 @@ export default function MarketsScreen() {
     : 'Crypto,\nat a glance';
   const pillLabel = (q: QuoteLike) => marketAssets(q.symbol, q.exchange)?.[0] ?? q.symbol;
   const shortcuts: { label: string; icon?: GlassIconName; art?: number; onPress: () => void }[] = [
-    { label: 'Search', icon: 'add', onPress: () => setSearchOpen(true) },
     { label: 'Markets', art: require('@/assets/images/home-markets.png'), onPress: () => router.push('/(tabs)/market') },
     { label: 'Calendar', art: require('@/assets/images/home-calendar.png'), onPress: () => router.push('/(tabs)/calendar') },
     { label: 'Community', art: require('@/assets/images/home-community.png'), onPress: () => router.push('/(tabs)/community') },

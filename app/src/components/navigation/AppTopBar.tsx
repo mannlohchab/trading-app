@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/AppText';
 import { GlassIcon } from '@/components/ui/GlassIcon';
 import { makeStyles } from '@/hooks/use-theme';
 
-const LOGO = { uri: 'https://i.pinimg.com/736x/b7/4a/b3/b74ab3b922824a6ccc26837cb6f4498b.jpg' };
+const LOGO = require('@/assets/images/brand-pyramid.png');
 
 type Props = {
   /** Brand tap. Defaults to opening Home; Home itself uses it to leave the market directory. */
@@ -61,7 +61,7 @@ const useStyles = makeStyles((Palette, _InsightPalette, scheme) => ({
     backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.border,
   },
   portfolioPill: {
-    borderWidth: 1, borderColor: Palette.accent, backgroundColor: Palette.card,
+    borderWidth: 1, borderColor: Palette.purple, backgroundColor: Palette.card,
     borderRadius: 20, paddingHorizontal: 16, minHeight: 36, justifyContent: 'center',
   },
   portfolioText: { color: Palette.text, fontWeight: '500', fontSize: 11 },
