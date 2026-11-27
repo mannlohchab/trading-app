@@ -1,12 +1,12 @@
 import { and, asc, desc, eq, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { conversations, messages } from '../../../db/schema';
 import type { AppDatabase } from '../../../db/types';
-import { historyContent } from '../domain/tool-context';
+import { historyReferences, stripReferenceEcho } from '../domain/tool-context';
 import type { Conversation, ConversationRepository, MessageMetadata, StoredMessage } from '../application/ports';
 
 type MessageRow = typeof messages.$inferSelect;
 const toMessage = (r: MessageRow): StoredMessage => ({
-  id: r.id, conversationId: r.conversationId, role: r.role, content: r.content, metadata: r.metadata as MessageMetadata,
+  id: r.id, conversationId: r.conversationId, role: r.role, content: r.role === 'ASSISTANT' ? stripReferenceEcho(r.content) : r.content, metadata: r.metadata as MessageMetadata,
   modelProvider: r.modelProvider, modelName: r.modelName, tokenUsage: r.tokenUsage, createdAt: r.createdAt,
 });
 const toConversation = (r: typeof conversations.$inferSelect): Conversation => ({
@@ -63,7 +63,11 @@ export class DrizzleConversationRepository implements ConversationRepository {
       .where(and(eq(messages.conversationId, conversationId), inArray(messages.role, ['USER', 'ASSISTANT'])))
       .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(limit);
-    return rows.reverse().map(row => ({ role: row.role as 'USER' | 'ASSISTANT', content: row.role === 'ASSISTANT' ? historyContent(row.content, row.metadata as MessageMetadata) : row.content })).filter(row => row.content.length > 0);
+    return rows.reverse().map(row => row.role === 'ASSISTANT'
+      ? { role: 'ASSISTANT' as const, content: stripReferenceEcho(row.content), references: historyReferences(row.metadata as MessageMetadata) }
+      : { role: 'USER' as const, content: row.content })
+      // Card-only replies stay for their references; the service sends only messages with text.
+      .filter(row => row.content.length > 0 || row.references?.length);
   }
 
   async addMessage(input: Parameters<ConversationRepository['addMessage']>[0]) {

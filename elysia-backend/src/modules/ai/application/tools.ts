@@ -198,7 +198,7 @@ export function createTools(
     ),
     defineTool(
       'draft_strategy',
-      'Propose a complete rule-based trading strategy. The server validates it and shows a card the user can save. Default to LONG with one entry and fixed stops/targets. Explicitly requested SHORT, pyramiding, trailing stops and partial exits are supported for historical backtests, not paper trading. Returns errors for invalid definitions.',
+      'Propose a complete rule-based trading strategy. Call only once you know the user\'s pair, timeframe, what the strategy should do and their risk limit (from the user, or because they asked you to choose); otherwise ask them first. The server validates it and shows a card the user can save. Default to LONG with one entry and fixed stops/targets. Explicitly requested SHORT, pyramiding, trailing stops and partial exits are supported for historical backtests, not paper trading. Returns errors for invalid definitions.',
       looseDraft,
       async draft => {
         const checked = await strategies.validate(normalizeDraft(draft));

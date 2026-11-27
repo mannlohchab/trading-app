@@ -11,7 +11,8 @@ export const CONVERSATION_LIMITS = {
   maxToolCallsPerRound: 5,
 } as const;
 
-export type HistoryMessage = { role: 'USER' | 'ASSISTANT'; content: string };
+/** `references`: run and strategy ids from an assistant reply's cards (see domain/tool-context). */
+export type HistoryMessage = { role: 'USER' | 'ASSISTANT'; content: string; references?: unknown[] };
 
 /** Title for a new conversation from its first message (no extra model call). */
 export function titleFromMessage(text: string): string {

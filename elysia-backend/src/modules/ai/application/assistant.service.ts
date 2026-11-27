@@ -1,6 +1,6 @@
 // One assistant turn: user message → model ↔ tools loop → structured, persisted reply.
 import { assembleBlocks, type ResponseBlock } from '../domain/blocks';
-import { toolResultContent } from '../domain/tool-context';
+import { renderHistoryReferences, stripReferenceEcho, toolResultContent } from '../domain/tool-context';
 import { CODE_REMOVED_FALLBACK, createCodeFilter } from '../domain/code-filter';
 import { createToolMarkupFilter, stripToolMarkup } from '../domain/tool-markup';
 import { CONVERSATION_LIMITS, selectHistory, titleFromMessage } from '../domain/conversation';
@@ -125,8 +125,12 @@ export class AssistantService {
       ]);
       const tools = this.deps.tools(input.userId);
       const base: ChatMessage[] = [
-        { role: 'system', content: buildSystemPrompt(persona, clock.now(), { webResearch: this.deps.webResearch, userContext: renderTurnContext(snapshot, input.context) }) },
-        ...history.map(m => m.role === 'USER' ? { role: 'user' as const, content: m.content } : { role: 'assistant' as const, content: stripToolMarkup(m.content) }),
+        { role: 'system', content: buildSystemPrompt(persona, clock.now(), {
+          webResearch: this.deps.webResearch,
+          userContext: renderTurnContext(snapshot, input.context),
+          historyReferences: renderHistoryReferences(history.filter(m => m.role === 'ASSISTANT').map(m => m.references ?? [])),
+        }) },
+        ...history.filter(m => m.content).map(m => m.role === 'USER' ? { role: 'user' as const, content: m.content } : { role: 'assistant' as const, content: stripToolMarkup(m.content) }),
         { role: 'user', content },
       ];
       const turn: ChatMessage[] = [];
@@ -250,6 +254,8 @@ export class AssistantService {
       if (codeRemoved && !text.trim()) { text = CODE_REMOVED_FALLBACK; yield { type: 'delta', text }; }
       else if (markupRemoved && !text.trim()) { text = UNFINISHED_FALLBACK; yield { type: 'delta', text }; }
       if (codeRemoved) this.deps.log?.(`Removed code from an assistant reply (conversation ${conversation.id})`);
+      // Internal reference lists must never reach the user; the saved reply replaces the streamed text.
+      text = stripReferenceEcho(text);
       const assistant = await conversations.addMessage({
         id: turnId,
         conversationId: conversation.id,
@@ -266,7 +272,7 @@ export class AssistantService {
       // Leave no orphaned question behind when nothing was answered; the client can resend it.
       if (userMessage && !text && !blocks.length) await conversations.deleteMessage(userMessage.id).catch(e => this.deps.log?.('Cleanup failed', e));
       else if (userMessage && (text || blocks.length)) {
-        const partialText = text.trim() || 'The reply was interrupted. Submitted tasks and observed results are available in the cards below.';
+        const partialText = stripReferenceEcho(text).trim() || 'The reply was interrupted. Submitted tasks and observed results are available in the cards below.';
         await conversations.addMessage({ conversationId: conversation.id, role: 'ASSISTANT', content: partialText, metadata: { blocks: assembleBlocks(partialText, blocks), interrupted: true } })
           .catch(e => this.deps.log?.('Saving a partial reply failed', e));
       }

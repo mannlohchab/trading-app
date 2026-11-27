@@ -17,9 +17,9 @@ export const APP_GUIDE = {
     title: 'Getting around',
     where: [
       'Bottom tabs, left to right: "Home", "Market", "Insights" (this AI assistant), "Calendar", "Community". The tab bar is hidden inside Insights; tap the home icon ("Back to Home") to leave.',
-      'Top bar on Home, Market and Community: "Gurukul" goes Home, the bell opens Profile → Settings, the "Portfolio" pill opens Profile → Overview.',
+      'Top bar on Home, Market and Community: "Gurukul" goes Home, the bell opens Profile → Settings, the "Portfolio" pill opens Profile on its "Portfolio" tab.',
     ],
-    actions: ['Home has shortcuts: "Search", "Markets", "Calendar", "Community", "Portfolio", "AI Insight".'],
+    actions: ['Home has shortcuts: "Markets", "Calendar", "Community", "Portfolio", "AI Insight".'],
     notes: ['The bell is not a notification feed; it opens Settings.'],
   },
   home: {
@@ -63,7 +63,7 @@ export const APP_GUIDE = {
   },
   paper_portfolio: {
     title: 'Paper trading portfolio',
-    where: ['"Portfolio" pill in the top bar, or Home → "Portfolio". It opens Profile; choose the "Portfolio" tab.'],
+    where: ['"Portfolio" pill in the top bar, or Home → "Portfolio". Both open Profile on its "Portfolio" tab.'],
     actions: ['See paper equity, P/L, "Positions" (tap one to open its chart), "Paper orders" (cancel open ones) and "Recent activity".'],
     notes: [
       'This is NOT the holdings table this assistant reviews. Paper positions come from Buy/Sell on charts; holdings are typed in by the user (see holdings).',

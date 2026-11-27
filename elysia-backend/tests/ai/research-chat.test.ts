@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { backtestJobs, paperStrategyInstances } from '../../src/db/schema';
 import { AiProviderError } from '../../src/modules/ai';
-import { historyContent, toolResultContent } from '../../src/modules/ai/domain/tool-context';
+import { historyReferences, renderHistoryReferences, stripReferenceEcho, toolResultContent } from '../../src/modules/ai/domain/tool-context';
 import { QUEUE } from '../../src/modules/backtesting/backtesting.constants';
 import { JobRunner } from '../../src/modules/system/jobs';
 import { createTestApp } from '../helpers/test-app';
@@ -58,7 +58,10 @@ test('chat queues one saved dated run despite duplicate model calls, then expose
   const runner = new JobRunner({ queue: t.backtesting.queue, handlers: [t.backtesting.jobHandler], workerId: 'ai-chat', leaseMs: QUEUE.leaseMs });
   await runner.tick();
   t.model.script(req => {
-    expect(req.messages.filter(m => m.role === 'assistant').some(m => m.content?.includes(runId))).toBe(true);
+    // Earlier cards reach the model through the system prompt, never inside its own reply text.
+    expect(req.messages[0]!.role).toBe('system');
+    expect(req.messages[0]!.content).toContain(runId);
+    expect(req.messages.filter(m => m.role === 'assistant').some(m => m.content?.includes('Application references'))).toBe(false);
     return [call('get_backtest', { id: runId }), done()];
   }, req => {
     const result = JSON.parse(req.messages.at(-1)!.content!);
@@ -131,12 +134,24 @@ test('oversized tool results stay valid JSON and retain status instead of cuttin
 });
 
 test('history retains saved references and unsaved definitions but never replays stale performance', () => {
-  const output = historyContent('Submitted.', { blocks: [
+  const references = historyReferences({ blocks: [
     { type: 'research_run', data: { kind: 'backtest', id: 'run', status: 'PENDING', title: 'EMA', summary: { netProfit: '99999' } } },
     { type: 'strategy_draft', draftId: 'draft-1', draft: { name: 'Draft', definition: definition() }, summary: [] },
   ] });
+  const output = renderHistoryReferences([references, []]).join('\n');
   expect(output).toContain('"id":"run"');
   expect(output).toContain('unsaved_strategy');
   expect(output).toContain('CROSSES_ABOVE');
+  expect(output).toContain('2 replies ago');
   expect(output).not.toContain('99999');
+});
+
+test('a reference footer copied into a reply is removed, leaving the answer intact', () => {
+  const footer = '[Application references from this message; fetch current state with tools. Unsaved draft identifiers do not persist across turns.]\n'
+    + '[{"kind":"backtest","id":"97ae","observedStatus":"COMPLETED"},{"kind":"strategy","strategyId":"231a","name":"BTC [15m] \\"Pullback\\""}]';
+  const answer = 'Want me to draft an improved version with a trend filter and backtest it?';
+  expect(stripReferenceEcho(`${answer}\n\n${footer}`)).toBe(answer);
+  expect(stripReferenceEcho(`${answer}\n\n${footer}\n\nMore text.`)).toBe(`${answer}\n\nMore text.`);
+  expect(stripReferenceEcho(`${answer}\n\n[Application references from this message; fetch`)).toBe(answer);
+  expect(stripReferenceEcho('Plain [brackets] stay.')).toBe('Plain [brackets] stay.');
 });

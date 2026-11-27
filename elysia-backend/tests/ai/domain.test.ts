@@ -39,6 +39,16 @@ test('the system prompt reflects the user\'s AI preferences', () => {
   expect(p).toContain('Never invent');
 });
 
+test('the system prompt makes the assistant clarify before proposing a strategy and stay on topic', () => {
+  const p = buildSystemPrompt({ responseStyle: 'BALANCED', explanationLevel: 'BEGINNER', language: null, timezone: 'UTC' }, new Date('2026-11-27T08:00:00Z'));
+  expect(p).toContain('Do not propose a strategy until you understand what the user wants');
+  expect(p).toContain('ask before doing anything else');
+  expect(p).toContain('Never present an assumption as something the user said');
+  expect(p).toContain('no backtesting, live testing, paper trading');
+  // The old "pick a default and proceed" rule pushed the agent to answer before understanding the request.
+  expect(p).not.toContain('pick the default');
+});
+
 test('blocks: text first, data cards, drafts, disclaimer last', () => {
   const blocks = assembleBlocks(' Hello ', [
     { type: 'strategy_draft', draftId: 'd1', draft: {}, summary: [] },

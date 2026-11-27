@@ -1,7 +1,14 @@
 import type { MessageMetadata } from '../application/ports';
 
-/** Preserve stable run references between turns without replaying large charts or stale metrics. */
-export function historyContent(content: string, metadata: MessageMetadata | null | undefined): string {
+const REFERENCES_MARKER = '[Application references';
+
+/**
+ * Stable run references from one assistant reply (backtests, research runs, strategies), so a later
+ * turn can resolve "that backtest" without replaying large charts or stale metrics. Newest kept first
+ * within a size budget. These go to the model in the system prompt, never inside the reply text:
+ * replies that "ended" with a reference footer taught the model to write that footer to the user.
+ */
+export function historyReferences(metadata: MessageMetadata | null | undefined): unknown[] {
   const references: unknown[] = [];
   for (const block of (metadata?.blocks ?? []).slice(-12)) {
     if (block.type === 'research_run') references.push({ kind: block.data.kind, id: block.data.id, observedStatus: block.data.status });
@@ -10,7 +17,6 @@ export function historyContent(content: string, metadata: MessageMetadata | null
       ? { kind: 'strategy', strategyId: block.savedStrategyId }
       : { kind: 'unsaved_strategy', draft: block.draft });
   }
-  if (!references.length) return content;
   // Full definitions are small and bounded by the strategy schema; retain newest references first.
   const kept: unknown[] = [];
   let size = 0;
@@ -19,7 +25,56 @@ export function historyContent(content: string, metadata: MessageMetadata | null
     if (encoded.length + size > 7000) continue;
     size += encoded.length; kept.unshift(item);
   }
-  return kept.length ? `${content}\n\n[Application references from this message; fetch current state with tools. Unsaved draft identifiers do not persist across turns.]\n${JSON.stringify(kept)}` : content;
+  return kept;
+}
+
+/** System-prompt lines for the references of earlier replies (oldest first), within a size budget. */
+export function renderHistoryReferences(perReply: unknown[][], maxChars = 12_000): string[] {
+  const lines: string[] = [];
+  let size = 0;
+  for (let i = perReply.length - 1; i >= 0; i--) {
+    if (!perReply[i]!.length) continue;
+    const ago = perReply.length - i;
+    const line = `- Your reply ${ago === 1 ? 'just before this message' : `${ago} replies ago`}: ${JSON.stringify(perReply[i])}`;
+    if (size + line.length > maxChars) break;
+    size += line.length; lines.unshift(line);
+  }
+  return lines;
+}
+
+/** End index (exclusive) of the JSON array or object starting at `start`, or -1 if it never closes. */
+function jsonEnd(text: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i]!;
+    if (inString) { if (c === '\\') i++; else if (c === '"') inString = false; continue; }
+    if (c === '"') inString = true;
+    else if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') { if (--depth === 0) return i + 1; }
+  }
+  return -1;
+}
+
+/**
+ * Removes the internal reference footer ("[Application references …]" plus its JSON) from reply
+ * text. Replies saved before references moved to the system prompt carry it, and a model may still
+ * copy it from them.
+ */
+export function stripReferenceEcho(text: string): string {
+  let out = text;
+  for (let at = out.indexOf(REFERENCES_MARKER); at !== -1; at = out.indexOf(REFERENCES_MARKER, at)) {
+    const close = out.indexOf(']', at);
+    if (close === -1) { out = out.slice(0, at); break; }
+    let end = close + 1;
+    const next = out.slice(end).search(/\S/);
+    if (next !== -1 && (out[end + next] === '[' || out[end + next] === '{')) {
+      const jsonClose = jsonEnd(out, end + next);
+      end = jsonClose === -1 ? out.length : jsonClose;
+    }
+    out = out.slice(0, at) + out.slice(end);
+  }
+  return out === text ? text : out.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** Tool messages must remain parseable JSON when a report exceeds the model context budget. */
